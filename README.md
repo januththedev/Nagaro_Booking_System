@@ -97,6 +97,23 @@ data/          the SQLite database (created at runtime, not committed)
 | `SECURITY_REVIEW.md` | Security findings and their resolution |
 | `docs/UX_GUIDE.md` | Palette, contrast ratios, breakpoints, client-side feature contracts |
 | `IMPLEMENTATION_REPORT.md` | What was delivered, how it was verified, what remains |
+| `USER_STORIES.md` | User stories by epic and role, with priority and implementation status |
+| `ACCEPTANCE_CRITERIA.md` | Measurable, independently testable acceptance criteria (`AC-*`) for every story |
+| `USER_STORY_TRACEABILITY.md` | Per-criterion story → implementation → test matrix, evidence-graded |
+| `REQUIREMENTS_IMPLEMENTATION_REPORT.md` | Summary of completed, partial, unverified and unimplemented requirements |
+| `FINAL_READINESS_REPORT.md` | Release-readiness verdict and the local demo boundary |
+| `PRESENTATION.md` | 10-slide presentation outline, speaker script and demo run-sheet |
+| `presentation/slides.html` | Self-contained 10-slide deck (screenshots in `presentation/assets/`) |
+
+## Project status
+
+**Locally demo-ready; not deployed.** The runtime uses a local SQLite file and a
+local uploads folder, and there is no serverless entry point. No production
+deployment and no live email delivery have been performed. The requirement
+documents distinguish *requirements* (intended behaviour), *implementation
+status* (what exists in code), *test evidence* (what has actually been verified)
+and *deployment status* (where it actually runs) — see `USER_STORIES.md` Epics 1–9
+for the demo scope and Epic 10 for the production boundary.
 
 ## Configuration
 

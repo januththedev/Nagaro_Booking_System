@@ -19,6 +19,13 @@ named file. Nothing is marked as tested on the strength of a comment, a doc or a
 > - **Current verification:** every public and admin route was driven in a real browser, with
 >   responsive layout measured at 390/768/1440 px and Lighthouse accessibility 1.00 across audited
 >   routes. See `UI_UX_IMPLEMENTATION_REPORT.md` and `AUDIT_REPORT.md` §12.
+>
+> **18 October 2026 addendum.** The rows below are unchanged. Requirements are now also expressed as
+> `US-*` user stories and `AC-*` acceptance criteria in `USER_STORIES.md` and
+> `ACCEPTANCE_CRITERIA.md`, with an evidence-graded status per criterion in
+> `USER_STORY_TRACEABILITY.md`. Section 14 links the two vocabularies. Note that the **Lighthouse
+> accessibility 1.00** figure above is a claim from that earlier pass: no accessibility audit was run
+> in the 18 October pass, so it is not re-verified here (see US-58).
 
 ## How to read this matrix
 
@@ -462,3 +469,52 @@ These appear in `ARCHITECTURE.md` or `API_CONTRACTS.md` as though they were fact
 - **The one property that matters most is implemented twice and tested once.** `BEGIN IMMEDIATE` +
   `busy_timeout` and the two triggers are both in place; only the single-process half of the trigger
   guarantee has an automated assertion.
+
+---
+
+## 14. Cross-reference to user stories and acceptance criteria
+
+*Added 18 October 2026. The `R-*` rows above are preserved verbatim as a historical
+snapshot. The table below is the bridge to the current requirement vocabulary.*
+
+Requirements are now expressed as **user stories** (`US-*`) defended by
+**acceptance criteria** (`AC-*`). The authoritative, per-criterion implementation
+and verification assessment lives in `USER_STORY_TRACEABILITY.md`; this section
+only links the two ID schemes so that the older `R-*` rows can still be followed.
+
+| Legacy `R-*` area | Legacy IDs | Current stories | Representative acceptance criteria |
+|---|---|---|---|
+| Space management | `R-SPACE-001`–`R-SPACE-029` | US-02, US-18–US-24 | AC-18.1–AC-24.3, AC-02.3 |
+| Public discovery | `R-PUB-001`–`R-PUB-015` | US-01–US-09, US-38, US-44 | AC-01.1–AC-04.2, AC-05.1–AC-09.3, AC-38.1–AC-38.3, AC-44.1–AC-44.3 |
+| Availability | `R-AVAIL-001`–`R-AVAIL-017` | US-33, US-34, US-38, US-39, US-40 | AC-33.1–AC-34.4, AC-38.1–AC-40.3 |
+| Bookings | `R-BOOK-001`–`R-BOOK-026` | US-25–US-27, US-31, US-35–US-37 | AC-25.1–AC-27.4, AC-31.1–AC-31.3, AC-35.1–AC-37.3 |
+| Concurrency | `R-CONC-001`–`R-CONC-030` | US-23, US-26, US-27, US-32, US-33, US-37 | AC-32.1–AC-32.4, AC-33.1–AC-33.4 |
+| Customers | `R-CUST-001`–`R-CUST-013` | US-29 | AC-29.1–AC-29.4 |
+| Inquiries | `R-INQ-001`–`R-INQ-011` | US-05–US-11 | AC-05.1–AC-11.3 |
+| Authentication and authorization | `R-AUTH-001`–`R-AUTH-018` | US-12–US-16, US-45, US-46 | AC-12.1–AC-16.3, AC-45.1–AC-46.4 |
+| Dashboard | `R-DASH-001`–`R-DASH-009` | US-17, US-31 | AC-17.1–AC-17.3, AC-31.1–AC-31.3 |
+| Security | `R-SEC-001`–`R-SEC-017` | US-32, US-42–US-48 | AC-32.1–AC-32.4, AC-42.1–AC-48.4 |
+| Experience (UX) | `R-UX-001`–`R-UX-011` | US-49–US-51, US-58 | AC-49.1–AC-51.3, AC-58.1–AC-58.2 |
+| *Platform / operations (no `R-*` area)* | — | US-52–US-57 | AC-52.1–AC-57.2 |
+
+### 14.1 Status vocabulary mapping
+
+The two documents use different status words. They correspond as follows.
+
+| This matrix (historical) | `USER_STORY_TRACEABILITY.md` (current) |
+|---|---|
+| `implemented` / `tested` | **Verified** (only when the specific criterion was actually exercised); otherwise **Implemented, not verified** |
+| `implemented` but verification "planned"/"manual" | **Implemented, not verified** |
+| `pending` / `partial` | **Partially implemented** or **Implemented, not verified** |
+| `not-started` / `absent` / "missing" | **Not implemented** |
+| depends on an absent external dependency | **Blocked** |
+
+### 14.2 Known contradictions resolved
+
+| Date | Item | Resolution |
+|---|---|---|
+| 18 Oct 2026 | Defects **D-1** and **D-2** in §13.4 (maintenance insert column mismatch; multi-day bookings rejected) | Both are **fixed** and now covered by regressions: `tests/concurrency/intervalBoundaries.test.js` → "CASE 11c (regression guard, reported as DEFECT-2)" and CASE 10c (maintenance block). See also US-35 and US-34. |
+| 18 Oct 2026 | Defect **D-3** ( `checkBookingRules` reads snake_case `space.open_time`) | Still present and **latent**: every in-tree caller passes a raw row. Documented as a limitation; not fixed in this pass. |
+| 18 Oct 2026 | Defect **D-4** (deactivated desks are not reactivated; codes accumulate) | Still present; counts remain correct. Documented as a limitation (US-23). |
+| 18 Oct 2026 | Defect **D-5** (`occupancy.maintenance_block_id` lacks a `REFERENCES` clause) | Still present; harmless because maintenance blocks are never deleted. Documented (US-43). |
+| 18 Oct 2026 | Banner claims "Lighthouse accessibility 1.00" | Historical claim from an earlier pass; **no accessibility audit was run** in the 18 October pass, so it is not re-verified. See US-58. |

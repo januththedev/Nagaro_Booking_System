@@ -228,3 +228,44 @@ ledger and half-open-interval expectations were corrected to match the corrected
 - **Tooling:** `package.json` (test globs, `test:e2e`).
 
 No Supabase migration, no Vercel Blob work, no payments and no deployment were performed or required.
+
+---
+
+## 12. Addendum — layout and readability fixes (readiness pass, 2026-10-18)
+
+Two visual defects survived the Phase 2 pass and were found during the readiness verification.
+Both are recorded in `FINAL_READINESS_REPORT.md §3`; the essentials:
+
+### 12.1 `.detail-list` value column collapsed to one character per line
+
+The responsive two-column rule was `grid-template-columns: minmax(10rem, 14rem) 1fr`. A non-`fr`
+track grows to its maximum before the `1fr` track is resolved, so inside any narrow card the value
+column collapsed to roughly one character and was clipped by the list's `overflow: hidden`. This
+affected the public venue sidebar, the booking-request preview and the admin detail panels.
+
+Fixed at the root in `src/web/public/styles.css`:
+
+```css
+.detail-list { grid-template-columns: minmax(0, min(10rem, 40%)) minmax(0, 1fr); }
+```
+
+The label column is now capped relative to its container and both tracks have a zero minimum.
+After the fix every value box measured 87–318 px with no overflow. Guarded by
+`tests/unit/detailListLayout.test.js`, which was verified to fail against the old rule.
+
+### 12.2 Admin data tables shredded names mid-word
+
+`.data-table` cells used `overflow-wrap: anywhere`, which broke words at arbitrary characters in
+narrow columns (`Acaci / a Train / ing Roo / m`). Changed to `overflow-wrap: break-word`, which
+still breaks unbreakable tokens that would overflow but keeps a column at least one word wide.
+Tables now scroll inside the existing focusable `.table-wrap` (`role="region"`, `tabindex="0"`)
+rather than squeezing columns below legibility. The space column at the 912 px QA viewport went
+from 71 px to 112 px and names now wrap at word boundaries; page-level horizontal overflow remains
+0 at 1440/768/390.
+
+### 12.3 Responsive re-verification after the fixes
+
+15 routes × 1440 / 768 / 390 px = **45 combinations: 0 page overflow, 0 collapsed or clipped
+detail lists.** Note that Phase 2's "0 page-level overflow" measurement was still true — a
+collapsed grid track does not overflow its page — which is exactly why these two defects needed a
+targeted check rather than the page-overflow metric alone.

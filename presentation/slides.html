@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nagaro Space Booking System — Presentation</title>
+<style>
+  :root {
+    --ink: #14201d;
+    --muted: #5d6b66;
+    --paper: #f7f5f0;
+    --surface: #ffffff;
+    --brand: #1d5c4c;
+    --brand-soft: #e4efe9;
+    --accent: #b06a2c;
+    --line: #d8d5cb;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --serif: Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  #deck { position: relative; width: 100%; height: 100vh; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    padding: 4vh 6vw 8vh;
+    background: var(--paper);
+    overflow: auto;
+  }
+  .slide.is-active { display: flex; }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--brand);
+    margin-bottom: 0.6rem;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.8rem, 3.6vw, 3rem);
+    line-height: 1.1;
+    margin: 0 0 0.8rem;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+    line-height: 1.15;
+    margin: 0 0 0.9rem;
+  }
+  h3 { font-size: 1.02rem; margin: 1.1rem 0 0.35rem; }
+  p, li { font-size: clamp(0.95rem, 1.35vw, 1.12rem); }
+  ul { margin: 0.2rem 0 0.6rem; padding-left: 1.15rem; }
+  li { margin-bottom: 0.34rem; }
+  .lede { color: var(--muted); max-width: 62ch; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2.4rem; align-items: start; }
+  .cols--wide { grid-template-columns: 1.15fr 0.85fr; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+  }
+  .callout {
+    background: var(--brand-soft);
+    border-left: 4px solid var(--brand);
+    border-radius: 0 10px 10px 0;
+    padding: 0.85rem 1.1rem;
+    font-weight: 600;
+  }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .shots img {
+    width: 100%; max-height: 36vh; object-fit: cover; object-position: top center;
+    border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  }
+  .shots--three { grid-template-columns: repeat(3, 1fr); }
+  .shots--three img { max-height: 30vh; }
+  table { border-collapse: collapse; width: 100%; font-size: clamp(0.85rem, 1.15vw, 1rem); }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem; }
+  code { background: #eceae3; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.92em; }
+  .meta { display: flex; gap: 1.6rem; flex-wrap: wrap; margin-top: 0.4rem; color: var(--muted); }
+  .meta b { display: block; font-family: var(--serif); font-size: 1.6rem; color: var(--brand); }
+  .notes {
+    margin-top: auto; padding-top: 1rem; border-top: 1px dashed var(--line);
+    color: var(--muted); font-size: 0.92rem;
+  }
+  .notes b { color: var(--brand); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; }
+  footer.hud {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 1rem; font-size: 0.78rem; color: var(--muted);
+    background: linear-gradient(to top, rgba(247,245,240,0.96), rgba(247,245,240,0.6));
+    pointer-events: none;
+  }
+  .brandmark { font-weight: 700; color: var(--brand); }
+  @media print {
+    .slide { display: flex !important; position: relative; height: auto; min-height: 100vh; page-break-after: always; }
+    footer.hud { display: none; }
+    #deck { height: auto; }
+  }
+</style>
+</head>
+<body>
+<div id="deck">
+
+  <!-- 1 -->
+  <section class="slide is-active">
+    <p class="eyebrow">TRACE Expert City · Maradana · Colombo, Sri Lanka</p>
+    <h1>Nagaro Space Booking System</h1>
+    <p class="lede">Space booking &amp; rental management for a meeting-room, auditorium and
+      co-working venue — public discovery, staff-verified confirmation, and a database that
+      makes double booking impossible.</p>
+    <div class="meta">
+      <span><b>5</b> published spaces</span>
+      <span><b>3</b> venue categories</span>
+      <span><b>SLST</b> UTC+05:30</span>
+      <span><b>LKR</b> pricing</span>
+    </div>
+    <div class="shots" style="margin-top:1.4rem">
+      <img src="../artifacts/presentation/screens/01-public-home.jpg" alt="Public home page" />
+      <img src="../artifacts/presentation/screens/06-admin-dashboard.jpg" alt="Admin dashboard" />
+    </div>
+    <div class="notes"><b>Say</b> This replaces the shared spreadsheet the venue used before: no
+      double bookings, no lost inquiries, one shared view of what is free.</div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <p class="eyebrow">The problem</p>
+    <h2>A spreadsheet cannot promise a room only once</h2>
+    <div class="cols">
+      <ul>
+        <li>Bookings held in a <b>shared spreadsheet</b> — no single source of truth</li>
+        <li>Two staff could promise the <b>same room to two clients</b></li>
+        <li>Inquiries arrived by phone, email and walk-in, tracked inconsistently</li>
+        <li>No reliable availability view for the public</li>
+        <li>Turnaround buffers enforced only by memory</li>
+      </ul>
+      <div class="card">
+        <h3>What it cost</h3>
+        <p>A conflict discovered at the door is a client who has to be turned away, a refund to
+          negotiate and a booking lost. Every one of these failures is structural, not personal —
+          and all of them are enforceable by software.</p>
+      </div>
+    </div>
+    <div class="notes"><b>Say</b> The damage is structural. Nothing here is a criticism of the staff;
+      the tool simply could not do the checks they were doing by hand.</div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <p class="eyebrow">The proposed solution</p>
+    <h2>Public discovery. Staff control. Database guarantee.</h2>
+    <div class="cols cols--wide">
+      <div>
+        <ul>
+          <li><b>Public site</b> — browse published spaces, check provisional availability,
+            submit a booking <i>request</i>. No accounts, no payments.</li>
+          <li><b>Staff console</b> — the only place a booking becomes <b>confirmed</b>.</li>
+          <li><b>Maintenance blocks</b>, turnaround buffers and an append-only audit log.</li>
+        </ul>
+        <p class="callout">Defining property: two overlapping confirmed reservations on the same
+          single-capacity resource can <b>never both commit</b> — enforced inside the database,
+          not by the interface.</p>
+      </div>
+      <div class="shots"><img src="../artifacts/presentation/screens/03-public-space-meeting-room.jpg" alt="Space detail" /></div>
+    </div>
+    <div class="notes"><b>Say</b> The split is deliberate: visitors discover and request; staff confirm.
+      Every check a human gets wrong moves into the database where it cannot be forgotten.</div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <p class="eyebrow">User workflow</p>
+    <h2>Browse → check → request → reference</h2>
+    <div class="cols">
+      <div>
+        <ul>
+          <li>Filter by category: meeting/training, auditorium, co-working</li>
+          <li>Capacity, amenities, <b>LKR</b> rate card and hours in <b>SLST</b></li>
+          <li>Availability check is explicitly <b>provisional</b></li>
+          <li>Submitting issues a reference such as <code>INQ-2026-00003</code> and
+            <b>reserves nothing</b></li>
+        </ul>
+        <p class="callout">"This check does not hold the space." — the exact wording a visitor sees.</p>
+      </div>
+      <div class="shots"><img src="../artifacts/presentation/screens/05-public-booking-request.jpg" alt="Booking request form" /></div>
+    </div>
+    <div class="notes"><b>Demonstrate</b> Open /spaces, filter to Auditorium, open a space, check
+      availability, submit a request, show the reference.</div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <p class="eyebrow">Administrator workflow</p>
+    <h2>One console for the whole operation</h2>
+    <div class="cols">
+      <ul>
+        <li><b>Spaces</b> — publish, archive, photographs, amenities, rates</li>
+        <li><b>Inquiries</b> — review requests; see whether email was delivered</li>
+        <li><b>Reservations</b> — confirm, edit, cancel <b>with a mandatory reason</b></li>
+        <li><b>Maintenance</b> — block a space or individual units</li>
+        <li><b>Calendar</b> — hour-by-hour occupancy per space</li>
+        <li><b>Customers</b> — staff-only client records</li>
+        <li><b>Activity log</b> — append-only, written in the same transaction</li>
+      </ul>
+      <div class="shots"><img src="../artifacts/presentation/screens/11-admin-maintenance.jpg" alt="Maintenance" />
+        <img src="../artifacts/presentation/screens/14-admin-activity-log.jpg" alt="Activity log" /></div>
+    </div>
+    <div class="notes"><b>Demonstrate</b> Review an inquiry → create a reservation → attempt an
+      overlapping booking (refused) → cancel with a reason.</div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <p class="eyebrow">Core rules</p>
+    <h2>Rules the system enforces for you</h2>
+    <table>
+      <tr><th>Rule</th><th>How it is guaranteed</th></tr>
+      <tr><td>No double booking</td><td>Occupancy triggers raise <code>DOUBLE_BOOKING_CONFLICT</code> inside a <code>BEGIN IMMEDIATE</code> transaction</td></tr>
+      <tr><td>Maintenance blocks availability</td><td>Blocks are written as occupancy, so they cannot collide with a booking</td></tr>
+      <tr><td>Turnaround buffer</td><td>Enforced server-side between adjacent bookings</td></tr>
+      <tr><td>Opening hours &amp; same-day rule</td><td>Rejected before anything is written</td></tr>
+      <tr><td>Colombo time</td><td>All local maths pinned to <code>Asia/Colombo</code> (UTC+05:30, no DST); storage is UTC epoch-ms</td></tr>
+      <tr><td>Cancellations</td><td>Reason required, kept permanently, inventory released atomically</td></tr>
+    </table>
+    <div class="notes"><b>Say</b> This is the slide an engineer will probe. Availability is re-checked
+      while holding the write lock, and a trigger still rejects any overlap even if some future code
+      path forgot to check.</div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <p class="eyebrow">Interface demonstration</p>
+    <h2>Real screenshots of the running system</h2>
+    <div class="shots">
+      <img src="../artifacts/presentation/screens/01-public-home.jpg" alt="Home" />
+      <img src="../artifacts/presentation/screens/03-public-space-meeting-room.jpg" alt="Space detail" />
+      <img src="../artifacts/presentation/screens/07-admin-reservations.jpg" alt="Reservations" />
+      <img src="../artifacts/presentation/screens/09-admin-calendar.jpg" alt="Calendar" />
+    </div>
+    <p class="lede" style="margin-top:0.8rem">Measured at 1440 / 768 / 390 px: 15 routes × 3 widths,
+      zero horizontal overflow, zero layout defects.</p>
+    <div class="notes"><b>Say</b> These are captures of the running app taken during this verification
+      pass — not mock-ups. The public site is server-rendered and small; the console is a dense
+      operations tool; both are fully responsive.</div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <p class="eyebrow">Technical architecture</p>
+    <h2>Deliberately boring, on purpose</h2>
+    <div class="cols">
+      <ul>
+        <li><b>Runtime:</b> Node.js 22.5+ with built-in <code>node:sqlite</code>; no native modules, no build step</li>
+        <li><b>HTTP:</b> custom router on <code>node:http</code>; server-rendered HTML; one small vanilla-JS layer (no SPA, no bundler)</li>
+        <li><b>Data:</b> SQLite with <code>BEGIN IMMEDIATE</code>, foreign keys ON, partial unique indexes, anti-overlap triggers</li>
+      </ul>
+      <ul>
+        <li><b>Security:</b> signed session cookies, CSRF on every mutating form, parameterised SQL, strict CSP, rate limiting, inert media, hashed IPs</li>
+        <li><b>Email:</b> optional SMTP; reports <code>NOT_CONFIGURED</code> honestly when unset</li>
+      </ul>
+    </div>
+    <div class="notes"><b>Say</b> The one hard guarantee is pushed down into the database where it
+      cannot be bypassed. That is also why the whole thing starts in seconds anywhere.</div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <p class="eyebrow">Testing &amp; verification</p>
+    <h2>What was actually run</h2>
+    <table>
+      <tr><th>Check</th><th>Result</th></tr>
+      <tr><td><code>npm test</code> — unit &amp; integration</td><td><b>192 passed, 0 failed</b></td></tr>
+      <tr><td><code>npm run test:concurrency</code></td><td><b>37 passed, 0 failed</b></td></tr>
+      <tr><td><code>npm run test:e2e</code> — real forms, CSRF, upload</td><td><b>63 passed, 0 failed</b></td></tr>
+      <tr><td>Browser workflow pass (request → confirm → overlap → cancel → maintenance)</td><td><b>Passed</b></td></tr>
+      <tr><td>Responsive sweep — 15 routes × 1440/768/390</td><td><b>0 overflow, 0 defects</b></td></tr>
+      <tr><td>Time-zone independence (4 host zones incl. UTC+14)</td><td><b>Passed</b></td></tr>
+    </table>
+    <p class="lede" style="margin-top:0.7rem">No deployment and no live-email claim is made here,
+      because neither was performed.</p>
+    <div class="notes"><b>Say</b> Everything on this slide was executed in this environment, not copied
+      from an earlier report. Where a workflow was driven in a real browser I say browser; where it was
+      verified by the HTTP harness I say harness.</div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <p class="eyebrow">Limitations &amp; next steps</p>
+    <h2>Locally demo-ready — not yet deployed</h2>
+    <div class="cols">
+      <ul>
+        <li><b>Deployment: locally demo-ready only.</b> The runtime uses a local SQLite file and a
+          local uploads folder; there is no serverless entry point and no <code>vercel.json</code>.</li>
+        <li><b>Persistence needed for production.</b> A PostgreSQL schema and a Vercel Blob adapter
+          already exist but are not wired to the runtime.</li>
+        <li><b>Email</b> is optional; the demo runs with SMTP unconfigured and says so.</li>
+      </ul>
+      <div class="card">
+        <h3>Next steps</h3>
+        <ul>
+          <li>Async PostgreSQL adapter behind the existing service layer</li>
+          <li>Scheduled retention job</li>
+          <li>Staff notification digests</li>
+        </ul>
+      </div>
+    </div>
+    <div class="notes"><b>Say</b> I want to be exact about the boundary: a reliable system you can
+      demo end to end today, not a production deployment. The reason is persistence — serverless
+      disks are ephemeral. The migration path is already sketched; the work is the adapter, not a
+      redesign.</div>
+  </section>
+
+</div>
+
+<footer class="hud">
+  <span class="brandmark">Nagaro — TRACE Expert City, Colombo</span>
+  <span><span id="pager">1 / 10</span> &nbsp;·&nbsp; ← → to navigate &nbsp;·&nbsp; Ctrl+P to print</span>
+</footer>
+
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var pager = document.getElementById('pager');
+    var i = 0;
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach(function (s, k) { s.classList.toggle('is-active', k === i); });
+      pager.textContent = (i + 1) + ' / ' + slides.length;
+      if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+    }
+    document.addEventListener('keydown', function (e) {
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) !== -1) { e.preventDefault(); show(i + 1); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) !== -1) { e.preventDefault(); show(i - 1); }
+      else if (e.key === 'Home') show(0);
+      else if (e.key === 'End') show(slides.length - 1);
+    });
+    document.addEventListener('click', function (e) { show(i + (e.clientX > window.innerWidth / 2 ? 1 : -1)); });
+    // Deep links (#6) and the browser back/forward buttons both change only the
+    // fragment, which does not re-run this script. React to it so a presenter can
+    // jump to a slide by URL or step back through visited slides.
+    window.addEventListener('hashchange', function () {
+      var n = parseInt((location.hash || '').replace('#', ''), 10);
+      if (Number.isFinite(n) && n > 0) show(n - 1);
+    });
+    var start = parseInt((location.hash || '').replace('#', ''), 10);
+    show(Number.isFinite(start) && start > 0 ? start - 1 : 0);
+  })();
+</script>
+</body>
+</html>

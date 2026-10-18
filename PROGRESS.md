@@ -26,18 +26,36 @@ Last updated: 2026-10-18
    Colombo, Sri Lanka; CSP tightened back to `style-src 'self'`; mobile overflow, footer contrast,
    heading-order and gallery-label defects fixed; `npm test` fixed for Node ≥ 22; docs reconciled.
    See `UI_UX_IMPLEMENTATION_REPORT.md` for the full record.
+9. **Readiness pass (this pass; see `FINAL_READINESS_REPORT.md`)** — independently re-verified
+   the state above, then fixed four release-affecting defects and produced the presentation pack:
+   - `.detail-list` collapsed to one character per line inside narrow cards (public sidebar,
+     inquiry preview, admin detail panels) — root-caused to a fixed `minmax(10rem, 14rem)` label
+     track and made container-relative; regression test added
+     (`tests/unit/detailListLayout.test.js`).
+   - `.data-table` cells used `overflow-wrap: anywhere`, shredding names mid-word
+     (`Acaci / a Train / ing Roo / m`); switched to `break-word` so tables scroll in the
+     already-focusable `.table-wrap` instead of squeezing columns below legibility.
+   - `scripts/e2e-verify.js` probed availability at `now + 30 days`, which preserved the current
+     time of day and therefore failed outside 08:00–18:00 SLST — a genuine reproducibility bug.
+     Replaced with a deterministic 10:00–12:00 SLST probe.
+   - `tools/node.cmd`, `tools/npm.cmd`, `tools/git.cmd` hardcoded another machine's paths; they now
+     resolve `%NAGARO_NODE%`/`%NAGARO_GIT%` or `PATH` and report an actionable error.
+   - Presentation pack added: `PRESENTATION.md` and `presentation/slides.html`.
+   - Local demo database reseeded so demo data is Colombo-localised (Sri Lankan names, `+94`
+     numbers, `LKR`); previous file backed up inside the gitignored `data/`.
 
 ## Test evidence (final)
 
-- `npm test` → **190/190 pass** (unit + integration)
+- `npm test` → **192/192 pass** (unit + integration; 190 pre-existing + 2 new regression tests)
 - `npm run test:concurrency` → **37/37 pass**
 - `npm run test:e2e` → **63/63 pass**
-- **Total: 290/290 pass**
+- **Total: 292/292 pass**
 
-New coverage added this pass: `tests/unit/businessTimeZone.test.js`,
+New coverage added in the first verification pass: `tests/unit/businessTimeZone.test.js`,
 `tests/integration/businessTimeZone.test.js`, `tests/unit/seedSceneImages.test.js`.
+New coverage added in the readiness pass: `tests/unit/detailListLayout.test.js` (2 tests).
 
-## Verification performed this pass
+## Verification performed in the first verification pass
 
 - Real Chromium browser against the production entry point on an **isolated** throwaway database and
   upload directory (`%TEMP%\opencode\nagaro-qa\`), seeded with `--demo`. Production data untouched.
@@ -72,10 +90,16 @@ New coverage added this pass: `tests/unit/businessTimeZone.test.js`,
 
 ## Environment note
 
-- **Screenshots are not capturable in this environment** (the browser tooling needs a visible desktop
-  window). Browser verification was therefore done through navigation, accessibility snapshots, DOM
-  and computed-style inspection, console/network capture, Lighthouse, and native iframe-pinned
-  viewport measurement. No before/after screenshots are fabricated.
+- **Screenshots are capturable in this environment as of the readiness pass.** Real captures of the
+  running application were taken and stored in `artifacts/presentation/` (15 native-viewport
+  screenshots plus 8 width-pinned responsive renders; deliberately gitignored because they are large
+  binaries). No screenshot is fabricated or retouched.
+- **The tab viewport is fixed at 912×670** and the browser tooling exposes no device emulation, so
+  exact-width 1440/768/390 *native* screenshots are impossible. Responsive verification is done by
+  rendering each route inside a width-pinned document at the true target width — real CSS layout and
+  real measurements — which is also how the `responsive/` images are produced.
+- Earlier passes did browser verification through navigation, accessibility snapshots, DOM and
+  computed-style inspection, console/network capture, and iframe-pinned viewport measurement.
 
 ## Next actions (when credentials are available)
 

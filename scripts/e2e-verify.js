@@ -31,6 +31,21 @@ const env = {
   NAGARO_IP_SALT: 'e2e-salt',
 };
 
+// Spaces are bookable 08:00-18:00 Sri Lanka Standard Time (UTC+05:30, no DST).
+// A probe derived from the current wall clock falls outside those hours
+// whenever the suite happens to run late in the Colombo afternoon/evening, which
+// made this check fail purely as a function of what time it was run. Pin the
+// probe to a deterministic 10:00-12:00 SLST window on a future date instead:
+// the intent (a valid future window returns 2xx) is unchanged, and the result no
+// longer depends on the host clock.
+const SLST_OFFSET_MS = 330 * 60000;
+function slstWindow(daysAhead, startHour, durationHours) {
+  const slst = new Date(Date.now() + daysAhead * 86400000 + SLST_OFFSET_MS);
+  slst.setUTCHours(startHour, 0, 0, 0);
+  const start = slst.getTime() - SLST_OFFSET_MS;
+  return { start, end: start + durationHours * 3600000 };
+}
+
 const child = spawn(process.execPath, ['src/server/index.js'], { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
 let bootLog = '';
 child.stdout.on('data', (d) => { bootLog += d; });
@@ -207,7 +222,8 @@ console.log('\n[7] public browse and availability');
   check('GET /api/public/spaces -> 200', r4.status === 200);
   const j = await r4.json();
   check('public spaces include our space', Array.isArray(j.items) && j.items.some((s) => s.code === spaceCode));
-  const r5 = await req('GET', `/api/public/availability?space=${spaceCode}&start=${Date.now() + 30*86400000}&end=${Date.now() + 30*86400000 + 7200000}`);
+  const probe = slstWindow(30, 10, 2);
+  const r5 = await req('GET', `/api/public/availability?space=${spaceCode}&start=${probe.start}&end=${probe.end}`);
   check('GET /api/public/availability -> 2xx', r5.status >= 200 && r5.status < 300, `got ${r5.status}`);
 }
 

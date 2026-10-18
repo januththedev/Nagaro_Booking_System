@@ -19,6 +19,8 @@
     "demo:double-booking": "node scripts/demo-double-booking.js"
   },
   "dependencies": {
-    "nodemailer": "^6.9.16"
+    "@vercel/blob": "^2.8.2",
+    "nodemailer": "^6.9.16",
+    "pg": "^8.23.1"
   }
 }

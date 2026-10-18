@@ -16,6 +16,7 @@ import { AppError, notFound } from '../domain/errors.js';
 import { LIMITS } from '../domain/validation.js';
 import { FLASH_COOKIE, requireAuth, requireCsrf } from '../security/sessions.js';
 import { ingestUploadFiles, removeStoredImage } from '../security/uploads.js';
+import { deleteBlob } from '../security/blobStorage.js';
 import { appendCookie, redirect, serializeCookie } from '../http/response.js';
 import { isSecureRequest } from '../http/request.js';
 import {
@@ -101,6 +102,8 @@ export function registerAdminUploadRoutes(router, deps = {}) {
             mimeType: file.mimeType,
             byteSize: file.byteSize,
             altText,
+            blobUrl: file.blobUrl ?? null,
+            blobPathname: file.blobPathname ?? null,
           });
           insertedNames.add(file.storedName);
         } catch (error) {
@@ -172,8 +175,9 @@ export function registerAdminUploadRoutes(router, deps = {}) {
     const target = `/admin/spaces/${spaceId}`;
 
     try {
-      const { removedStoredName } = deleteImage(db, { actor: ctx.actor, spaceId, imageId });
+      const { removedStoredName, removedBlobPathname } = deleteImage(db, { actor: ctx.actor, spaceId, imageId });
       removeStoredImage(removedStoredName); // best effort: the row is already gone
+      if (removedBlobPathname) deleteBlob(removedBlobPathname).catch(() => {});
       flashRedirect(ctx, deps, target, { kind: 'success', message: 'Photograph removed.' });
     } catch (error) {
       if (!(error instanceof AppError)) throw error;

@@ -19,6 +19,7 @@ import { chmodSync, closeSync, mkdirSync, openSync, statSync, unlinkSync, writeS
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { assertUploadableImage, LIMITS, sniffImageType } from '../domain/validation.js';
 import { AppError, validationError } from '../domain/errors.js';
+import { blobEnabled, storeBlob } from './blobStorage.js';
 
 /** A stored name is exactly: 32 lowercase hex characters + `.` + jpg|png|webp. */
 const STORED_NAME_RE = /^[a-f0-9]{32}\.(jpg|png|webp)$/;
@@ -232,7 +233,12 @@ export async function ingestUploadFiles(files, { maxFiles = LIMITS.maxImagesPerS
       // Magic bytes decide the type; the declared Content-Type only has to be
       // consistent with what the bytes actually are.
       const sniffed = assertUploadableImage(entry.buffer, entry.declaredType ?? '', { field: 'image' });
-      const stored = storeImage(entry.buffer, sniffed, { originalName });
+      let stored;
+      if (blobEnabled()) {
+        stored = await storeBlob(entry.buffer, sniffed);
+      } else {
+        stored = storeImage(entry.buffer, sniffed, { originalName });
+      }
       accepted.push({ ...stored, originalName });
     } catch (error) {
       rejected.push({ originalName, reason: uploadProblem(error) });

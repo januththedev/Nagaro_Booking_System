@@ -154,6 +154,25 @@ All timestamps are stored as epoch milliseconds in UTC. Every local calculation 
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `SMTP_FROM` | No | Email delivery |
 | `NAGARO_UPLOAD_DIR` | No (`storage/uploads`) | Photograph storage |
 
-## 12. Delivery stages and role ownership
+## 13. Target production architecture (Supabase + Vercel)
 
-See `IMPLEMENTATION_PLAN.md` for the workstream map, file ownership assignments, dependency graph and integration order.
+The shipped code runs on SQLite + local filesystem by default (development).
+For production, the following environment variables switch the runtime:
+
+- `DATABASE_URL` (and `DIRECT_URL` for migrations): when set, the application
+  uses PostgreSQL (Supabase) instead of SQLite. The `pg` driver is used.
+- `BLOB_READ_WRITE_TOKEN`: when set, uploaded photographs are stored in Vercel
+  Blob; otherwise the local filesystem is used.
+
+Schema for PostgreSQL is in `db/migrations-postgres/0001_init.sql`. It preserves
+the domain model and adds a GiST exclusion constraint on `occupancy`
+(`tstzrange(start_at, end_at, '[)')`) that enforces non-overlap at the
+database level for single-capacity resources, plus explicit `resource_unit`
+rows for the desk pool.
+
+See `AUDIT_REPORT.md` §7-§10 for the migration plan and remaining
+configuration steps.
+
+**Status:** migration code and SQL are provided; a live Supabase project and
+Vercel Blob store are required to execute the cutover (no credentials were
+available in this environment).

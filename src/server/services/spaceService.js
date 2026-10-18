@@ -494,11 +494,11 @@ export function listImages(db, spaceId) {
     sortOrder: r.sort_order,
     isCover: r.is_cover === 1,
     createdAt: r.created_at,
-    url: `/media/${r.stored_name}`,
+    url: r.blob_url ? r.blob_url : `/media/${r.stored_name}`,
   }));
 }
 
-export function addImageRecord(db, { actor, spaceId, storedName, originalName, mimeType, byteSize, altText = null } = {}) {
+export function addImageRecord(db, { actor, spaceId, storedName, originalName, mimeType, byteSize, altText = null, blobUrl = null, blobPathname = null } = {}) {
   if (!actor || !actor.id) throw validationError('An authenticated staff actor is required.');
   const id = Number(spaceId);
   getSpaceOrThrow(db, id);
@@ -509,9 +509,9 @@ export function addImageRecord(db, { actor, spaceId, storedName, originalName, m
     const nextOrder = (db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM space_image WHERE space_id = ?').get(id).m) + 1;
     const isCover = count === 0 ? 1 : 0;
     const info = db.prepare(`
-      INSERT INTO space_image (space_id, stored_name, original_name, mime_type, byte_size, alt_text, sort_order, is_cover, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?)
-    `).run(id, storedName, originalName, mimeType, byteSize, altText, nextOrder, isCover, now);
+      INSERT INTO space_image (space_id, stored_name, original_name, mime_type, byte_size, alt_text, sort_order, is_cover, blob_url, blob_pathname, created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    `).run(id, storedName, originalName, mimeType, byteSize, altText, nextOrder, isCover, blobUrl, blobPathname, now);
 
     recordAudit(db, {
       actorAdminUserId: actor.id, actorLabel: actor.label,
@@ -541,7 +541,7 @@ export function deleteImage(db, { actor, spaceId, imageId } = {}) {
       summary: `Removed photograph ${image.original_name}`,
       details: { storedName: image.stored_name },
     });
-    return { removedStoredName: image.stored_name };
+    return { removedStoredName: image.stored_name, removedBlobPathname: image.blob_pathname ?? null };
   });
 }
 

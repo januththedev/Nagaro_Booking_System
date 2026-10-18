@@ -440,7 +440,7 @@ test('R-SEC-012 both occupancy triggers exist after migrations', () => {
   // The migration ledger must agree that the schema was applied.
   assert.deepEqual(
     db.prepare('SELECT name FROM schema_migrations').all().map((row) => row.name),
-    ['0001_init.sql'],
+    ['0001_init.sql', '0002_blob_columns.sql'],
   );
   db.close();
 });

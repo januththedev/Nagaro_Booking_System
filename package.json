@@ -1,0 +1,24 @@
+{
+  "name": "nagaro-space-booking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nagaro space booking and rental management system for Trace Expert City",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node src/server/index.js",
+    "dev": "node --watch src/server/index.js",
+    "migrate": "node src/server/db/migrate.js",
+    "seed": "node src/server/db/seed.js",
+    "admin:create": "node scripts/create-admin.js",
+    "test": "node --test --test-concurrency=1 tests/unit tests/integration",
+    "test:concurrency": "node --test --test-concurrency=1 tests/concurrency",
+    "test:all": "node --test --test-concurrency=1 tests/unit tests/integration tests/concurrency",
+    "demo:double-booking": "node scripts/demo-double-booking.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.16"
+  }
+}

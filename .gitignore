@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Runtime data (never commit)
+data/
+storage/
+*.db
+*.db-wal
+*.db-shm
+
+# Local configuration and secrets
+.env
+.env.local
+.env.*.local
+
+# Logs and editor noise
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+coverage/
+tmp/

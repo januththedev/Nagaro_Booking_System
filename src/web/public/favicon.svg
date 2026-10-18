@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Nagaro">
+  <!-- Nagaro Space Booking mark: the letter N on the brand teal.
+       Self-contained: no scripts, no external references, no fonts. -->
+  <title>Nagaro</title>
+  <rect width="32" height="32" rx="7" fill="#0e4f5f"/>
+  <path fill="#ffffff" d="M8.5 24V8h3.6l7.6 9.9V8h3.8v16h-3.6l-7.6-9.9V24H8.5Z"/>
+</svg>

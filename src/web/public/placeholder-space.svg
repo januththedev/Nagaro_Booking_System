@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180"
+     role="img" aria-label="Photograph not available" preserveAspectRatio="xMidYMid slice">
+  <!-- Neutral 16:9 stand-in for a published space with no photograph yet.
+       Inline styles only; the prefers-color-scheme block applies when the file
+       is loaded through <img>, which is the intended use. -->
+  <title>Photograph not available</title>
+  <style>
+    .bg { fill: #ece9e3; }
+    .frame { fill: none; stroke: #a9b1b8; stroke-width: 3; stroke-linejoin: round; }
+    .sun { fill: #a9b1b8; }
+    .hills { fill: #c3c8cd; }
+    .plate { fill: #7f8a93; font: 600 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1b262e; }
+      .frame { stroke: #6d7d88; }
+      .sun { fill: #6d7d88; }
+      .hills { fill: #3d4e59; }
+      .plate { fill: #9aa9b3; }
+    }
+  </style>
+  <rect class="bg" width="320" height="180"/>
+  <rect class="frame" x="96" y="46" width="128" height="88" rx="8"/>
+  <circle class="sun" cx="126" cy="72" r="10"/>
+  <path class="hills" d="M104 126l34-38 24 26 20-20 34 32v0a8 8 0 0 1-8 8H112a8 8 0 0 1-8-8z"/>
+  <text class="plate" x="160" y="160" text-anchor="middle">No photograph yet</text>
+</svg>

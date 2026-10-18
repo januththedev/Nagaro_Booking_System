@@ -41,16 +41,26 @@ function plural(count, singular, pluralForm = `${singular}s`) {
   return Number(count) === 1 ? singular : pluralForm;
 }
 
-function statCard({ label, value, caption, tone = null }) {
+function statCard({ label, value, caption, tone = null, actionHref = null, actionLabel = null }) {
   return html`<div class="stat ${tone ? `stat--${tone}` : ''}">
     <span class="stat__value">${value}</span>
     <span class="stat__label">${label}</span>
     ${caption ? html`<span class="hint">${caption}</span>` : ''}
+    ${actionHref && actionLabel ? html`<a class="stat__action" href="${actionHref}">${actionLabel} →</a>` : ''}
   </div>`;
 }
 
-function statGrid(items) {
-  return html`<div class="stat-grid">${items.map((item) => item instanceof RawHtml ? item : statCard(item))}</div>`;
+function statGrid(items, modifier = '') {
+  return html`<div class="stat-grid ${modifier}">${items.map((item) => item instanceof RawHtml ? item : statCard(item))}</div>`;
+}
+
+/** Visual occupancy progress bar (0–100%). */
+function occupancyMeter(percentage, label = null) {
+  const pct = Math.max(0, Math.min(100, Math.round(Number(percentage) || 0)));
+  const tone = pct >= 90 ? 'meter--danger' : pct >= 65 ? 'meter--warning' : 'meter--ok';
+  return html`<div class="meter ${tone}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${label ?? `${pct}% occupied`}">
+    <span class="meter__fill" style="width: ${pct}%"></span>
+  </div>`;
 }
 
 /** Delivery badge. `title` carries the failure reason so the queue is usable
@@ -139,7 +149,42 @@ export function renderDashboardPage({
   const occupied = summary.availableNow.occupied;
   const totalUnits = summary.availableNow.total;
 
-  const metrics = [
+  /* Tier 1: Primary Executive KPIs (4 most actionable daily operational signals) */
+  const primaryMetrics = [
+    statCard({
+      label: "Today's bookings",
+      value: summary.today.bookings,
+      caption: `Business day ${businessDate} (EAT) · cancelled excluded`,
+      actionHref: `/admin/calendar?date=${businessDate}`,
+      actionLabel: 'Open day schedule',
+    }),
+    statCard({
+      label: 'Spaces free right now',
+      value: `${availability.freeSpaces} of ${availability.totalSpaces}`,
+      caption: 'No booked unit in the 60 minutes after page load',
+      actionHref: '/admin/spaces',
+      actionLabel: 'Manage spaces',
+    }),
+    statCard({
+      label: 'New inquiries',
+      value: summary.inquiries.new,
+      caption: 'All time · every request with status NEW',
+      tone: summary.inquiries.new > 0 ? 'warning' : null,
+      actionHref: '/admin/inquiries?status=NEW',
+      actionLabel: 'Review new requests',
+    }),
+    statCard({
+      label: 'Notifications not delivered',
+      value: summary.inquiries.awaitingEmailDelivery,
+      caption: 'All time · delivery failed or email not configured, not closed or withdrawn',
+      tone: summary.inquiries.awaitingEmailDelivery > 0 ? 'danger' : null,
+      actionHref: '/admin/inquiries',
+      actionLabel: 'Inspect delivery queue',
+    }),
+  ];
+
+  /* Tier 2: Secondary Operational Context Strip (6 supporting capacity & horizon metrics) */
+  const secondaryMetrics = [
     statCard({
       label: 'Active spaces',
       value: summary.activeSpaces.total,
@@ -147,19 +192,9 @@ export function renderDashboardPage({
         + `${summary.activeSpaces.draft} draft, ${summary.activeSpaces.archived} archived`,
     }),
     statCard({
-      label: 'Spaces free right now',
-      value: `${availability.freeSpaces} of ${availability.totalSpaces}`,
-      caption: 'No booked unit in the 60 minutes after page load',
-    }),
-    statCard({
       label: 'Bookable units free',
       value: `${summary.availableNow.free} of ${totalUnits}`,
       caption: 'Next 60 minutes from page load',
-    }),
-    statCard({
-      label: "Today's bookings",
-      value: summary.today.bookings,
-      caption: `Business day ${businessDate} (EAT) · cancelled excluded`,
     }),
     statCard({
       label: "Today's attendees",
@@ -177,17 +212,6 @@ export function renderDashboardPage({
       caption: 'Confirmed, starting within 30 days of page load',
     }),
     statCard({
-      label: 'New inquiries',
-      value: summary.inquiries.new,
-      caption: 'All time · every request with status NEW',
-    }),
-    statCard({
-      label: 'Notifications not delivered',
-      value: summary.inquiries.awaitingEmailDelivery,
-      caption: 'All time · delivery failed or email not configured, not closed or withdrawn',
-      tone: summary.inquiries.awaitingEmailDelivery > 0 ? 'danger' : null,
-    }),
-    statCard({
       label: 'Active maintenance blocks',
       value: summary.maintenance.activeNow,
       caption: `In progress at page load · ${summary.maintenance.upcoming} starting later`,
@@ -202,39 +226,54 @@ export function renderDashboardPage({
     csrfToken,
     flash,
     activePath: '/admin',
-    pageActions: html`<a class="button button--primary button--small" href="/admin/reservations/new">New reservation</a>`,
+    pageActions: html`
+      <a class="button button--ghost button--small" href="/admin/calendar?date=${businessDate}">Today's calendar</a>
+      <a class="button button--primary button--small" href="/admin/reservations/new">New reservation</a>`,
     body: html`<div class="stack" data-dashboard="admin" data-summary-url="/api/admin/dashboard/summary">
 
-      ${statGrid(metrics)}
+      ${statGrid(primaryMetrics, 'stat-grid--primary')}
+      ${statGrid(secondaryMetrics, 'stat-grid--secondary')}
+
       <p class="hint">All figures are read live from the booking database. Generated
         ${timeTag(summary.generatedAt)} (East Africa Time).</p>
 
       ${card({
     title: 'Available now',
     description: 'Per-space bookable units blocked by a reservation or a maintenance block in the next 60 minutes.',
+    actions: html`<a class="button button--ghost button--small" href="/admin/calendar?date=${businessDate}">Full day timeline</a>`,
     body: table({
       columns: [
         { label: 'Space' },
         { label: 'Units free' },
         { label: 'Units occupied' },
+        { label: 'Occupancy load' },
         { label: 'Availability' },
         { label: 'Calendar' },
       ],
-      rows: availability.spaces.map((space) => ({
-        cells: [
-          html`<a href="/admin/spaces/${space.spaceId}">${space.name}</a>
-                <span class="meta-line">${space.code} · ${categoryLabel(space.category)}</span>`,
-          html`${space.freeUnits} of ${space.totalUnits}`,
-          html`${space.occupiedUnits} of ${space.totalUnits}`,
-          availabilityPill(
-            space.freeUnits > 0,
-            space.occupiedUnits === 0
-              ? 'Free'
-              : `${space.freeUnits} of ${space.totalUnits} free`,
-          ),
-          html`<a href="/admin/calendar?space=${space.spaceId}&amp;date=${businessDate}">Day view</a>`,
-        ],
-      })),
+      rows: availability.spaces.map((space) => {
+        const occupiedPct = space.totalUnits > 0
+          ? Math.round((space.occupiedUnits / space.totalUnits) * 100)
+          : 0;
+        return {
+          cells: [
+            html`<a href="/admin/spaces/${space.spaceId}">${space.name}</a>
+                  <span class="meta-line">${space.code} · ${categoryLabel(space.category)}</span>`,
+            html`${space.freeUnits} of ${space.totalUnits}`,
+            html`${space.occupiedUnits} of ${space.totalUnits}`,
+            html`<div class="stack">
+                  <span class="meta-line">${occupiedPct}% occupied</span>
+                  ${occupancyMeter(occupiedPct, `${space.name}: ${occupiedPct}% occupied`)}
+                </div>`,
+            availabilityPill(
+              space.freeUnits > 0,
+              space.occupiedUnits === 0
+                ? 'Free'
+                : `${space.freeUnits} of ${space.totalUnits} free`,
+            ),
+            html`<a class="button button--ghost button--small" href="/admin/calendar?space=${space.spaceId}&amp;date=${businessDate}">Day view</a>`,
+          ],
+        };
+      }),
       emptyMessage: 'No bookable spaces yet. Create a space and publish it to take bookings.',
     }),
   })}
@@ -243,6 +282,7 @@ export function renderDashboardPage({
         ${card({
     title: "Today's confirmed bookings",
     description: `Business day ${businessDate}. Cancelled bookings are listed separately below.`,
+    actions: html`<a class="button button--ghost button--small" href="/admin/reservations?from=${businessDate}&amp;to=${businessDate}">All today's records</a>`,
     body: reservationTable(today, 'No confirmed bookings touch today yet.'),
   })}
       </div>
@@ -260,6 +300,7 @@ export function renderDashboardPage({
       ${card({
     title: 'Upcoming (next 30 days)',
     description: `Confirmed bookings starting in the next 30 days. Showing ${upcoming.shown} of ${upcoming.total}.`,
+    actions: html`<a class="button button--ghost button--small" href="/admin/reservations">View all reservations</a>`,
     body: upcoming.groups.length
       ? html`<div class="stack">
           ${upcoming.groups.map((group) => html`<div>
@@ -275,15 +316,20 @@ export function renderDashboardPage({
     title: 'Current and upcoming occupancy',
     description: 'Occupancy is measured on bookable resource units, not on spaces.',
     body: html`<div class="stack">
-      <p class="stat__value">${currentRate === null ? '—' : `${Math.round(currentRate * 1000) / 10}%`}</p>
-      <p>${totalUnits > 0
+      <div class="cluster">
+        <p class="stat__value">${currentRate === null ? '—' : `${Math.round(currentRate * 1000) / 10}%`}</p>
+        <div>
+          <p>${totalUnits > 0
     ? `${occupied} of ${totalUnits} bookable units ${occupied === 1 ? 'is' : 'are'} occupied right now (the 60 minutes after page load).`
     : 'No bookable units are configured yet, so there is nothing to measure.'}</p>
-      <p class="hint">Today's peak hourly occupancy: ${peakRate === null
+          <p class="hint">Today's peak hourly occupancy: ${peakRate === null
     ? 'not measurable — no space has opening hours configured for today.'
     : `${Math.round(peakRate * 1000) / 10}%`} (business day ${businessDate}, per hourly open-hours bucket).</p>
+        </div>
+      </div>
+      ${currentRate !== null ? occupancyMeter(currentRate * 100, 'Current overall unit occupancy') : ''}
       ${utilisation.length
-    ? html`<div>
+    ? html`<div class="stack">
       <h3 class="card__title">Booked unit-hours, today to 30 days ahead</h3>
       ${table({
       columns: [
@@ -292,14 +338,20 @@ export function renderDashboardPage({
         { label: 'Bookable unit-hours', align: 'right' },
         { label: 'Utilisation', align: 'right' },
       ],
-      rows: utilisation.map((row) => ({
-        cells: [
-          html`<a href="/admin/spaces/${row.spaceId}">${row.name}</a>`,
-          html`${row.bookedUnitHours}`,
-          html`${row.bookableUnitHours}`,
-          html`${row.utilisationRate === null ? '—' : `${Math.round(row.utilisationRate * 1000) / 10}%`}`,
-        ],
-      })),
+      rows: utilisation.map((row) => {
+        const pct = row.utilisationRate === null ? null : Math.round(row.utilisationRate * 1000) / 10;
+        return {
+          cells: [
+            html`<a href="/admin/spaces/${row.spaceId}">${row.name}</a>`,
+            html`${row.bookedUnitHours}`,
+            html`${row.bookableUnitHours}`,
+            html`<div class="stack">
+              <span>${pct === null ? '—' : `${pct}%`}</span>
+              ${pct !== null ? occupancyMeter(pct, `${row.name}: ${pct}% utilisation`) : ''}
+            </div>`,
+          ],
+        };
+      }),
       emptyMessage: 'No spaces to measure.',
     })}
       <p class="hint">Booked unit-hours divide bookable unit-hours (units × the hours the space is
@@ -312,6 +364,7 @@ export function renderDashboardPage({
       ${card({
     title: 'Inquiries needing attention',
     description: 'Every NEW or CONTACTED request. Nothing in this queue has reserved a space — conversion is manual.',
+    actions: html`<a class="button button--ghost button--small" href="/admin/inquiries">Open inquiry queue</a>`,
     body: html`<div class="stack">
       ${(undelivered.count > 0) ? undeliveredBanner(undelivered.count, undelivered.items) : ''}
       ${attention.length
@@ -350,17 +403,21 @@ export function renderDashboardPage({
     </div>`,
   })}
 
-      ${card({
+      <div class="split-layout">
+        ${card({
     title: 'Recent reservation changes',
     description: 'Written to the append-only activity log inside the same transaction as the change.',
+    actions: html`<a class="button button--ghost button--small" href="/admin/audit?entityType=reservation">View all</a>`,
     body: auditList(reservationChanges, 'No reservation changes recorded yet.'),
   })}
 
-      ${card({
+        ${card({
     title: 'Other recent activity',
     description: 'The most recent activity-log entries across every record type.',
+    actions: html`<a class="button button--ghost button--small" href="/admin/audit">Full audit log</a>`,
     body: auditList(recentChanges, 'No activity recorded yet.'),
   })}
+      </div>
 
       ${card({
     title: 'Quick actions',
@@ -370,6 +427,7 @@ export function renderDashboardPage({
       <a class="button button--ghost" href="/admin/customers/new">New customer</a>
       <a class="button button--ghost" href="/admin/calendar">Calendar</a>
       <a class="button button--ghost" href="/admin/inquiries">Inquiry queue</a>
+      <a class="button button--ghost" href="/admin/maintenance">Maintenance blocks</a>
     </div>`,
   })}
     </div>`,
@@ -411,6 +469,43 @@ export function renderInquiryListPage({
   const extraQuery = { ...filters.query };
   const statusOptions = Object.values(INQUIRY_STATUS);
 
+  const primaryInquiryStats = [
+    statCard({
+      label: 'New',
+      value: stats.new,
+      caption: 'All time · waiting for first contact',
+      tone: stats.new > 0 ? 'warning' : null,
+      actionHref: '/admin/inquiries?status=NEW',
+      actionLabel: 'Filter new',
+    }),
+    statCard({
+      label: 'Contacted',
+      value: stats.contacted,
+      caption: 'All time · in conversation',
+      actionHref: '/admin/inquiries?status=CONTACTED',
+      actionLabel: 'Filter contacted',
+    }),
+    statCard({
+      label: 'Notifications not delivered',
+      value: stats.emailNotDelivered,
+      caption: 'All time · FAILED or email not configured',
+      tone: stats.emailNotDelivered > 0 ? 'danger' : null,
+    }),
+    statCard({
+      label: 'Converted',
+      value: stats.converted,
+      caption: 'All time · linked to a reservation',
+      actionHref: '/admin/inquiries?status=CONVERTED',
+      actionLabel: 'View converted',
+    }),
+  ];
+
+  const secondaryInquiryStats = [
+    statCard({ label: 'Closed', value: stats.closed, caption: 'All time · no booking made' }),
+    statCard({ label: 'Withdrawn', value: stats.withdrawn, caption: 'All time · withdrawn by the visitor' }),
+    statCard({ label: 'Total requests', value: stats.total, caption: 'All time' }),
+  ];
+
   return adminShell({
     title: 'Inquiries',
     subtitle: 'Requests submitted through the public request-to-book form. '
@@ -419,26 +514,19 @@ export function renderInquiryListPage({
     csrfToken,
     flash,
     activePath: '/admin/inquiries',
+    breadcrumbs: [
+      { label: 'Admin', href: '/admin' },
+      { label: 'Inquiries' },
+    ],
+    pageActions: html`<a class="button button--primary button--small" href="/admin/reservations/new">New reservation</a>`,
     body: html`<div class="stack">
 
-      ${statGrid([
-    statCard({ label: 'New', value: stats.new, caption: 'All time · waiting for first contact' }),
-    statCard({ label: 'Contacted', value: stats.contacted, caption: 'All time · in conversation' }),
-    statCard({ label: 'Converted', value: stats.converted, caption: 'All time · linked to a reservation' }),
-    statCard({ label: 'Closed', value: stats.closed, caption: 'All time · no booking made' }),
-    statCard({ label: 'Withdrawn', value: stats.withdrawn, caption: 'All time · withdrawn by the visitor' }),
-    statCard({
-      label: 'Notifications not delivered',
-      value: stats.emailNotDelivered,
-      caption: 'All time · FAILED or email not configured',
-      tone: stats.emailNotDelivered > 0 ? 'danger' : null,
-    }),
-    statCard({ label: 'Total requests', value: stats.total, caption: 'All time' }),
-  ])}
+      ${statGrid(primaryInquiryStats, 'stat-grid--primary')}
+      ${statGrid(secondaryInquiryStats, 'stat-grid--secondary')}
 
       ${stats.emailNotDelivered > 0
     ? html`<div class="alert alert--error" role="alert" data-notification-undelivered>
-        <p><strong>${stats.emailNotDelivered}
+        <p><strong>Notification email NOT delivered — ${stats.emailNotDelivered}
           request${stats.emailNotDelivered === 1 ? '' : 's'} could not be notified by email.</strong></p>
         <p>${NOT_DELIVERED_WARNING}</p>
       </div>`
@@ -446,6 +534,7 @@ export function renderInquiryListPage({
 
       ${card({
     title: 'Filter the queue',
+    description: 'Search by visitor name, email, or reference, and narrow by lifecycle status, space, or email delivery outcome.',
     body: html`<form class="filter-bar" method="get" action="/admin/inquiries">
         <div class="filter-bar__field">
           <label for="filter-q">Name, email or reference</label>
@@ -547,6 +636,8 @@ export function renderInquiryListPage({
   });
 }
 
+export const renderInquiryQueuePage = renderInquiryListPage;
+
 /* --------------------------------------------------------- inquiry detail */
 
 function convertUrl(inquiry) {
@@ -567,6 +658,12 @@ export function renderInquiryDetailPage({
 }) {
   const multiDay = businessDateKey(inquiry.startAt) !== businessDateKey(inquiry.endAt - 1);
   const delivered = inquiry.emailStatus === 'SENT';
+  const occupiedUnits = availability
+    ? Math.max(0, Number(availability.totalUnits || 0) - Number(availability.freeUnits || 0))
+    : 0;
+  const occupiedPct = availability && availability.totalUnits > 0
+    ? Math.round((occupiedUnits / availability.totalUnits) * 100)
+    : 0;
 
   return adminShell({
     title: `Inquiry ${inquiry.reference}`,
@@ -580,9 +677,11 @@ export function renderInquiryDetailPage({
       { label: 'Inquiries', href: '/admin/inquiries' },
       { label: inquiry.reference },
     ],
-    pageActions: inquiry.spaceId
-      ? html`<a class="button button--primary button--small" href="${convertUrl(inquiry)}">Create reservation from this inquiry</a>`
-      : null,
+    pageActions: html`
+      <a class="button button--ghost button--small" href="/admin/inquiries">Back to queue</a>
+      ${inquiry.spaceId
+    ? html`<a class="button button--primary button--small" href="${convertUrl(inquiry)}">Create reservation from this inquiry</a>`
+    : ''}`,
     body: html`<div class="stack">
 
       ${!delivered
@@ -596,12 +695,15 @@ export function renderInquiryDetailPage({
     ? html` ${timeTag(inquiry.emailAttemptedAt)}` : ''}.</p>
       </div>`}
 
-      ${card({
-    title: 'Request',
-    actions: html`<a class="button button--primary button--small"
-        href="${convertUrl(inquiry)}">Create reservation from this inquiry</a>`,
-    body: html`<dl class="detail-list">
-        <dt>Reference</dt><dd>${inquiry.reference}</dd>
+      <div class="split-layout">
+        <div class="stack">
+          ${card({
+    title: 'Visitor request & message',
+    description: 'Submitted through the public booking request form.',
+    actions: statusBadge(inquiry.status),
+    body: html`<div class="stack">
+      <dl class="detail-list">
+        <dt>Reference</dt><dd><code>${inquiry.reference}</code></dd>
         <dt>Received</dt><dd>${timeTag(inquiry.createdAt)}</dd>
         <dt>Status</dt><dd>${statusBadge(inquiry.status)}</dd>
         <dt>Requested space</dt><dd>${inquiry.spaceName
@@ -613,7 +715,7 @@ export function renderInquiryDetailPage({
             ${timeLabel(inquiry.startAt)}–${timeLabel(inquiry.endAt)} (East Africa Time)</span></dd>
         <dt>Attendees</dt><dd>${inquiry.attendees === null ? 'Not stated' : inquiry.attendees}</dd>
         <dt>Desks requested</dt><dd>${inquiry.deskQuantity === null ? 'Not stated' : inquiry.deskQuantity}</dd>
-        <dt>Message</dt><dd>${inquiry.message ? html`${inquiry.message}` : html`<span class="meta-line">No message sent.</span>`}</dd>
+        <dt>Visitor message</dt><dd>${inquiry.message ? html`<blockquote>${inquiry.message}</blockquote>` : html`<span class="meta-line">No message sent.</span>`}</dd>
         ${inquiry.convertedReservationId
     ? html`<dt>Converted reservation</dt><dd>
             <a href="/admin/reservations/${inquiry.convertedReservationId}">${inquiry.convertedReservationReference ?? `#${inquiry.convertedReservationId}`}</a>
@@ -624,71 +726,85 @@ export function renderInquiryDetailPage({
       ${multiDay
     ? html`<p class="hint">This window spans more than one business day. Check the dates on the
         booking form before saving — the link above carries only the first day.</p>`
-    : ''}`,
+    : ''}
+    </div>`,
   })}
 
-      ${card({
-    title: 'Contact details',
+          ${card({
+    title: 'Visitor contact details',
+    actions: html`<a class="button button--ghost button--small" href="/admin/customers?q=${encodeURIComponent(inquiry.email)}">Look up in customer directory</a>`,
     body: html`<dl class="detail-list">
       <dt>Name</dt><dd>${inquiry.customerName}</dd>
-      <dt>Email</dt><dd>${inquiry.email}</dd>
+      <dt>Email</dt><dd><a href="mailto:${inquiry.email}">${inquiry.email}</a></dd>
       <dt>Phone</dt><dd>${inquiry.phone ?? html`<span class="meta-line">Not provided</span>`}</dd>
       <dt>Organisation</dt><dd>${inquiry.organization ?? html`<span class="meta-line">Not provided</span>`}</dd>
     </dl>`,
   })}
 
-      ${card({
-    title: 'Notification delivery',
-    description: 'Recorded exactly as it happened. A stored request is never reported as a delivered email.',
-    body: html`<dl class="detail-list">
-      <dt>Delivery status</dt><dd>${deliveryBadge(inquiry)} ${INQUIRY_EMAIL_STATUS_LABEL[inquiry.emailStatus]}</dd>
-      <dt>Attempted</dt><dd>${inquiry.emailAttemptedAt
-    ? timeTag(inquiry.emailAttemptedAt)
-    : html`<span class="meta-line">No delivery attempt recorded.</span>`}</dd>
-      <dt>Error</dt><dd>${inquiry.emailError
-    ? html`<code>${inquiry.emailError}</code>`
-    : html`<span class="meta-line">None recorded.</span>`}</dd>
-      ${inquiry.emailMessageId
-    ? html`<dt>Message id</dt><dd><code>${inquiry.emailMessageId}</code></dd>`
-    : ''}
-    </dl>
-    ${!delivered
-    ? html`<p class="hint">Contact this visitor by phone or another channel. Nothing was sent
-        automatically from this system.</p>`
-    : ''}`,
-  })}
-
-      ${card({
+          ${card({
     title: 'Availability for the requested window (read-only)',
     description: 'A preview computed at page load. The authority is the check inside the transaction that commits a booking.',
     body: availability
-    ? html`<div class="stack">
-        <p>${availabilityPill(availability.isAvailable, availability.label)}</p>
-        <dl class="detail-list">
-          <dt>Bookable units</dt><dd>${availability.totalUnits}</dd>
-          <dt>Free in this window</dt><dd>${availability.freeUnits}</dd>
-          <dt>Units this request needs</dt><dd>${availability.requestedUnits}</dd>
-          <dt>Checked</dt><dd>${timeTag(availability.checkedAt)}</dd>
-        </dl>
-        <p class="hint">Provisional only: another confirmed booking can change this before a
-          reservation is created.</p>
-      </div>`
-    : html`<p class="hint">Availability could not be computed for this request (the space may have
-        been removed or archived).</p>`,
+      ? html`<div class="stack">
+          <div class="cluster">
+            ${availabilityPill(availability.isAvailable, availability.label)}
+            <span class="meta-line">${availability.freeUnits} of ${availability.totalUnits} bookable units free</span>
+          </div>
+          ${occupancyMeter(occupiedPct, `Requested window occupancy: ${occupiedPct}%`)}
+          <dl class="detail-list">
+            <dt>Bookable units</dt><dd>${availability.totalUnits}</dd>
+            <dt>Free in this window</dt><dd>${availability.freeUnits}</dd>
+            <dt>Units this request needs</dt><dd>${availability.requestedUnits}</dd>
+            <dt>Checked</dt><dd>${timeTag(availability.checkedAt)}</dd>
+          </dl>
+          <p class="hint">Provisional only: another confirmed booking can change this before a
+            reservation is created.</p>
+        </div>`
+      : html`<p class="hint">Availability could not be computed for this request (the space may have
+          been removed or archived).</p>`,
   })}
 
-      ${card({
-    title: 'This inquiry holds no inventory',
-    body: html`<p>This request <strong>has not reserved any inventory</strong> and holds no occupancy row
-      in the database. The space may be booked by someone else at any time until staff press
-      “Create reservation from this inquiry” and the booking commits.</p>`,
+          ${card({
+    title: 'Activity for this inquiry',
+    description: 'Append-only. Every entry was written in the same transaction as the change it describes.',
+    body: timeline.length
+      ? html`<ol class="stack">${timeline.map((entry) => html`<li>
+          ${timeTag(entry.at)} — ${entry.actorLabel} — ${tag(entry.action)}
+          <span class="meta-line">${entry.summary}</span>
+          ${entry.details
+      ? html`<details><summary>Details</summary><pre>${JSON.stringify(entry.details, null, 2)}</pre></details>`
+      : ''}
+        </li>`)}</ol>`
+      : emptyState('No activity recorded for this inquiry yet.'),
+  })}
+        </div>
+
+        <div class="stack">
+          ${card({
+    title: 'Convert to Confirmed Reservation',
+    description: 'This inquiry holds no inventory until a staff reservation is committed.',
+    body: html`<div class="stack">
+      <p>This request <strong>has not reserved any inventory</strong> and holds no occupancy row
+        in the database. The space may be booked by someone else at any time until staff press
+        “Create reservation from this inquiry” and the booking commits.</p>
+      ${inquiry.convertedReservationId
+    ? html`<div class="alert alert--success" role="status">
+          <p>Already linked to reservation <a href="/admin/reservations/${inquiry.convertedReservationId}">${inquiry.convertedReservationReference ?? `#${inquiry.convertedReservationId}`}</a>.</p>
+        </div>`
+    : ''}
+      <div class="stack">
+        <a class="button button--primary button--block" href="${convertUrl(inquiry)}">Create reservation from this inquiry</a>
+        <a class="button button--ghost button--block" href="/admin/customers/new?name=${encodeURIComponent(inquiry.customerName ?? '')}&amp;email=${encodeURIComponent(inquiry.email ?? '')}&amp;phone=${encodeURIComponent(inquiry.phone ?? '')}&amp;organization=${encodeURIComponent(inquiry.organization ?? '')}">Create customer profile first</a>
+      </div>
+    </div>`,
   })}
 
-      ${card({
+          ${card({
     title: 'Update this inquiry',
+    description: 'Record follow-up progress and internal staff notes.',
     body: html`<form method="post" action="/admin/inquiries/${inquiry.id}/status" class="form-grid">
       <input type="hidden" name="_csrf" value="${csrfToken}">
-      <div class="form-field">
+      <div class="form-field form-field--full">
         <label for="inquiry-status">Status</label>
         <select id="inquiry-status" name="status" aria-describedby="inquiry-status-hint">
           ${statuses.map((value) => html`<option value="${value}"
@@ -698,7 +814,7 @@ export function renderInquiryDetailPage({
           reservation. Create the reservation from this page first, then link it; the system
           refuses a conversion without one.</p>
       </div>
-      <div class="form-field">
+      <div class="form-field form-field--full">
         <label for="inquiry-notes">Internal notes</label>
         <textarea id="inquiry-notes" name="internal_notes" rows="5"
           aria-describedby="inquiry-notes-hint">${inquiry.internalNotes ?? ''}</textarea>
@@ -712,19 +828,30 @@ export function renderInquiryDetailPage({
     </form>`,
   })}
 
-      ${card({
-    title: 'Activity for this inquiry',
-    description: 'Append-only. Every entry was written in the same transaction as the change it describes.',
-    body: timeline.length
-    ? html`<ol class="stack">${timeline.map((entry) => html`<li>
-        ${timeTag(entry.at)} — ${entry.actorLabel} — ${tag(entry.action)}
-        <span class="meta-line">${entry.summary}</span>
-        ${entry.details
-    ? html`<details><summary>Details</summary><pre>${JSON.stringify(entry.details, null, 2)}</pre></details>`
+          ${card({
+    title: 'Notification delivery diagnostic',
+    description: 'Recorded exactly as it happened. A stored request is never reported as a delivered email.',
+    body: html`<div class="stack">
+      <dl class="detail-list">
+        <dt>Delivery status</dt><dd>${deliveryBadge(inquiry)} ${INQUIRY_EMAIL_STATUS_LABEL[inquiry.emailStatus]}</dd>
+        <dt>Attempted</dt><dd>${inquiry.emailAttemptedAt
+    ? timeTag(inquiry.emailAttemptedAt)
+    : html`<span class="meta-line">No delivery attempt recorded.</span>`}</dd>
+        <dt>Error</dt><dd>${inquiry.emailError
+    ? html`<code>${inquiry.emailError}</code>`
+    : html`<span class="meta-line">None recorded.</span>`}</dd>
+        ${inquiry.emailMessageId
+    ? html`<dt>Message id</dt><dd><code>${inquiry.emailMessageId}</code></dd>`
     : ''}
-      </li>`)}</ol>`
-    : emptyState('No activity recorded for this inquiry yet.'),
+      </dl>
+      ${!delivered
+    ? html`<p class="hint">Contact this visitor by phone or another channel. Nothing was sent
+          automatically from this system.</p>`
+    : ''}
+    </div>`,
   })}
+        </div>
+      </div>
     </div>`,
   });
 }
@@ -779,13 +906,22 @@ export function renderMaintenancePage({
     csrfToken,
     flash,
     activePath: '/admin/maintenance',
+    breadcrumbs: [
+      { label: 'Admin', href: '/admin' },
+      { label: 'Maintenance' },
+    ],
     body: html`<div class="stack">
 
       ${statGrid([
-    statCard({ label: 'Active blocks', value: activeBlocks.length, caption: 'In the current filter, not yet cancelled' }),
+    statCard({
+      label: 'Active blocks',
+      value: activeBlocks.length,
+      caption: 'In the current filter, not yet cancelled',
+      tone: activeBlocks.length > 0 ? 'warning' : null,
+    }),
     statCard({ label: 'Cancelled blocks', value: cancelledBlocks.length, caption: 'In the current filter, inventory released' }),
     statCard({ label: 'Blocks listed', value: blocks.length, caption: 'Matching the filters below' }),
-  ])}
+  ], 'stat-grid--primary')}
 
       ${card({
     title: 'Filter',
@@ -855,7 +991,7 @@ export function renderMaintenancePage({
           <p class="hint" id="maint-window-hint">An end time that is not after the start time rolls
             over to the next day, so overnight blocks are possible.</p>
         </div>
-        <div class="form-field">
+        <div class="form-field form-field--full">
           <label for="maint-reason">Reason</label>
           <textarea id="maint-reason" name="reason" rows="3" required
             aria-describedby="maint-reason-hint"></textarea>
@@ -900,10 +1036,15 @@ export function renderAuditPage({
     csrfToken,
     flash,
     activePath: '/admin/audit',
+    breadcrumbs: [
+      { label: 'Admin', href: '/admin' },
+      { label: 'Activity log' },
+    ],
     body: html`<div class="stack">
 
       ${card({
     title: 'Filter the log',
+    description: 'Inspect immutable operational records by entity type, action name, or staff member.',
     body: html`<form class="filter-bar" method="get" action="/admin/audit">
       <div class="filter-bar__field">
         <label for="audit-entity">Entity type</label>
@@ -955,7 +1096,7 @@ export function renderAuditPage({
       rows: entries.map((entry) => ({
         cells: [
           timeTag(entry.at),
-          html`${entry.actorLabel}`,
+          html`<span>${entry.actorLabel}</span>`,
           tag(entry.action),
           auditEntity(entry),
           html`${entry.summary}`,

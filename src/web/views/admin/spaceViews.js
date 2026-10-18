@@ -44,7 +44,7 @@ import {
 import { rateSummary } from '../../../server/services/spaceService.js';
 import {
   attr, categoryLabel, csrfField, emptyState, fieldError, friendlyDate, html,
-  money, pagination, pricingUnitLabel, problemList, statusBadge, tag,
+  money, pagination, pricingUnitLabel, problemList, raw, statusBadge, tag,
 } from '../../lib/html.js';
 import { adminShell, card, table } from '../layout.js';
 
@@ -96,6 +96,14 @@ const STATUS_OPTIONS = Object.freeze([
   { value: 'all', label: 'All statuses' },
 ]);
 
+const QUICK_STATUS_PILLS = Object.freeze([
+  { value: 'all', label: 'All' },
+  { value: SPACE_STATUS.PUBLISHED, label: 'Published' },
+  { value: SPACE_STATUS.DRAFT, label: 'Draft' },
+  { value: SPACE_STATUS.ARCHIVED, label: 'Archived' },
+  { value: 'active', label: 'Active (Draft & Published)' },
+]);
+
 /* ------------------------------------------------------------------ helpers */
 
 function errorMessage(details, field) {
@@ -119,8 +127,6 @@ function formFieldId(field) {
 function fieldMeta({ details, field, id = field, hintId = null }) {
   const message = errorMessage(details, field);
   const describedBy = [message ? `${id}-error` : null, hintId].filter(Boolean);
-  // `hintId` is the id of the hint paragraph that is actually rendered. It is
-  // resolved by the caller so `aria-describedby` never names a missing element.
   return {
     invalid: attr('aria-invalid', message ? 'true' : null),
     describedBy: attr('aria-describedby', describedBy.length ? describedBy.join(' ') : null),
@@ -158,11 +164,11 @@ function problemsSummary(details, { renderedIds = new Set(), title = 'Please cor
 function inputField({
   id, name = id, label, value = '', details = null, type = 'text', hint = null,
   required = false, inputmode = null, placeholder = null, min = null, max = null,
-  step = null, autocomplete = null, hintId = null, lookup = null,
+  step = null, autocomplete = null, hintId = null, lookup = null, className = '',
 }) {
   const resolvedHintId = hint ? (hintId ?? `${id}-hint`) : null;
   const meta = fieldMeta({ details, field: lookup ?? id, id, hintId: resolvedHintId });
-  return html`<div class="form-field">
+  return html`<div class="form-field ${className}">
     <label for="${id}">${label}${required ? html` <span class="required-mark" aria-hidden="true">*</span>` : ''}</label>
     <input id="${id}" name="${name}" type="${type}" value="${value ?? ''}"
       ${attr('required', required ? true : null)}
@@ -176,10 +182,10 @@ function inputField({
   </div>`;
 }
 
-function textareaField({ id, name = id, label, value = '', details = null, hint = null, rows = 4, required = false, maxlength = null }) {
+function textareaField({ id, name = id, label, value = '', details = null, hint = null, rows = 4, required = false, maxlength = null, className = '' }) {
   const hintId = hint ? `${id}-hint` : null;
   const meta = fieldMeta({ details, field: id, id, hintId });
-  return html`<div class="form-field">
+  return html`<div class="form-field ${className}">
     <label for="${id}">${label}${required ? html` <span class="required-mark" aria-hidden="true">*</span>` : ''}</label>
     <textarea id="${id}" name="${name}" rows="${rows}" ${attr('required', required ? true : null)}${attr('maxlength', maxlength)} ${meta.invalid}${meta.describedBy}>${value ?? ''}</textarea>
     ${hint ? html`<p class="hint" id="${hintId}">${hint}</p>` : ''}
@@ -187,10 +193,10 @@ function textareaField({ id, name = id, label, value = '', details = null, hint 
   </div>`;
 }
 
-function selectField({ id, name = id, label, value, options, details = null, hint = null, required = false }) {
+function selectField({ id, name = id, label, value, options, details = null, hint = null, required = false, className = '' }) {
   const hintId = hint ? `${id}-hint` : null;
   const meta = fieldMeta({ details, field: id, id, hintId });
-  return html`<div class="form-field">
+  return html`<div class="form-field ${className}">
     <label for="${id}">${label}${required ? html` <span class="required-mark" aria-hidden="true">*</span>` : ''}</label>
     <select id="${id}" name="${name}" ${attr('required', required ? true : null)}${meta.invalid}${meta.describedBy}>
       ${options.map((option) => html`<option value="${option.value}"${attr('selected', String(option.value) === String(value) ? true : null)}>${option.label}</option>`)}
@@ -241,32 +247,76 @@ function unitLabel(category) {
   return category === SPACE_CATEGORY.COWORKING ? 'desks' : 'bookable units';
 }
 
+function inventoryIndicator(space) {
+  if (space.category === SPACE_CATEGORY.COWORKING) {
+    return `${space.unitCount} Co-working ${space.unitCount === 1 ? 'Desk' : 'Desks'}`;
+  }
+  return `${space.unitCount} Exclusive ${space.unitCount === 1 ? 'Unit' : 'Units'}`;
+}
+
+function spaceThumbnail(space) {
+  if (space.coverImage) {
+    return html`<img src="/media/${space.coverImage}" alt="${space.name}" width="48" height="32" loading="lazy" decoding="async">`;
+  }
+  return html`<span class="tag" aria-hidden="true">${space.code}</span>`;
+}
+
+function statusFilterHref(statusValue, filters) {
+  const params = new URLSearchParams();
+  params.set('status', statusValue);
+  if (filters.category) params.set('category', filters.category);
+  if (filters.sort && filters.sort !== 'name') params.set('sort', filters.sort);
+  if (filters.search) params.set('q', filters.search);
+  return `/admin/spaces?${params.toString()}`;
+}
+
 /* ---------------------------------------------------------- list of spaces */
 
 export function renderSpaceListPage({
   actor, csrfToken, flash, spaces, total, filters, page, pageSize,
 }) {
+  const currentStatus = filters.status || 'active';
+
+  const statusPills = html`<nav class="cluster" aria-label="Quick status filters">
+    ${QUICK_STATUS_PILLS.map((pill) => {
+      const isActive = currentStatus === pill.value;
+      return html`<a class="button ${isActive ? 'button--primary' : 'button--ghost'} button--small"
+        href="${statusFilterHref(pill.value, filters)}"
+        ${isActive ? raw('aria-current="page"') : ''}>${pill.label}</a>`;
+    })}
+  </nav>`;
+
   const rows = spaces.map((space) => ({
     cells: [
-      html`<code>${space.code}</code>`,
-      html`<a href="/admin/spaces/${space.id}">${space.name}</a>`,
-      categoryLabel(space.category),
-      String(space.capacity),
-      `${space.unitCount} ${unitLabel(space.category)}`,
-      rateSummary(space),
+      html`<div class="cluster">
+        ${spaceThumbnail(space)}
+        <div>
+          <a href="/admin/spaces/${space.id}"><strong>${space.name}</strong></a>
+          <div class="meta-line"><code>${space.code}</code>${space.location ? ` · ${space.location}` : ''}${space.floor ? `, ${space.floor}` : ''}</div>
+        </div>
+      </div>`,
+      tag(categoryLabel(space.category)),
+      html`<span><strong>${inventoryIndicator(space)}</strong></span>
+        <div class="meta-line">Capacity: ${space.capacity} ${space.capacity === 1 ? 'person' : 'people'} · ${space.unitCount} ${unitLabel(space.category)}</div>`,
+      html`<span class="price">${rateSummary(space)}</span>`,
       space.imageCount > 0
-        ? String(space.imageCount)
+        ? tag(`${space.imageCount} ${space.imageCount === 1 ? 'photo' : 'photos'}`, 'ok')
         : tag('No photograph', 'warn'),
       statusBadge(space.status),
       friendlyDate(space.updatedAt),
       html`<span class="cluster">
-        <a class="button button--ghost button--small" href="/admin/spaces/${space.id}">View</a>
+        <a class="button button--primary button--small" href="/admin/spaces/${space.id}">Manage</a>
         <a class="button button--ghost button--small" href="/admin/spaces/${space.id}/edit">Edit</a>
+        <a class="button button--ghost button--small" href="/admin/calendar?space=${space.id}">Calendar</a>
       </span>`,
     ],
   }));
 
   const body = html`<div class="stack">
+    <div class="cluster">
+      ${statusPills}
+    </div>
+
     <form method="get" action="/admin/spaces" class="filter-bar admin-filter-form">
       <div class="filter-bar__field">
         <label for="q">Search</label>
@@ -299,12 +349,13 @@ export function renderSpaceListPage({
     </form>
 
     ${card({
-    title: 'Catalogue',
+    title: 'Space Directory',
     description: `${total} space${total === 1 ? '' : 's'} match the current filters.`,
+    actions: html`<a class="button button--primary button--small" href="/admin/spaces/new">New space</a>`,
     body: html`${table({
       columns: [
-        { label: 'Code' }, { label: 'Name' }, { label: 'Category' }, { label: 'Capacity' },
-        { label: 'Inventory' }, { label: 'Rates' }, { label: 'Photos' }, { label: 'Status' },
+        { label: 'Space' }, { label: 'Category' }, { label: 'Inventory & Capacity' },
+        { label: 'Rates' }, { label: 'Photos' }, { label: 'Status' },
         { label: 'Updated' }, { label: 'Actions' },
       ],
       rows,
@@ -326,7 +377,7 @@ export function renderSpaceListPage({
 
   return adminShell({
     title: 'Spaces',
-    subtitle: 'The bookable catalogue: rooms, auditorium and co-working desks.',
+    subtitle: 'The bookable catalogue: meeting rooms, auditorium and co-working desks.',
     actor,
     csrfToken,
     flash,
@@ -348,10 +399,6 @@ export function renderSpaceFormPage({
   const cancelHref = isEdit ? `/admin/spaces/${space.id}` : '/admin/spaces';
   const category = values.category;
   const allowedUnits = ALLOWED_PRICING_UNITS[category] ?? PRICING_UNITS;
-  // Editing renders only the units this category supports, plus the space's
-  // current default unit if it is (incorrectly) outside that set, so the
-  // select can never silently change the stored value. Creating renders every
-  // unit because the category may still be changed before submitting.
   const visibleUnits = isEdit
     ? [...new Set([...allowedUnits, values.pricing_unit].filter(Boolean))]
     : PRICING_UNITS;
@@ -377,7 +424,8 @@ export function renderSpaceFormPage({
     : `Enter the units you want to offer. Meeting & training room and Auditorium support: ${ALLOWED_PRICING_UNITS.MEETING_ROOM.map((unit) => (PRICING_UNIT_LABEL[unit] ?? unit).replace('per ', '')).join(', ')}. Co-working supports: ${ALLOWED_PRICING_UNITS.COWORKING.map((unit) => (PRICING_UNIT_LABEL[unit] ?? unit).replace('per ', '')).join(', ')}. Units the chosen category does not support are ignored by the server.`;
 
   const ratesFieldset = html`<div class="stack">
-    ${visibleUnits.map((unit) => {
+    <div class="form-grid">
+      ${visibleUnits.map((unit) => {
     const id = `rates_${unit}`;
     return inputField({
       id, label: pricingUnitLabel(unit).replace(/^per /, 'Price per '),
@@ -385,6 +433,7 @@ export function renderSpaceFormPage({
       placeholder: '0.00', hintId: 'rates-hint', lookup: `rates.${unit}`,
     });
   })}
+    </div>
     <p class="hint" id="rates-hint">${ratesHint}</p>
     <p class="hint">At least one rate is required before the space can be published.</p>
   </div>`;
@@ -394,7 +443,8 @@ export function renderSpaceFormPage({
     : 'The unit used when a booking does not choose one. It must be one of the units your chosen category supports, otherwise the server rejects the form with the allowed list.';
 
   const attributesBody = (panel) => html`<div class="stack">
-    ${(ATTRIBUTE_FIELDS[panel] ?? []).map((field) => {
+    <div class="form-grid">
+      ${(ATTRIBUTE_FIELDS[panel] ?? []).map((field) => {
     const name = `attributes_${panel}[${field.key}]`;
     const value = values.attributes?.[panel]?.[field.key];
     if (field.type === 'checkbox') {
@@ -407,9 +457,10 @@ export function renderSpaceFormPage({
       min: field.type === 'number' ? '0' : null, step: field.type === 'number' ? '1' : null,
     });
   })}
+    </div>
     ${panel === 'coworking' && (isEdit ? category === SPACE_CATEGORY.COWORKING : true)
       ? inputField({
-        id: 'desk_count', label: 'Desks in this space', value: values.desk_count ?? '1',
+        id: 'desk_count', label: 'Desks in this space (bookable desk inventory)', value: values.desk_count ?? '1',
         details, type: 'number', min: '1', max: '500', step: '1', required: true,
         hint: 'Each desk is an individually bookable unit, so a booking of three desks consumes three desk rows. Reducing the desk count is refused while a desk still holds active occupancy — cancel or move those reservations first.',
       })
@@ -418,7 +469,7 @@ export function renderSpaceFormPage({
 
   const categoryDetails = isEdit
     ? html`<fieldset class="stack">
-        <legend>${categoryLabel(category)} details</legend>
+        <legend>${categoryLabel(category)} specifications</legend>
         ${attributesBody(currentPanel)}
       </fieldset>`
     : html`<div class="stack">
@@ -432,7 +483,7 @@ export function renderSpaceFormPage({
       </div>`;
 
   const amenitiesBody = html`<div class="stack">
-    <p class="hint">These are shown on the public space page and power the visitor amenity filter.</p>
+    <p class="hint">Facilities shown on the public space page and used by the visitor amenity filter.</p>
     <div class="form-field--checkboxes">
       ${AMENITY_CATALOG.map((amenity) => checkboxField({
     id: `amenity_${amenity.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
@@ -455,66 +506,73 @@ export function renderSpaceFormPage({
   })}
 
     ${card({
-    title: 'Identity',
-    description: 'How the space is named and found in the catalogue.',
-    body: html`<div class="form-grid">
-      ${inputField({ id: 'code', label: 'Space code', value: values.code, details, required: true, placeholder: 'e.g. MR-01', hint: 'Letters, numbers, dashes and underscores. Shown on bookings and invoices.' })}
-      ${inputField({ id: 'name', label: 'Name', value: values.name, details, required: true, placeholder: 'e.g. Meeting room 1' })}
-      ${selectField({
-      id: 'category', label: 'Category', value: category, required: true, details,
-      options: SPACE_CATEGORY_ORDER.map((option) => ({ value: option, label: SPACE_CATEGORY_LABEL[option] })),
-      hint: 'The category decides which details and pricing units apply. It cannot be changed while the space has active occupancy.',
-    })}
-      ${inputField({ id: 'location', label: 'Location', value: values.location, details, required: true, placeholder: 'e.g. Trace Expert City, Building A' })}
-      ${inputField({ id: 'floor', label: 'Floor', value: values.floor, details, placeholder: 'e.g. 2nd floor' })}
-      ${inputField({ id: 'capacity', label: 'Capacity (people)', value: values.capacity, details, required: true, type: 'number', min: '1', step: '1', hint: 'The largest group the space can hold. The booking rules refuse larger groups.' })}
-    </div>`,
-  })}
-
-    ${card({
-    title: 'Summary and description',
-    description: 'Shown to visitors in the public directory and on the space page.',
+    modifiers: 'form-section',
+    title: '01 · Identity & Category',
+    description: 'How the space is identified, classified, and introduced in the public directory.',
     body: html`<div class="stack">
-      ${inputField({ id: 'short_description', label: 'Short summary', value: values.short_description, details, required: true, hint: 'One line, up to 300 characters.' })}
-      ${textareaField({ id: 'description', label: 'Detailed description', value: values.description, details, required: true, rows: 6, hint: 'At least 20 characters. This is a publishing requirement.' })}
+      <div class="form-grid">
+        ${inputField({ id: 'code', label: 'Space code', value: values.code, details, required: true, placeholder: 'e.g. MR-01', hint: 'Letters, numbers, dashes and underscores. Shown on bookings and invoices.' })}
+        ${inputField({ id: 'name', label: 'Name', value: values.name, details, required: true, placeholder: 'e.g. Meeting room 1' })}
+        ${selectField({
+        id: 'category', label: 'Category', value: category, required: true, details,
+        options: SPACE_CATEGORY_ORDER.map((option) => ({ value: option, label: SPACE_CATEGORY_LABEL[option] })),
+        hint: 'Meeting rooms and auditoriums book as 1 exclusive unit; co-working spaces book as pooled individual desks. Category cannot be changed while active occupancy exists.',
+      })}
+      </div>
+      ${inputField({ id: 'short_description', label: 'Short summary', value: values.short_description, details, required: true, hint: 'One concise line (up to 300 characters) shown on directory cards.' })}
+      ${textareaField({ id: 'description', label: 'Detailed description', value: values.description, details, required: true, rows: 6, hint: 'At least 20 characters. Required before the space can be published.' })}
     </div>`,
   })}
 
     ${card({
-    title: 'Booking rules',
-    description: 'Applied to every reservation for this space.',
+    modifiers: 'form-section',
+    title: '02 · Location & Capacity',
+    description: 'Physical placement, maximum group size, and visitor access instructions.',
+    body: html`<div class="stack">
+      <div class="form-grid">
+        ${inputField({ id: 'location', label: 'Location', value: values.location, details, required: true, placeholder: 'e.g. Trace Expert City, Building A', hint: 'Building or wing name shown to visitors.' })}
+        ${inputField({ id: 'floor', label: 'Floor', value: values.floor, details, placeholder: 'e.g. 2nd floor' })}
+        ${inputField({ id: 'capacity', label: 'Capacity (people)', value: values.capacity, details, required: true, type: 'number', min: '1', step: '1', hint: 'The largest group the space can hold. The booking engine refuses reservations with more attendees than this limit.' })}
+      </div>
+      ${inputField({ id: 'contact_note', label: 'Contact & access note', value: values.contact_note, details, hint: 'Optional. Phone extension, reception check-in instructions, or key collection note.' })}
+    </div>`,
+  })}
+
+    ${card({
+    modifiers: 'form-section',
+    title: '03 · Operating Hours & Booking Rules',
+    description: 'Daily East Africa Time (UTC+03:00) operating hours, booking length bounds, and turnaround buffers.',
     body: html`<div class="form-grid">
-      ${selectField({ id: 'currency', label: 'Currency', value: values.currency, options: CURRENCIES.map((code) => ({ value: code, label: code })), details })}
-      ${selectField({ id: 'pricing_unit', label: 'Default pricing unit', value: values.pricing_unit, required: true, options: pricingUnitOptions, details, hint: pricingUnitHint })}
-      ${inputField({ id: 'min_duration_minutes', label: 'Minimum duration (minutes)', value: values.min_duration_minutes, details, type: 'number', min: '15', step: '15' })}
-      ${inputField({ id: 'max_duration_minutes', label: 'Maximum duration (minutes)', value: values.max_duration_minutes, details, type: 'number', min: '15', step: '15', hint: 'Leave blank for no maximum.' })}
-      ${inputField({ id: 'buffer_minutes', label: 'Buffer between bookings (minutes)', value: values.buffer_minutes, details, type: 'number', min: '0', max: '240', step: '5', hint: 'Kept free before and after a reservation, against reservations only.' })}
-      ${inputField({ id: 'open_time', label: 'Opens at', value: values.open_time, details, type: 'time', required: true })}
-      ${inputField({ id: 'close_time', label: 'Closes at', value: values.close_time, details, type: 'time', required: true, hint: 'Closing time must be after opening time.' })}
+      ${inputField({ id: 'open_time', label: 'Opens at (EAT)', value: values.open_time, details, type: 'time', required: true })}
+      ${inputField({ id: 'close_time', label: 'Closes at (EAT)', value: values.close_time, details, type: 'time', required: true, hint: 'Closing time must be after opening time.' })}
+      ${inputField({ id: 'min_duration_minutes', label: 'Minimum duration (minutes)', value: values.min_duration_minutes, details, type: 'number', min: '15', step: '15', hint: 'Shortest reservation allowed (in 15-minute increments).' })}
+      ${inputField({ id: 'max_duration_minutes', label: 'Maximum duration (minutes)', value: values.max_duration_minutes, details, type: 'number', min: '15', step: '15', hint: 'Leave blank for no maximum duration.' })}
+      ${inputField({ id: 'buffer_minutes', label: 'Turnaround buffer between bookings (minutes)', value: values.buffer_minutes, details, type: 'number', min: '0', max: '240', step: '5', hint: 'Kept free before and after each reservation for room reset/cleaning.' })}
     </div>`,
   })}
 
     ${card({
-    title: 'Rates',
-    description: 'Amounts are stored per pricing unit. At least one rate is required to publish.',
-    body: ratesFieldset,
+    modifiers: 'form-section',
+    title: '04 · Pricing & Billing Units',
+    description: 'Configure currency, default billing unit, and the rate schedule. At least one rate is required to publish.',
+    body: html`<div class="stack">
+      <div class="form-grid">
+        ${selectField({ id: 'currency', label: 'Currency', value: values.currency, options: CURRENCIES.map((code) => ({ value: code, label: code })), details })}
+        ${selectField({ id: 'pricing_unit', label: 'Default pricing unit', value: values.pricing_unit, required: true, options: pricingUnitOptions, details, hint: pricingUnitHint })}
+      </div>
+      ${ratesFieldset}
+    </div>`,
   })}
 
     ${card({
-    title: 'Category details',
-    description: 'Only the panel matching the space category is stored.',
-    body: categoryDetails,
-  })}
-
-    ${card({
-    title: 'Amenities',
-    description: 'Facilities visitors can filter by.',
-    body: amenitiesBody,
-  })}
-
-    ${card({
-    title: 'Contact note',
-    body: inputField({ id: 'contact_note', label: 'Note shown with booking information', value: values.contact_note, details, hint: 'Optional. For example a phone extension or access instructions.' }),
+    modifiers: 'form-section',
+    title: '05 · Category Specifications & Amenities',
+    description: 'Category-specific room layout, pooled desk inventory, and visitor-facing amenities.',
+    body: html`<div class="stack">
+      ${categoryDetails}
+      <hr>
+      ${amenitiesBody}
+    </div>`,
   })}
 
     <div class="form-actions">
@@ -523,7 +581,7 @@ export function renderSpaceFormPage({
     </div>
   </form>`;
 
-  const page = adminShell({
+  return adminShell({
     title: isEdit ? `Edit ${space.name}` : 'New space',
     subtitle: isEdit ? `${space.code} · ${categoryLabel(space.category)}` : 'Create a catalogue entry. It starts as a draft until it is published.',
     actor,
@@ -535,8 +593,6 @@ export function renderSpaceFormPage({
       : [{ label: 'Admin', href: '/admin' }, { label: 'Spaces', href: '/admin/spaces' }, { label: 'New space' }],
     body,
   });
-
-  return page;
 }
 
 /* --------------------------------------------------------------- detail page */
@@ -552,7 +608,15 @@ export function renderSpaceDetailPage({
   const ready = issues.length === 0;
   const canPublish = isDraft && ready;
 
-  /* ------------------------------------------------------------ status card */
+  /* --------------------------------------------------- publish readiness */
+  const checklistItems = [
+    { label: 'At least one photograph uploaded', ok: space.imageCount >= 1 },
+    { label: 'Detailed description (20+ characters)', ok: Boolean(space.description && space.description.length >= 20) },
+    { label: 'Short summary and location configured', ok: Boolean(space.shortDescription && space.location) },
+    { label: 'Rate schedule configured', ok: Boolean(space.rates && Object.keys(space.rates).length > 0) },
+    { label: 'Active bookable resource units', ok: space.unitCount >= 1 },
+  ];
+
   const publishForm = canPublish
     ? html`<form method="post" action="${base}/publish" class="inline-form">
         ${csrfField(csrfToken)}
@@ -575,16 +639,19 @@ export function renderSpaceDetailPage({
       </form>`
     : '';
 
-  const archiveForm = isArchived ? '' : html`<form method="post" action="${base}/archive" class="stack" data-confirm="Archive this space? It will be hidden from the public site and will not accept new reservations.">
-    ${csrfField(csrfToken)}
-    <div class="form-field">
-      <label for="archive_reason">Archive reason (optional)</label>
-      <input id="archive_reason" name="reason" maxlength="300" placeholder="e.g. Refurbishment, replaced by a larger room">
-    </div>
-    <div class="form-actions">
-      <button class="button button--danger" type="submit">Archive this space</button>
-    </div>
-  </form>`;
+  const archiveForm = isArchived ? '' : html`<details>
+    <summary class="hint">Archive this space…</summary>
+    <form method="post" action="${base}/archive" class="stack" data-confirm="Archive this space? It will be hidden from the public site and will not accept new reservations.">
+      ${csrfField(csrfToken)}
+      <div class="form-field">
+        <label for="archive_reason">Archive reason (optional)</label>
+        <input id="archive_reason" name="reason" maxlength="300" placeholder="e.g. Refurbishment, replaced by a larger room">
+      </div>
+      <div class="form-actions">
+        <button class="button button--danger button--small" type="submit">Archive this space</button>
+      </div>
+    </form>
+  </details>`;
 
   const restoreForm = isArchived
     ? html`<form method="post" action="${base}/restore" class="inline-form" data-confirm="Restore this space to draft? It stays hidden until it is published again.">
@@ -593,10 +660,13 @@ export function renderSpaceDetailPage({
       </form>`
     : '';
 
-  const statusCard = card({
-    title: 'Status and publishing',
+  const statusBannerCard = card({
+    title: 'Status & Publish Readiness',
     description: 'A space cannot be published until every checklist item is clear.',
-    actions: statusBadge(space.status),
+    actions: html`<div class="cluster">
+      ${statusBadge(space.status)}
+      ${tag(inventoryIndicator(space), 'info')}
+    </div>`,
     body: html`<div class="stack">
       <dl class="detail-list detail-list--inline">
         <dt>Status</dt><dd>${SPACE_STATUS_LABEL[space.status] ?? space.status}</dd>
@@ -604,6 +674,9 @@ export function renderSpaceDetailPage({
         <dt>Archived</dt><dd>${space.archivedAt ? friendlyDate(space.archivedAt) : '—'}</dd>
         <dt>Last updated</dt><dd>${friendlyDate(space.updatedAt)}</dd>
       </dl>
+      <div class="cluster">
+        ${checklistItems.map((item) => tag(`${item.ok ? '✓' : '✕'} ${item.label}`, item.ok ? 'ok' : 'warn'))}
+      </div>
       ${ready
       ? html`<div class="alert alert--success" role="status">
             <p>Ready to publish: every requirement is met.</p>
@@ -633,101 +706,117 @@ export function renderSpaceDetailPage({
 
   const imageList = images.length === 0
     ? emptyState('No photographs yet.', 'A space cannot be published until at least one photograph has been uploaded.')
-    : html`<ul class="stack">
+    : html`<div class="space-grid">
         ${images.map((image, index) => {
       const upValue = reorderValue(index, index - 1);
       const downValue = reorderValue(index, index + 1);
-      return html`<li class="cluster">
-        <img src="${image.url}" alt="${image.altText ?? image.originalName}" width="160" height="120" loading="lazy" decoding="async">
-        <div class="stack">
+      return html`<article class="space-card">
+        <div class="space-card__media">
+          <img src="${image.url}" alt="${image.altText ?? image.originalName}" width="320" height="180" loading="lazy" decoding="async">
+          ${image.isCover ? html`<span class="space-card__badge">Cover</span>` : ''}
+        </div>
+        <div class="space-card__body">
           <p class="meta-line">
-            ${image.isCover ? tag('Cover', 'info') : ''}
+            ${image.isCover ? tag('Cover', 'info') : tag(`#${index + 1}`)}
             <strong>${image.originalName}</strong>
           </p>
           <p class="hint">${image.mimeType} · ${formatBytes(image.byteSize)} · position ${index + 1} of ${images.length}</p>
           <p class="hint">${image.altText ? `Alt text: ${image.altText}` : 'No alt text recorded.'}</p>
+          <div class="space-card__actions">
+            ${image.isCover ? '' : html`<form method="post" action="${base}/images/${image.id}/cover" class="inline-form">
+              ${csrfField(csrfToken)}
+              <button class="button button--ghost button--small" type="submit">Make cover</button>
+            </form>`}
+            ${upValue ? html`<form method="post" action="${base}/images/reorder" class="inline-form">
+              ${csrfField(csrfToken)}
+              <input type="hidden" name="orderedIds" value="${upValue}">
+              <button class="button button--ghost button--small" type="submit">Move up</button>
+            </form>` : ''}
+            ${downValue ? html`<form method="post" action="${base}/images/reorder" class="inline-form">
+              ${csrfField(csrfToken)}
+              <input type="hidden" name="orderedIds" value="${downValue}">
+              <button class="button button--ghost button--small" type="submit">Move down</button>
+            </form>` : ''}
+            <form method="post" action="${base}/images/${image.id}/delete" class="inline-form"
+                  data-confirm="Delete this photograph? The file is removed and cannot be recovered.">
+              ${csrfField(csrfToken)}
+              <button class="button button--danger button--small" type="submit">Delete</button>
+            </form>
+          </div>
         </div>
-        <div class="cluster">
-          ${image.isCover ? '' : html`<form method="post" action="${base}/images/${image.id}/cover" class="inline-form">
-            ${csrfField(csrfToken)}
-            <button class="button button--ghost button--small" type="submit">Make cover</button>
-          </form>`}
-          ${upValue ? html`<form method="post" action="${base}/images/reorder" class="inline-form">
-            ${csrfField(csrfToken)}
-            <input type="hidden" name="orderedIds" value="${upValue}">
-            <button class="button button--ghost button--small" type="submit">Move up</button>
-          </form>` : ''}
-          ${downValue ? html`<form method="post" action="${base}/images/reorder" class="inline-form">
-            ${csrfField(csrfToken)}
-            <input type="hidden" name="orderedIds" value="${downValue}">
-            <button class="button button--ghost button--small" type="submit">Move down</button>
-          </form>` : ''}
-          <form method="post" action="${base}/images/${image.id}/delete" class="inline-form"
-                data-confirm="Delete this photograph? The file is removed and cannot be recovered.">
-            ${csrfField(csrfToken)}
-            <button class="button button--danger button--small" type="submit">Delete</button>
-          </form>
-        </div>
-      </li>`;
+      </article>`;
     })}
-      </ul>`;
+      </div>`;
 
   const photographsCard = card({
-    title: 'Photographs',
-    description: `${images.length} of 12 · the photograph marked as the cover is shown first in the public directory.`,
+    title: 'Photograph Gallery & Upload Manager',
+    description: `${images.length} of 12 uploaded · the photograph marked as the cover is shown first in the public directory.`,
     body: html`<div class="stack">
+      ${imageList}
       <form method="post" action="${base}/images" enctype="multipart/form-data" class="stack">
         ${csrfField(csrfToken)}
-        <div class="form-field">
-          <label for="images">Add photographs</label>
-          <input id="images" name="images" type="file" multiple accept="image/jpeg,image/png,image/webp"
-                 aria-describedby="images-hint">
-          <p class="hint" id="images-hint">JPEG, PNG or WebP, up to 5 MB each, at most 12 per space. A space cannot be published without a photograph.</p>
-        </div>
-        <div class="form-field">
-          <label for="alt_text">Alt text for the new photographs (optional)</label>
-          <input id="alt_text" name="alt_text" maxlength="300" aria-describedby="alt_text-hint">
-          <p class="hint" id="alt_text-hint">Describe the photographs for visitors who cannot see them.</p>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="images">Add photographs</label>
+            <input id="images" name="images" type="file" multiple accept="image/jpeg,image/png,image/webp"
+                   aria-describedby="images-hint">
+            <p class="hint" id="images-hint">JPEG, PNG or WebP, up to 5 MB each, at most 12 per space. A space cannot be published without a photograph.</p>
+          </div>
+          <div class="form-field">
+            <label for="alt_text">Alt text for the new photographs (optional)</label>
+            <input id="alt_text" name="alt_text" maxlength="300" aria-describedby="alt_text-hint"
+                   placeholder="e.g. Boardroom table with 10 chairs and natural light">
+            <p class="hint" id="alt_text-hint">Describe the photographs for visitors using screen readers.</p>
+          </div>
         </div>
         <div class="form-actions">
           <button class="button button--primary" type="submit">Upload photographs</button>
         </div>
       </form>
-      ${imageList}
     </div>`,
   });
 
   /* ---------------------------------------------------------------- rates card */
   const rateEntries = Object.entries(space.rates ?? {}).sort((a, b) => a[1] - b[1]);
   const ratesCard = card({
-    title: 'Rates',
-    description: rateSummary(space),
+    title: 'Rate Schedule',
+    description: `${rateSummary(space)} · Default unit: ${pricingUnitLabel(space.pricingUnit)}`,
     actions: html`<a class="button button--ghost button--small" href="${base}/edit">Edit rates</a>`,
     body: rateEntries.length === 0
       ? emptyState('No rates configured.', 'Add at least one rate before publishing this space.')
       : table({
         columns: [{ label: 'Pricing unit' }, { label: 'Amount', align: 'right' }],
         rows: rateEntries.map(([unit, cents]) => ({
-          cells: [pricingUnitLabel(unit), html`<span class="price">${money(cents, space.currency)}</span>`],
+          cells: [
+            html`${pricingUnitLabel(unit)} ${unit === space.pricingUnit ? tag('Default', 'info') : ''}`,
+            html`<span class="price">${money(cents, space.currency)}</span>`,
+          ],
         })),
       }),
   });
 
   /* ------------------------------------------------------------ inventory card */
   const inventoryCard = card({
-    title: 'Bookable inventory',
-    description: 'Concrete resource units; each one can carry only one active booking at a time.',
+    title: isCoworking ? 'Desk Inventory (Pooled Units)' : 'Bookable Resource Units',
+    description: isCoworking
+      ? `${space.unitCount} individually bookable co-working ${space.unitCount === 1 ? 'desk' : 'desks'}.`
+      : 'Exclusive room allocation; only one active booking can hold this unit at any given time.',
+    actions: html`<a class="button button--ghost button--small" href="${base}/edit">Configure</a>`,
     body: html`<div class="stack">
-      <dl class="detail-list detail-list--inline">
-        <dt>${isCoworking ? 'Desks' : 'Exclusive units'}</dt><dd>${space.unitCount}</dd>
-        <dt>Capacity</dt><dd>${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}</dd>
+      <dl class="detail-list">
+        <dt>${isCoworking ? 'Pooled Desks' : 'Exclusive Units'}</dt>
+        <dd><strong>${inventoryIndicator(space)}</strong></dd>
+        <dt>Max Capacity</dt>
+        <dd>${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}</dd>
       </dl>
       ${isCoworking
-      ? html`<p class="hint">Each desk is an individually bookable unit, so a reservation of three desks consumes three desk rows and overlapping desk bookings are refused. Reducing the desk count is refused while a desk still holds active occupancy.</p>`
-      : html`<p class="hint">This category books one exclusive unit at a time. Capacity is a listing attribute, not a counter.</p>`}
+      ? html`<p class="hint">Each desk is an individually bookable resource unit, so a reservation of three desks claims three desk rows and overlapping desk bookings are refused. Reducing the desk count is refused while a desk still holds active occupancy.</p>`
+      : html`<p class="hint">This category books one exclusive unit at a time. Capacity (${space.capacity}) limits attendee headcount, not concurrent bookings.</p>`}
       ${table({
         columns: [{ label: 'Unit code' }, { label: 'Label' }, { label: 'Kind' }],
-        rows: space.units.map((unit) => ({ cells: [html`<code>${unit.code}</code>`, unit.label, unit.kind] })),
+        rows: space.units.map((unit) => ({
+          cells: [html`<code>${unit.code}</code>`, unit.label, tag(unit.kind)],
+        })),
         emptyMessage: 'No active units — configure the inventory before publishing.',
       })}
     </div>`,
@@ -745,7 +834,8 @@ export function renderSpaceDetailPage({
       </dl>`;
 
   const detailsCard = card({
-    title: 'Details',
+    title: 'Space Overview & Specifications',
+    description: 'Core catalogue metadata, operating hours, duration limits, and amenities.',
     actions: html`<a class="button button--ghost button--small" href="${base}/edit">Edit details</a>`,
     body: html`<div class="stack">
       <dl class="detail-list">
@@ -756,7 +846,7 @@ export function renderSpaceDetailPage({
         <dt>Description</dt><dd>${space.description ?? '—'}</dd>
         <dt>Location</dt><dd>${space.location ?? '—'}</dd>
         <dt>Floor</dt><dd>${space.floor ?? '—'}</dd>
-        <dt>Capacity</dt><dd>${space.capacity}</dd>
+        <dt>Capacity</dt><dd>${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}</dd>
         <dt>Currency</dt><dd>${space.currency}</dd>
         <dt>Default pricing unit</dt><dd>${pricingUnitLabel(space.pricingUnit)}</dd>
         <dt>Minimum duration</dt><dd>${durationMinutesLabel(space.minDurationMinutes)}</dd>
@@ -778,11 +868,17 @@ export function renderSpaceDetailPage({
   });
 
   const body = html`<div class="stack">
-    ${statusCard}
-    ${photographsCard}
-    ${ratesCard}
-    ${inventoryCard}
-    ${detailsCard}
+    ${statusBannerCard}
+    <div class="split-layout">
+      <div class="stack">
+        ${photographsCard}
+        ${detailsCard}
+      </div>
+      <div class="stack">
+        ${ratesCard}
+        ${inventoryCard}
+      </div>
+    </div>
   </div>`;
 
   return adminShell({
@@ -798,7 +894,7 @@ export function renderSpaceDetailPage({
       { label: space.code },
     ],
     pageActions: html`<a class="button button--ghost button--small" href="${base}/edit">Edit space</a>
-      <a class="button button--ghost button--small" href="/admin/reservations/new?space=${space.id}">Create reservation for this space</a>
+      <a class="button button--primary button--small" href="/admin/reservations/new?space=${space.id}">Create reservation for this space</a>
       <a class="button button--ghost button--small" href="/admin/calendar?space=${space.id}">View in calendar</a>`,
     body,
   });

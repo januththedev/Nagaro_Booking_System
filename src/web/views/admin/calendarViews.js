@@ -19,7 +19,7 @@
  *   [data-calendar-view]         "day" | "week"
  */
 import {
-  emptyState, friendlyDate, html, raw, statusBadge, timeLabel,
+  availabilityPill, emptyState, friendlyDate, html, raw, statusBadge, tag, timeLabel,
 } from '../../lib/html.js';
 import { adminShell, card, table } from '../layout.js';
 import {
@@ -48,6 +48,16 @@ function weekdayLabel(dateKey) {
 
 function dayHeading(dateKey) {
   return `${weekdayLabel(dateKey)} ${friendlyDate(epochFromDateKey(dateKey))}`;
+}
+
+function viewToggleHref(view, filters) {
+  const params = new URLSearchParams();
+  params.set('view', view);
+  if (filters.date) params.set('date', filters.date);
+  if (filters.space) params.set('space', filters.space);
+  if (filters.category) params.set('category', filters.category);
+  if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+  return `/admin/calendar?${params.toString()}`;
 }
 
 /**
@@ -81,12 +91,12 @@ function occupantLine(occupant) {
   const units = occupant.unitCodes.length ? ` · ${occupant.unitCodes.join(', ')}` : '';
   const when = `${timeLabel(occupant.startAt)}\u2013${timeLabel(occupant.endAt)}`;
   if (occupant.source === OCCUPANCY_SOURCE.MAINTENANCE) {
-    return html`${when} · <strong>Maintenance</strong>${occupant.maintenanceReason ? `: ${occupant.maintenanceReason}` : ''}${units}`;
+    return html`<span class="timeline__block--muted">${when} · <strong>Maintenance</strong>${occupant.maintenanceReason ? `: ${occupant.maintenanceReason}` : ''}${units}</span>`;
   }
-  return html`${when} ·
-    <a href="/admin/reservations/${occupant.reservationId}">${occupant.reference ?? 'Booking'}</a>
+  return html`<span>${when} ·
+    <a href="/admin/reservations/${occupant.reservationId}"><strong>${occupant.reference ?? 'Booking'}</strong></a>
     · ${occupant.customerName ?? 'Customer'}${units}
-    ${occupant.reservationStatus === RESERVATION_STATUS.COMPLETED ? statusBadge(RESERVATION_STATUS.COMPLETED) : ''}`;
+    ${occupant.reservationStatus === RESERVATION_STATUS.COMPLETED ? statusBadge(RESERVATION_STATUS.COMPLETED) : ''}</span>`;
 }
 
 /** Legend for the timeline colouring; mirrors .timeline__slot--free/--busy. */
@@ -106,10 +116,24 @@ function spaceFilterOptions(spaces, selected) {
   )}>${space.code} \u2014 ${space.name}</option>`);
 }
 
-function calendarFilterCard({ filters, spaces }) {
+function calendarToolbar({ filters, spaces, nav, heading }) {
+  const isDay = (filters.view ?? 'day') === 'day';
+  const isWeek = filters.view === 'week';
+
   return card({
-    title: 'Filters',
-    description: 'Pick the view, the date, a space, a category and a reservation status. Changing a dropdown applies it immediately.',
+    title: heading,
+    description: 'Navigate dates, switch between Day and Week views, or filter by space, category and booking status.',
+    actions: html`<div class="cluster">
+      <div class="cluster" role="group" aria-label="View mode">
+        <a class="button ${isDay ? 'button--primary' : 'button--ghost'} button--small"
+           href="${viewToggleHref('day', filters)}"
+           ${isDay ? raw('aria-current="page"') : ''}>Day view</a>
+        <a class="button ${isWeek ? 'button--primary' : 'button--ghost'} button--small"
+           href="${viewToggleHref('week', filters)}"
+           ${isWeek ? raw('aria-current="page"') : ''}>Week view</a>
+      </div>
+      ${calendarNavBar(nav)}
+    </div>`,
     body: html`<form class="filter-bar" method="get" action="/admin/calendar">
       <div class="filter-bar__field">
         <label for="calendar-view">View</label>
@@ -119,7 +143,7 @@ function calendarFilterCard({ filters, spaces }) {
         </select>
       </div>
       <div class="filter-bar__field">
-        <label for="calendar-date">Date</label>
+        <label for="calendar-date">Date (EAT)</label>
         <input id="calendar-date" name="date" type="date" value="${filters.date ?? ''}">
       </div>
       <div class="filter-bar__field">
@@ -187,6 +211,9 @@ function projectionNote({ eventsUrl, fromKey, toKey }) {
 function spaceDayCard({ space, grid }) {
   const slots = grid?.slots ?? [];
   const legend = timelineLegend();
+  const freeSlotCount = slots.filter((slot) => slot.isFree).length;
+  const busySlotCount = slots.length - freeSlotCount;
+  const distinctDayOccupants = dedupeGridOccupants(slots.flatMap((slot) => slot.occupancy ?? []));
 
   const timelineBody = slots.length === 0
     ? emptyState(
@@ -198,17 +225,28 @@ function spaceDayCard({ space, grid }) {
           const occupants = dedupeGridOccupants(slot.occupancy);
           return html`<div class="timeline__slot ${slot.isFree ? 'timeline__slot--free' : 'timeline__slot--busy'}">
             <div>${timeLabel(slot.startAt)}</div>
-            <div>
+            <div class="cluster">
               ${occupants.length === 0
                 ? html`<span class="hint">Free \u2014 ${slot.freeUnits} of ${slot.totalUnits} ${slot.totalUnits === 1 ? 'unit' : 'units'} bookable.</span>`
-                : html`${occupants.map((occupant) => html`<div>${occupantLine(occupant)}</div>`)}
-                   ${slot.isFree
-                  ? html`<p class="hint">${slot.freeUnits} of ${slot.totalUnits} still free in this hour.</p>`
-                  : ''}`}
+                : html`<div class="stack">
+                    ${occupants.map((occupant) => html`<div>${occupantLine(occupant)}</div>`)}
+                    ${slot.isFree
+                      ? html`<p class="hint">${slot.freeUnits} of ${slot.totalUnits} still free in this hour.</p>`
+                      : ''}
+                  </div>`}
             </div>
           </div>`;
         })}
       </div>`;
+
+  const scheduleSummaryList = distinctDayOccupants.length > 0
+    ? html`<details>
+        <summary class="hint">Schedule summary (${distinctDayOccupants.length} ${distinctDayOccupants.length === 1 ? 'entry' : 'entries'} on this day)</summary>
+        <ul>
+          ${distinctDayOccupants.map((occupant) => html`<li>${occupantLine(occupant)}</li>`)}
+        </ul>
+      </details>`
+    : '';
 
   const unitsText = grid
     ? `${grid.totalUnits} active ${grid.totalUnits === 1 ? 'unit' : 'units'} \u00b7 opening hours ${grid.openTime}\u2013${grid.closeTime}`
@@ -217,13 +255,29 @@ function spaceDayCard({ space, grid }) {
     ? html`<span class="hint"> \u00b7 ${grid.bufferMinutes} min changeover buffer between bookings is enforced by the server.</span>`
     : '';
 
+  const occupancyBadge = slots.length > 0
+    ? availabilityPill(
+      freeSlotCount > 0,
+      busySlotCount === 0
+        ? `All ${slots.length}h free`
+        : `${freeSlotCount} of ${slots.length}h free`,
+    )
+    : '';
+
   return card({
     title: `${space.code} \u2014 ${space.name}`,
     description: html`${SPACE_CATEGORY_LABEL[space.category] ?? space.category}. ${unitsText}.${bufferText}${' '}
       ${space.status === 'ARCHIVED' ? html`<strong>This space is archived and no longer bookable.</strong>` : ''}`,
-    actions: html`<a class="button button--ghost button--small"
-      href="/admin/reservations/new?space=${space.id}&date=${grid?.dateKey ?? ''}">Book this space</a>`,
-    body: html`${timelineBody}${legend}`,
+    actions: html`<div class="cluster">
+      ${occupancyBadge}
+      <a class="button button--primary button--small"
+         href="/admin/reservations/new?space=${space.id}&date=${grid?.dateKey ?? ''}">Book this space</a>
+    </div>`,
+    body: html`<div class="stack">
+      ${timelineBody}
+      ${scheduleSummaryList}
+      ${legend}
+    </div>`,
   });
 }
 
@@ -234,18 +288,19 @@ export function renderCalendarPage({
   const dayKey = filters.date ?? '';
   const hasSpaces = dayGrids.length > 0;
 
-  const body = html`
+  const body = html`<div class="stack">
     ${unknownSpaceAlert(unknownSpace ? filters.space : null)}
-    ${calendarFilterCard({ filters, spaces })}
+    ${calendarToolbar({ filters: { ...filters, view: 'day' }, spaces, nav, heading: `${dayHeading(dayKey)} \u2014 day view` })}
 
     ${card({
-    title: `${dayHeading(dayKey)} \u2014 day view`,
-    description: 'One row per hour of the space\u2019s opening hours. Rows tinted green are free; striped rows are fully booked for that hour.',
+    title: `Hourly Occupancy Timeline \u00b7 ${dayHeading(dayKey)}`,
+    description: 'One row per hour of the space\u2019s opening hours (East Africa Time). Rows tinted green are free; striped rows are fully booked for that hour.',
     actions: calendarNavBar(nav),
-    body: html`<div data-calendar-events-url="${eventsUrl}"
-                       data-calendar-date="${dayKey}"
-                       data-calendar-view="day"
-                       data-tz-offset="+03:00">
+    body: html`<div class="stack"
+                    data-calendar-events-url="${eventsUrl}"
+                    data-calendar-date="${dayKey}"
+                    data-calendar-view="day"
+                    data-tz-offset="+03:00">
         ${hasSpaces
       ? dayGrids.map(({ space, grid }) => spaceDayCard({ space, grid }))
       : emptyState(
@@ -255,7 +310,8 @@ export function renderCalendarPage({
       </div>`,
   })}
 
-    ${projectionNote({ eventsUrl, fromKey: dayKey, toKey: addDaysToDateKey(dayKey, 1) })}`;
+    ${projectionNote({ eventsUrl, fromKey: dayKey, toKey: addDaysToDateKey(dayKey, 1) })}
+  </div>`;
 
   return adminShell({
     title: 'Calendar',
@@ -290,15 +346,15 @@ function clippedWeekEntry(entry, day) {
 function weekReservationEntry(reservation, day) {
   const { when, marks } = clippedWeekEntry(reservation, day);
   const units = reservation.unitCount === 1 ? '1 unit' : `${reservation.unitCount} units`;
-  return html`<a href="${reservation.url}">${reservation.reference}</a>
-    <br><span class="hint">${when}${marks} \u00b7 ${reservation.spaceCode} \u00b7 ${reservation.customerName} \u00b7 ${units}</span>
+  return html`<a href="${reservation.url}"><strong>${reservation.reference}</strong></a>
+    <br><span class="hint">${when}${marks} \u00b7 <code>${reservation.spaceCode}</code> \u00b7 ${reservation.customerName} \u00b7 ${units}</span>
     <br>${statusBadge(reservation.status)}`;
 }
 
 function weekMaintenanceEntry(block, day) {
   const { when, marks } = clippedWeekEntry(block, day);
-  return html`<a href="${block.url}">Maintenance</a>
-    <br><span class="hint">${when}${marks} \u00b7 ${block.spaceCode} \u00b7 ${block.reason}</span>`;
+  return html`<a href="${block.url}"><strong>Maintenance</strong></a>
+    <br><span class="hint">${when}${marks} \u00b7 <code>${block.spaceCode}</code> \u00b7 ${block.reason}</span>`;
 }
 
 function weekDayCell(day, todayKey) {
@@ -308,14 +364,14 @@ function weekDayCell(day, todayKey) {
   ].sort((a, b) => a.sortAt - b.sortAt);
 
   const total = day.reservations.length + day.maintenance.length;
-  const today = day.dateKey === todayKey ? html`<p class="hint">Today</p>` : '';
+  const today = day.dateKey === todayKey ? html`<p class="hint">${tag('Today', 'info')}</p>` : '';
 
   if (entries.length === 0) {
     return html`${today}${emptyState('Nothing scheduled.')}`;
   }
   return html`${today}${' '}
-    <p class="hint">${total} ${total === 1 ? 'entry' : 'entries'}</p>
-    <ul>${entries.map((entry) => html`<li>${entry.node}</li>`)}</ul>`;
+    <p class="hint">${tag(`${total} ${total === 1 ? 'entry' : 'entries'}`, 'ok')}</p>
+    <ul class="stack">${entries.map((entry) => html`<li>${entry.node}</li>`)}</ul>`;
 }
 
 export function renderCalendarWeekPage({
@@ -334,18 +390,32 @@ export function renderCalendarWeekPage({
     ? `${dayHeading(firstDayKey)} \u2192 ${dayHeading(lastDayKey)}`
     : 'No days to show';
 
-  const body = html`
+  const daysWithEntries = days.filter((day) => (day.reservations.length + day.maintenance.length) > 0);
+  const mobileScheduleList = daysWithEntries.length > 0
+    ? html`<details>
+        <summary class="hint">Daily schedule list (${daysWithEntries.length} active ${daysWithEntries.length === 1 ? 'day' : 'days'} this week)</summary>
+        <div class="stack">
+          ${daysWithEntries.map((day) => html`<div>
+            <h4 class="card__title">${dayHeading(day.dateKey)}</h4>
+            ${weekDayCell(day, todayKey)}
+          </div>`)}
+        </div>
+      </details>`
+    : '';
+
+  const body = html`<div class="stack">
     ${unknownSpaceAlert(unknownSpace ? filters.space : null)}
-    ${calendarFilterCard({ filters, spaces })}
+    ${calendarToolbar({ filters: { ...filters, view: 'week' }, spaces, nav, heading: `${headerText} \u2014 week view` })}
 
     ${card({
-    title: `${headerText} \u2014 week view`,
+    title: `Weekly Schedule Matrix \u00b7 ${headerText}`,
     description: 'Seven day columns. A booking that spans several days appears, clipped, in every day it covers. Maintenance blocks are listed with the reservations they were checked against.',
     actions: calendarNavBar(nav),
-    body: html`<div data-calendar-events-url="${eventsUrl}"
-                       data-calendar-date="${firstDayKey}"
-                       data-calendar-view="week"
-                       data-tz-offset="+03:00">
+    body: html`<div class="stack"
+                    data-calendar-events-url="${eventsUrl}"
+                    data-calendar-date="${firstDayKey}"
+                    data-calendar-view="week"
+                    data-tz-offset="+03:00">
         ${days.length
       ? table({
         columns,
@@ -353,11 +423,13 @@ export function renderCalendarWeekPage({
         emptyMessage: 'Nothing scheduled this week.',
       })
       : emptyState('No week to show. Pick a date and try again.')}
+        ${mobileScheduleList}
       </div>
       ${timelineLegend()}`,
   })}
 
-    ${projectionNote({ eventsUrl, fromKey: firstDayKey, toKey: addDaysToDateKey(lastDayKey, 1) })}`;
+    ${projectionNote({ eventsUrl, fromKey: firstDayKey, toKey: addDaysToDateKey(lastDayKey, 1) })}
+  </div>`;
 
   return adminShell({
     title: 'Calendar',

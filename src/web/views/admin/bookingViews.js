@@ -9,7 +9,7 @@
  */
 import {
   csrfField, dateTimeLabel, durationLabel, emptyState, fieldError, friendlyDate, html, money,
-  pagination, periodLabel, pricingUnitLabel, problemList, raw, relativeDayLabel, statusBadge, timeLabel,
+  pagination, periodLabel, pricingUnitLabel, problemList, raw, relativeDayLabel, statusBadge, tag, timeLabel,
 } from '../../lib/html.js';
 import { adminShell, card, table } from '../layout.js';
 import {
@@ -18,6 +18,13 @@ import {
 } from '../../../server/domain/constants.js';
 
 const NOT_SET = '—';
+
+const RESERVATION_STATUS_TABS = Object.freeze([
+  { value: 'all', label: 'All' },
+  { value: RESERVATION_STATUS.CONFIRMED, label: 'Confirmed' },
+  { value: RESERVATION_STATUS.COMPLETED, label: 'Completed' },
+  { value: RESERVATION_STATUS.CANCELLED, label: 'Cancelled' },
+]);
 
 /* ------------------------------------------------------------------ shared */
 
@@ -85,14 +92,29 @@ function spaceSelect({ spaces, selectedId, id = 'space_id', required = true, all
   </select>`;
 }
 
+function reservationStatusTabHref(statusValue, filters) {
+  const params = new URLSearchParams();
+  if (statusValue && statusValue !== 'all') params.set('status', statusValue);
+  else params.set('status', 'all');
+  if (filters.space) params.set('space', filters.space);
+  if (filters.category) params.set('category', filters.category);
+  if (filters.customer) params.set('customer', filters.customer);
+  if (filters.q) params.set('q', filters.q);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  if (filters.sort && filters.sort !== 'start') params.set('sort', filters.sort);
+  return `/admin/reservations?${params.toString()}`;
+}
+
 /* -------------------------------------------------------------- list page */
 
 export function renderReservationListPage({
   actor, csrfToken, flash = null, reservations = [], filters = {}, spaces = [],
   total = 0, page = 1, pageSize = 20,
 }) {
+  const currentStatus = filters.status ?? 'all';
   const extraQuery = {
-    status: filters.status ?? 'all',
+    status: currentStatus,
     space: filters.space ?? '',
     category: filters.category ?? '',
     customer: filters.customer ?? '',
@@ -103,31 +125,52 @@ export function renderReservationListPage({
   };
   Object.keys(extraQuery).forEach((key) => { if (!extraQuery[key]) delete extraQuery[key]; });
 
-  const rows = reservations.map((reservation) => ({
-    cells: [
-      html`<a href="/admin/reservations/${reservation.id}">${reservation.reference}</a>`,
-      html`<span class="nowrap">${reservation.spaceCode}</span><br><span class="hint">${reservation.spaceName}</span>`,
-      categoryLabelText(reservation.category),
-      html`${reservation.customerName}<br><span class="hint">${reservation.customerOrganization ?? NOT_SET}</span>`,
-      periodLabel(reservation.startAt, reservation.endAt),
-      durationLabel(reservation.startAt, reservation.endAt),
-      unitSummary(reservation),
-      html`<span class="nowrap">${money(reservation.totalCents, reservation.currency)}</span>`,
-      statusBadge(reservation.status),
-      html`${reservation.createdByName ?? NOT_SET}<br><span class="hint">${relativeDayLabel(reservation.createdAt)} ${timeLabel(reservation.createdAt)}</span>`,
-    ],
-  }));
+  const statusTabs = html`<nav class="cluster" aria-label="Filter reservations by status">
+    ${RESERVATION_STATUS_TABS.map((tab) => {
+      const isActive = currentStatus === tab.value;
+      return html`<a class="button ${isActive ? 'button--primary' : 'button--ghost'} button--small"
+        href="${reservationStatusTabHref(tab.value, filters)}"
+        ${isActive ? raw('aria-current="page"') : ''}>${tab.label}</a>`;
+    })}
+  </nav>`;
 
-  const body = html`
+  const rows = reservations.map((reservation) => {
+    const isCancelled = reservation.status === RESERVATION_STATUS.CANCELLED;
+    return {
+      cells: [
+        html`<a href="/admin/reservations/${reservation.id}"><code>${reservation.reference}</code></a>
+          <div class="meta-line">${relativeDayLabel(reservation.createdAt)} ${timeLabel(reservation.createdAt)}</div>`,
+        html`<strong>${reservation.spaceName}</strong>
+          <div class="meta-line"><code class="nowrap">${reservation.spaceCode}</code> · ${categoryLabelText(reservation.category)}</div>`,
+        html`<span><strong>${reservation.customerName}</strong></span>
+          <div class="meta-line">${reservation.customerOrganization ?? NOT_SET}</div>`,
+        html`<span>${periodLabel(reservation.startAt, reservation.endAt)}</span>
+          <div class="meta-line">${tag(durationLabel(reservation.startAt, reservation.endAt))} · EAT</div>`,
+        unitSummary(reservation),
+        html`<span class="price nowrap">${money(reservation.totalCents, reservation.currency)}</span>`,
+        statusBadge(reservation.status),
+        html`<span class="cluster">
+          <a class="button button--ghost button--small" href="/admin/reservations/${reservation.id}">View</a>
+          ${isCancelled ? '' : html`<a class="button button--ghost button--small" href="/admin/reservations/${reservation.id}/edit">Edit</a>`}
+        </span>`,
+      ],
+    };
+  });
+
+  const body = html`<div class="stack">
+    <div class="cluster">
+      ${statusTabs}
+    </div>
+
     ${card({
     title: 'Filters',
-    description: 'Narrow the list by status, space, category, customer, reference or period.',
+    description: 'Narrow the reservation ledger by status, space, category, customer, reference or date range.',
     body: html`<form class="filter-bar" method="get" action="/admin/reservations">
       <div class="filter-bar__field">
         <label for="filter-status">Status</label>
         <select id="filter-status" name="status">
           ${[['all', 'All statuses'], ['CONFIRMED', 'Confirmed'], ['COMPLETED', 'Completed'], ['CANCELLED', 'Cancelled']]
-        .map(([value, label]) => html`<option value="${value}"${raw((filters.status ?? 'all') === value ? ' selected' : '')}>${label}</option>`)}
+        .map(([value, label]) => html`<option value="${value}"${raw(currentStatus === value ? ' selected' : '')}>${label}</option>`)}
         </select>
       </div>
       <div class="filter-bar__field">
@@ -176,23 +219,24 @@ export function renderReservationListPage({
 
     ${card({
     title: `${total} reservation${total === 1 ? '' : 's'}`,
-    description: 'Confirmed and completed bookings hold inventory. Cancelled bookings release it and are shown for history.',
+    description: 'Confirmed and completed bookings hold inventory. Cancelled bookings release it immediately and remain in the ledger for history.',
     actions: html`<span class="hint">Page ${page} · ${pageSize} per page</span>`,
     body: html`${table({
       columns: [
-        { label: 'Reference' }, { label: 'Space' }, { label: 'Category' }, { label: 'Customer' },
-        { label: 'Period' }, { label: 'Duration' }, { label: 'Units / attendees' },
-        { label: 'Total', align: 'right' }, { label: 'Status' }, { label: 'Created' },
+        { label: 'Reference' }, { label: 'Space' }, { label: 'Customer' },
+        { label: 'Period (EAT)' }, { label: 'Units / attendees' },
+        { label: 'Total', align: 'right' }, { label: 'Status' }, { label: 'Actions' },
       ],
       rows,
       emptyMessage: 'No reservations match these filters yet. Create the first one with “New reservation”.',
     })}
     ${pagination({ page, pageSize, total, basePath: '/admin/reservations', extraQuery })}`,
-  })}`;
+  })}
+  </div>`;
 
   return adminShell({
     title: 'Reservations',
-    subtitle: 'Every booking, with filters for status, space, category, customer and period.',
+    subtitle: 'Every booking in the ledger, with filters for status, space, category, customer and period.',
     actor,
     csrfToken,
     flash,
@@ -212,7 +256,7 @@ function unitSummary(reservation) {
   const attendees = reservation.attendees === null || reservation.attendees === undefined
     ? '—'
     : `${reservation.attendees} attending`;
-  return html`${units}<br><span class="hint">${attendees}</span>`;
+  return html`<strong>${units}</strong><br><span class="hint">${attendees}</span>`;
 }
 
 /* ------------------------------------------------------------- booking form */
@@ -223,8 +267,6 @@ export function renderBookingFormPage({
 }) {
   const isEdit = mode === 'edit';
   const selectedSpace = spaces.find((space) => String(space.id) === String(values.space_id)) ?? null;
-  // Same fallback the route uses when it builds the server-side preview, so the
-  // "× N units" figure always matches the quote the server rendered.
   const previewUnitCount = Math.max(1, Number(values.unit_count) || 1);
   const windowError = firstError(fieldErrors, ['date', 'start_time', 'end_time', 'start_at', 'end_at']);
   const title = isEdit ? `Edit ${reservation.reference}` : 'New reservation';
@@ -233,33 +275,38 @@ export function renderBookingFormPage({
     ${alertBlock(alert)}
 
     <form method="post" action="${isEdit ? `/admin/reservations/${reservation.id}` : '/admin/reservations'}"
-          class="form-grid" data-reservation-form data-tz-offset="+03:00"
+          class="split-layout" data-reservation-form data-booking-form
+          data-availability-url="/api/admin/availability" data-tz-offset="+03:00"
           data-space-code="${selectedSpace?.code ?? ''}"
           data-available-desks="${selectedSpace?.unitCount ?? ''}">
       ${csrfField(csrfToken)}
       <input type="hidden" name="form_token" value="${formToken}">
 
-      <div class="form-field form-field--full"><h2 class="card__title">Space and period</h2></div>
-
+      <div class="stack">
+        ${card({
+    modifiers: 'form-section',
+    title: '01 · Space & Time Window',
+    description: 'Select the space, business date, and East Africa Time (UTC+03:00) window.',
+    body: html`<div class="form-grid">
       <div class="form-field form-field--full">
-        <label for="space_id">Space</label>
+        <label for="space_id">Space <span class="required-mark" aria-hidden="true">*</span></label>
         ${spaceSelect({ spaces, selectedId: values.space_id ?? '', required: true, allowArchived: isEdit })}
         <p class="hint">Grouped by category. Archived spaces are not bookable.</p>
         ${fieldError(fieldErrors, 'space_id')}
       </div>
 
       <div class="form-field">
-        <label for="date">Date</label>
+        <label for="date">Date <span class="required-mark" aria-hidden="true">*</span></label>
         <input id="date" name="date" type="date" value="${values.date ?? ''}" required
                ${raw(windowError ? ' aria-invalid="true"' : '')}>
       </div>
       <div class="form-field">
-        <label for="start_time">Start time</label>
+        <label for="start_time">Start time (EAT) <span class="required-mark" aria-hidden="true">*</span></label>
         <input id="start_time" name="start_time" type="time" value="${values.start_time ?? ''}" required
                ${raw(windowError ? ' aria-invalid="true"' : '')}>
       </div>
       <div class="form-field">
-        <label for="end_time">End time</label>
+        <label for="end_time">End time (EAT) <span class="required-mark" aria-hidden="true">*</span></label>
         <input id="end_time" name="end_time" type="time" value="${values.end_time ?? ''}" required
                ${raw(windowError ? ' aria-invalid="true"' : '')}>
         <p class="hint">An end time earlier than the start time rolls over to the next day (overnight bookings).</p>
@@ -283,69 +330,67 @@ export function renderBookingFormPage({
         ${fieldError(fieldErrors, 'attendees')}
       </div>
 
-      <div class="form-field form-field--full">${windowError ? html`<p class="field-error">${windowError}</p>` : ''}</div>
+      ${windowError ? html`<div class="form-field form-field--full"><p class="field-error">${windowError}</p></div>` : ''}
+    </div>`,
+  })}
 
-      <div class="form-field form-field--full">${availabilityPanel(preview, selectedSpace)}</div>
-
-      <div class="form-field form-field--full"><h2 class="card__title">Customer</h2></div>
-      <div class="form-field form-field--full">
-        <div class="combobox">
-          <label for="customer_search">Customer</label>
-          <input id="customer_search" name="customer_search" type="search" value="${values.customer_search ?? ''}"
-                 data-customer-search role="combobox" aria-expanded="false" aria-controls="customer-search-listbox"
-                 aria-autocomplete="list" autocomplete="off"
-                 aria-describedby="customer-hint">
-          <input type="hidden" name="customer_id" value="${values.customer_id ?? ''}">
-          <ul class="combobox__list" id="customer-search-listbox" role="listbox" hidden></ul>
-          <p class="hint" id="customer-hint" data-customer-display>${customerDisplay || 'Type at least two letters and pick a customer profile.'}</p>
-          <div class="cluster">
-            <button class="button button--ghost button--small" type="button" data-new-customer-toggle>New customer</button>
-            <button class="button button--ghost button--small" type="button" data-customer-clear>Clear selection</button>
-          </div>
-          ${fieldError(fieldErrors, 'customer_id')}
+        ${card({
+    modifiers: 'form-section',
+    title: '02 · Customer Selection',
+    description: 'Link an existing customer profile from the directory or create a new customer inline.',
+    body: html`<div class="stack">
+      <div class="combobox" data-customer-combobox data-customer-search-url="/api/admin/customers/search">
+        <label for="customer_search">Customer</label>
+        <input id="customer_search" name="customer_search" type="search" value="${values.customer_search ?? ''}"
+               data-customer-search role="combobox" aria-expanded="false" aria-controls="customer-search-listbox"
+               aria-autocomplete="list" autocomplete="off"
+               aria-describedby="customer-hint"
+               placeholder="Search by name, email or organisation…">
+        <input type="hidden" name="customer_id" value="${values.customer_id ?? ''}">
+        <ul class="combobox__list" id="customer-search-listbox" role="listbox" hidden></ul>
+        <p class="hint" id="customer-hint" data-customer-display>${customerDisplay || 'Type at least two letters and pick a customer profile.'}</p>
+        <div class="cluster">
+          <button class="button button--ghost button--small" type="button" data-new-customer-toggle>New customer</button>
+          <button class="button button--ghost button--small" type="button" data-customer-clear>Clear selection</button>
         </div>
-        <details data-new-customer-fields open>
-          <summary>Create a new customer profile</summary>
-          <p class="hint">Without JavaScript this is the path that works: complete these fields and the customer is created together with the booking.</p>
-          <div class="form-grid">
-            <div class="form-field">
-              <label for="new_customer_name">Full name</label>
-              <input id="new_customer_name" name="new_customer_name" type="text" maxlength="160"
-                     value="${values.new_customer_name ?? ''}"${raw(fieldErrors?.new_customer_name ? ' aria-invalid="true"' : '')}>
-              ${fieldError(fieldErrors, 'new_customer_name')}
-            </div>
-            <div class="form-field">
-              <label for="new_customer_email">Email</label>
-              <input id="new_customer_email" name="new_customer_email" type="email" maxlength="254"
-                     value="${values.new_customer_email ?? ''}"${raw(fieldErrors?.new_customer_email ? ' aria-invalid="true"' : '')}>
-              ${fieldError(fieldErrors, 'new_customer_email')}
-            </div>
-            <div class="form-field">
-              <label for="new_customer_phone">Telephone</label>
-              <input id="new_customer_phone" name="new_customer_phone" type="tel" maxlength="40" value="${values.new_customer_phone ?? ''}">
-              ${fieldError(fieldErrors, 'new_customer_phone')}
-            </div>
-            <div class="form-field">
-              <label for="new_customer_organization">Organisation</label>
-              <input id="new_customer_organization" name="new_customer_organization" type="text" maxlength="160" value="${values.new_customer_organization ?? ''}">
-              ${fieldError(fieldErrors, 'new_customer_organization')}
-            </div>
+        ${fieldError(fieldErrors, 'customer_id')}
+      </div>
+      <details data-new-customer-fields open>
+        <summary>Create a new customer profile</summary>
+        <p class="hint">Without JavaScript this is the path that works: complete these fields and the customer is created together with the booking.</p>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="new_customer_name">Full name</label>
+            <input id="new_customer_name" name="new_customer_name" type="text" maxlength="160"
+                   value="${values.new_customer_name ?? ''}"${raw(fieldErrors?.new_customer_name ? ' aria-invalid="true"' : '')}>
+            ${fieldError(fieldErrors, 'new_customer_name')}
           </div>
-        </details>
-      </div>
+          <div class="form-field">
+            <label for="new_customer_email">Email</label>
+            <input id="new_customer_email" name="new_customer_email" type="email" maxlength="254"
+                   value="${values.new_customer_email ?? ''}"${raw(fieldErrors?.new_customer_email ? ' aria-invalid="true"' : '')}>
+            ${fieldError(fieldErrors, 'new_customer_email')}
+          </div>
+          <div class="form-field">
+            <label for="new_customer_phone">Telephone</label>
+            <input id="new_customer_phone" name="new_customer_phone" type="tel" maxlength="40" value="${values.new_customer_phone ?? ''}">
+            ${fieldError(fieldErrors, 'new_customer_phone')}
+          </div>
+          <div class="form-field">
+            <label for="new_customer_organization">Organisation</label>
+            <input id="new_customer_organization" name="new_customer_organization" type="text" maxlength="160" value="${values.new_customer_organization ?? ''}">
+            ${fieldError(fieldErrors, 'new_customer_organization')}
+          </div>
+        </div>
+      </details>
+    </div>`,
+  })}
 
-      <div class="form-field form-field--full"><h2 class="card__title">Notes and billing</h2></div>
-      <div class="form-field form-field--full">
-        <label for="purpose">Purpose of the booking</label>
-        <input id="purpose" name="purpose" type="text" maxlength="2000" value="${values.purpose ?? ''}">
-        ${fieldError(fieldErrors, 'purpose')}
-      </div>
-      <div class="form-field form-field--full">
-        <label for="internal_notes">Internal notes</label>
-        <textarea id="internal_notes" name="internal_notes" rows="3" maxlength="2000">${values.internal_notes ?? ''}</textarea>
-        <p class="hint">Staff only. Never shown on the public site or in notification emails.</p>
-        ${fieldError(fieldErrors, 'internal_notes')}
-      </div>
+        ${card({
+    modifiers: 'form-section',
+    title: '03 · Allocation, Billing & Notes',
+    description: 'Configure billing unit overrides, booking purpose, and internal staff notes.',
+    body: html`<div class="form-grid">
       <div class="form-field">
         <label for="billing_unit">Billing unit</label>
         <select id="billing_unit" name="billing_unit">
@@ -360,14 +405,52 @@ export function renderBookingFormPage({
         <p class="hint">Optional override. Blank means the server derives the quantity from the period.</p>
         ${fieldError(fieldErrors, 'billing_quantity')}
       </div>
-
-      <div class="form-field form-field--full">${pricingPreview(preview, selectedSpace, previewUnitCount)}</div>
-
-      <div class="form-actions form-field--full">
-        <button class="button button--primary" type="submit">${isEdit ? 'Save changes' : 'Create reservation'}</button>
-        <a class="button button--ghost" href="${isEdit ? `/admin/reservations/${reservation.id}` : '/admin/reservations'}">Cancel</a>
-        ${isEdit ? html`<span class="hint">Saving re-allocates inventory atomically. If the period is taken the change is refused and nothing is written.</span>` : ''}
+      <div class="form-field form-field--full">
+        <label for="purpose">Purpose of the booking</label>
+        <input id="purpose" name="purpose" type="text" maxlength="2000" value="${values.purpose ?? ''}"
+               placeholder="e.g. Quarterly strategy workshop, team sprint">
+        ${fieldError(fieldErrors, 'purpose')}
       </div>
+      <div class="form-field form-field--full">
+        <label for="internal_notes">Internal notes</label>
+        <textarea id="internal_notes" name="internal_notes" rows="3" maxlength="2000">${values.internal_notes ?? ''}</textarea>
+        <p class="hint">Staff only. Never shown on the public site or in notification emails.</p>
+        ${fieldError(fieldErrors, 'internal_notes')}
+      </div>
+    </div>`,
+  })}
+
+        <div class="form-actions">
+          <button class="button button--primary" type="submit">${isEdit ? 'Save changes' : 'Create reservation'}</button>
+          <a class="button button--ghost" href="${isEdit ? `/admin/reservations/${reservation.id}` : '/admin/reservations'}">Cancel</a>
+          ${isEdit ? html`<span class="hint">Saving re-allocates inventory atomically. If the period is taken the change is refused and nothing is written.</span>` : ''}
+        </div>
+      </div>
+
+      <aside class="stack" aria-label="Live availability and quote preview">
+        ${card({
+    title: 'Live Availability Check',
+    description: 'Real-time check against committed bookings and maintenance blocks.',
+    body: availabilityPanel(preview, selectedSpace),
+  })}
+
+        ${pricingPreview(preview, selectedSpace, previewUnitCount)}
+
+        ${card({
+    title: 'Booking Rules & Safeguards',
+    body: html`<div class="stack">
+      <dl class="detail-list detail-list--inline">
+        <dt>Time zone</dt><dd>East Africa Time (UTC+03:00)</dd>
+        ${selectedSpace ? html`
+          <dt>Operating hours</dt><dd>${selectedSpace.openTime}–${selectedSpace.closeTime}</dd>
+          <dt>Turnaround buffer</dt><dd>${selectedSpace.bufferMinutes > 0 ? `${selectedSpace.bufferMinutes} min` : 'None'}</dd>
+          <dt>Max capacity</dt><dd>${selectedSpace.capacity} people</dd>
+        ` : ''}
+      </dl>
+      <p class="hint">All reservations are validated and allocated inside an immediate SQLite write transaction. Concurrent double-bookings and duplicate form submissions are blocked automatically.</p>
+    </div>`,
+  })}
+      </aside>
     </form>`;
 
   return adminShell({
@@ -452,8 +535,13 @@ function pricingPreview(preview, space, unitCount = 1) {
 
   if (!price) {
     return html`<div class="card" data-pricing-preview>
+      <header class="card__head">
+        <div>
+          <h3 class="card__title">Price preview</h3>
+          <p class="card__description">Estimated quote based on the space rate schedule.</p>
+        </div>
+      </header>
       <div class="card__body">
-        <h2 class="card__title">Price preview</h2>
         <p class="hint">${rateList
     ? `Rates for this space: ${rateList}. Choose a space and a period to see the estimated total.`
     : 'Choose a space and a period to see the estimated total. Rates are configured per space.'}</p>
@@ -465,9 +553,14 @@ function pricingPreview(preview, space, unitCount = 1) {
                    data-pricing-rate="${price.rateCents}"
                    data-pricing-quantity="${price.billingQuantity}"
                    data-pricing-unit-count="${billableUnits}">
+    <header class="card__head">
+      <div>
+        <h3 class="card__title">Price preview</h3>
+        <p class="card__description">Authoritative server calculation for the selected window.</p>
+      </div>
+    </header>
     <div class="card__body">
-      <h2 class="card__title">Price preview</h2>
-      <p>${money(price.rateCents, price.currency)} ${pricingUnitLabel(price.billingUnit)} × ${price.billingQuantity} × ${billableUnits} ${billableUnits === 1 ? 'unit' : 'units'} = <strong>${money(price.totalCents, price.currency)}</strong></p>
+      <p>${money(price.rateCents, price.currency)} ${pricingUnitLabel(price.billingUnit)} × ${price.billingQuantity} × ${billableUnits} ${billableUnits === 1 ? 'unit' : 'units'} = <strong class="price">${money(price.totalCents, price.currency)}</strong></p>
       <p class="hint">Computed by the server for this exact window and billing unit. The total is recomputed when you save, and the confirmed total appears in the confirmation message.</p>
     </div>
   </div>`;
@@ -482,9 +575,43 @@ export function renderReservationDetailPage({
   const cancelled = reservation.status === RESERVATION_STATUS.CANCELLED;
   const completed = reservation.status === RESERVATION_STATUS.COMPLETED;
 
+  const actions = html`<div class="cluster">
+    ${cancelled ? '' : html`<a class="button button--primary button--small" href="/admin/reservations/${reservation.id}/edit">Edit booking</a>`}
+    <a class="button button--ghost button--small" href="/admin/reservations/new?customer=${reservation.customerId}&space=${reservation.spaceId}">New booking for this customer</a>
+    ${space ? html`<a class="button button--ghost button--small" href="/admin/spaces/${space.id}">View space</a>` : ''}
+    <a class="button button--ghost button--small" href="/admin/calendar?date=${startDateKey(reservation)}&space=${reservation.spaceId}">Show on calendar</a>
+    <a class="button button--ghost button--small" href="/admin/maintenance?space=${reservation.spaceId}">Maintenance</a>
+  </div>`;
+
+  const executiveSummaryCard = card({
+    title: `Executive Summary · ${reservation.reference}`,
+    description: `${reservation.spaceCode} — ${reservation.spaceName} · ${periodLabel(reservation.startAt, reservation.endAt)} (${durationLabel(reservation.startAt, reservation.endAt)})`,
+    actions: statusBadge(reservation.status),
+    body: html`<div class="stack">
+      <div class="stat-grid">
+        <div class="stat">
+          <span class="stat__value">${money(reservation.totalCents, reservation.currency)}</span>
+          <span class="stat__label">Agreed Total</span>
+          <span class="hint">${reservation.billingQuantity} × ${pricingUnitLabel(reservation.billingUnit)}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">${reservation.unitCount}</span>
+          <span class="stat__label">Allocated Units</span>
+          <span class="hint">${reservation.units.length ? reservation.units.map((u) => u.code).join(', ') : 'Released'}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">${reservation.attendees ?? NOT_SET}</span>
+          <span class="stat__label">Attendees</span>
+          <span class="hint">${categoryLabelText(reservation.category)}</span>
+        </div>
+      </div>
+      ${actions}
+    </div>`,
+  });
+
   const details = html`
     <dl class="detail-list">
-      <dt>Reference</dt><dd>${reservation.reference}</dd>
+      <dt>Reference</dt><dd><code>${reservation.reference}</code></dd>
       <dt>Status</dt><dd>${statusBadge(reservation.status)}</dd>
       <dt>Space</dt><dd>${space
     ? html`<a href="/admin/spaces/${space.id}">${reservation.spaceCode} \u2014 ${reservation.spaceName}</a>`
@@ -504,28 +631,34 @@ export function renderReservationDetailPage({
       <dt>Cancelled</dt><dd>${cancelled
     ? html`${reservation.cancelledByName ?? NOT_SET} · ${dateTimeLabel(reservation.cancelledAt)}<br><span class="hint">Reason: ${reservation.cancellationReason}</span>`
     : NOT_SET}</dd>
-      <dt>Idempotency key</dt><dd>${reservation.idempotencyKey ?? NOT_SET}
+      <dt>Idempotency key</dt><dd><code>${reservation.idempotencyKey ?? NOT_SET}</code>
         <span class="hint"> · the form token that makes a repeated submission safe</span></dd>
       <dt>Record id</dt><dd>${reservation.id}</dd>
     </dl>`;
 
-  const pricing = html`
+  const pricing = html`<div class="stack">
     <dl class="detail-list">
       <dt>Billing unit</dt><dd>${pricingUnitLabel(reservation.billingUnit)}</dd>
       <dt>Quantity</dt><dd>${reservation.billingQuantity}</dd>
       <dt>Unit rate</dt><dd>${money(reservation.rateCents, reservation.currency)}</dd>
       <dt>Billable units</dt><dd>${reservation.unitCount}</dd>
-      <dt>Total</dt><dd><strong>${money(reservation.totalCents, reservation.currency)}</strong></dd>
+      <dt>Total</dt><dd><strong class="price">${money(reservation.totalCents, reservation.currency)}</strong></dd>
       <dt>Currency</dt><dd>${reservation.currency}</dd>
     </dl>
     <p class="hint">${money(reservation.rateCents, reservation.currency)} × ${reservation.billingQuantity} × ${reservation.unitCount} = ${money(reservation.totalCents, reservation.currency)}.
       The stored figures are the price that was agreed; later rate changes never rewrite history.</p>
     ${currentRateCents !== null && currentRateCents !== reservation.rateCents
     ? html`<p class="hint">The space's current ${pricingUnitLabel(reservation.billingUnit)} rate is ${money(currentRateCents, reservation.currency)}.</p>`
-    : ''}`;
+    : ''}
+  </div>`;
 
   const unitsBody = reservation.units.length
-    ? html`<ul>${reservation.units.map((unit) => html`<li>${unit.code} · ${unit.label} · ${unit.kind}</li>`)}</ul>`
+    ? table({
+      columns: [{ label: 'Unit code' }, { label: 'Label' }, { label: 'Kind' }],
+      rows: reservation.units.map((unit) => ({
+        cells: [html`<code>${unit.code}</code>`, unit.label, tag(unit.kind)],
+      })),
+    })
     : emptyState(cancelled ? 'The allocation was released when this booking was cancelled.' : 'No active allocation found for this reservation.');
 
   const auditRows = audit.map((entry) => ({
@@ -538,7 +671,7 @@ export function renderReservationDetailPage({
   }));
 
   const timeline = html`
-    <ol>
+    <ol class="stack">
       <li>${statusBadge(RESERVATION_STATUS.CONFIRMED)} ${reservation.createdByName ?? NOT_SET} · ${dateTimeLabel(reservation.createdAt)}</li>
       ${reservation.updatedAt && reservation.updatedAt !== reservation.createdAt
     ? html`<li>Updated by ${reservation.updatedByName ?? NOT_SET} · ${dateTimeLabel(reservation.updatedAt)}</li>` : ''}
@@ -550,29 +683,24 @@ export function renderReservationDetailPage({
       : ''}
     </ol>`;
 
-  const actions = html`<div class="cluster">
-    ${cancelled ? '' : html`<a class="button button--primary button--small" href="/admin/reservations/${reservation.id}/edit">Edit booking</a>`}
-    <a class="button button--ghost button--small" href="/admin/reservations/new?customer=${reservation.customerId}&space=${reservation.spaceId}">New booking for this customer</a>
-    ${space ? html`<a class="button button--ghost button--small" href="/admin/spaces/${space.id}">View space</a>` : ''}
-    <a class="button button--ghost button--small" href="/admin/calendar?date=${startDateKey(reservation)}&space=${reservation.spaceId}">Show on calendar</a>
-    <a class="button button--ghost button--small" href="/admin/maintenance?space=${reservation.spaceId}">Maintenance</a>
-  </div>`;
-
   const cancelCard = cancelled
     ? card({
-      title: 'Cancellation',
-      body: html`<p>${reservation.cancelledByName ?? NOT_SET} cancelled this booking on ${dateTimeLabel(reservation.cancelledAt)}.</p>
+      title: 'Cancellation Record',
+      body: html`<div class="stack">
+        <p>${reservation.cancelledByName ?? NOT_SET} cancelled this booking on ${dateTimeLabel(reservation.cancelledAt)}.</p>
         <p class="hint">Reason recorded: ${reservation.cancellationReason}</p>
-        <p class="hint">The record is permanent: the reservation row and its released occupancy rows are kept for history.</p>`,
+        <p class="hint">The record is permanent: the reservation row and its released occupancy rows are kept for history.</p>
+      </div>`,
     })
-    : html`${card({
+    : card({
+      modifiers: 'card--danger',
       title: 'Cancel this reservation',
-      description: 'Cancelling releases the space or desks immediately.',
+      description: 'Cancelling releases the space or desks immediately and requires a non-blank reason.',
       body: html`<form method="post" action="/admin/reservations/${reservation.id}/cancel"
         data-confirm="Cancel ${reservation.reference}? The cancellation is recorded permanently with your name, the time and the reason you give.">
         ${csrfField(csrfToken)}
         <div class="form-field">
-          <label for="cancellation_reason">Cancellation reason (required)</label>
+          <label for="cancellation_reason">Cancellation reason (required) <span class="required-mark" aria-hidden="true">*</span></label>
           <textarea id="cancellation_reason" name="cancellation_reason" rows="3" maxlength="1000" required
                     aria-describedby="cancel-hint"${raw(fieldErrors?.cancellation_reason ? ' aria-invalid="true"' : '')}>${cancelReason}</textarea>
           ${fieldError(fieldErrors, 'cancellation_reason')}
@@ -583,17 +711,18 @@ export function renderReservationDetailPage({
           <button class="button button--danger" type="submit">Cancel this reservation</button>
         </div>
       </form>`,
-    })}`;
+    });
 
-  const body = html`
+  const body = html`<div class="stack">
     ${alertBlock(alert)}
+    ${executiveSummaryCard}
     <div class="split-layout">
-      <div>
-        ${card({ title: 'Booking', description: 'Every stored field for this reservation.', body: details })}
-        ${card({ title: 'Pricing breakdown', body: pricing })}
-        ${card({ title: 'Allocated inventory', description: 'The specific units this booking holds.', body: unitsBody })}
+      <div class="stack">
+        ${card({ title: 'Booking & Schedule Summary', description: 'Every stored field for this reservation.', body: details })}
+        ${card({ title: 'Financial & Rate Breakdown', body: pricing })}
+        ${card({ title: 'Allocated Resource Units', description: 'The specific resource units this booking holds.', body: unitsBody })}
         ${card({
-      title: 'Activity for this reservation',
+      title: 'Activity History',
       description: 'Immutable audit entries written in the same transaction as each change.',
       body: auditRows.length
         ? table({
@@ -604,10 +733,11 @@ export function renderReservationDetailPage({
         : emptyState('No audit entries for this reservation yet.'),
     })}
       </div>
-      <div>
+      <div class="stack">
         ${card({
-      title: 'Customer',
-      body: html`<dl class="detail-list">
+      title: 'Customer Profile',
+      body: html`<div class="stack">
+        <dl class="detail-list">
           <dt>Name</dt><dd><a href="/admin/customers/${reservation.customerId}">${reservation.customer.fullName}</a></dd>
           <dt>Email</dt><dd>${reservation.customer.email}</dd>
           <dt>Telephone</dt><dd>${reservation.customer.phone ?? NOT_SET}</dd>
@@ -616,13 +746,15 @@ export function renderReservationDetailPage({
           ${customer && customer.stats.lastBookingAt
           ? html`<dt>Last booking</dt><dd>${friendlyDate(customer.stats.lastBookingAt)}</dd>` : ''}
         </dl>
-        <p class="hint"><a href="/admin/customers/${reservation.customerId}">Open the customer profile</a> for the full history.</p>`,
+        <p class="hint"><a href="/admin/customers/${reservation.customerId}">Open the customer profile</a> for the full history.</p>
+      </div>`,
     })}
         ${card({ title: 'Status timeline', body: timeline })}
         ${card({ title: 'Permitted actions', body: actions })}
         ${cancelCard}
       </div>
-    </div>`;
+    </div>
+  </div>`;
 
   return adminShell({
     title: `Reservation ${reservation.reference}`,
@@ -636,6 +768,7 @@ export function renderReservationDetailPage({
       { label: 'Reservations', href: '/admin/reservations' },
       { label: reservation.reference },
     ],
+    pageActions: cancelled ? null : html`<a class="button button--primary button--small" href="/admin/reservations/${reservation.id}/edit">Edit booking</a>`,
     body,
   });
 }
@@ -653,11 +786,11 @@ export function renderMaintenancePage({
 }) {
   const rows = blocks.map((block) => ({
     cells: [
-      html`${block.spaceCode}<br><span class="hint">${block.spaceName}</span>`,
+      html`<strong>${block.spaceCode}</strong><br><span class="hint">${block.spaceName}</span>`,
       periodLabel(block.startAt, block.endAt),
-      durationLabel(block.startAt, block.endAt),
+      tag(durationLabel(block.startAt, block.endAt)),
       block.reason,
-      block.unitCodes.length ? block.unitCodes.join(', ') : 'all units',
+      block.unitCodes.length ? html`<code>${block.unitCodes.join(', ')}</code>` : tag('all units', 'info'),
       statusBadge(block.status === 'ACTIVE' ? 'PUBLISHED' : 'ARCHIVED'),
       html`${block.createdByName ?? NOT_SET}<br><span class="hint">${relativeDayLabel(block.createdAt)} ${timeLabel(block.createdAt)}</span>`,
       block.status === 'ACTIVE'
@@ -665,24 +798,24 @@ export function renderMaintenancePage({
                        data-confirm="Cancel this maintenance block? The blocked inventory is released immediately.">
             ${csrfField(csrfToken)}
             <input type="hidden" name="reason" value="Cancelled from the maintenance list">
-            <button class="button button--ghost button--small" type="submit">Cancel block</button>
+            <button class="button button--danger button--small" type="submit">Cancel block</button>
           </form>`
         : html`<span class="hint">Cancelled</span>`,
     ],
   }));
 
-  const body = html`
+  const body = html`<div class="stack">
     ${alertBlock(alert)}
     ${problems && problems.length ? html`<div class="alert alert--error" role="alert">${problemList(problems)}</div>` : ''}
 
     <div class="split-layout">
-      <div>
+      <div class="stack">
         ${card({
     title: 'Maintenance blocks',
     description: 'A block claims the space\'s units as occupancy, so the same database rule that stops double bookings also stops maintenance over a confirmed reservation.',
     body: html`${table({
       columns: [
-        { label: 'Space' }, { label: 'Period' }, { label: 'Duration' }, { label: 'Reason' },
+        { label: 'Space' }, { label: 'Period (EAT)' }, { label: 'Duration' }, { label: 'Reason' },
         { label: 'Units' }, { label: 'Status' }, { label: 'Created' }, { label: 'Action' },
       ],
       rows,
@@ -690,34 +823,35 @@ export function renderMaintenancePage({
     })}`,
   })}
       </div>
-      <div>
+      <div class="stack">
         ${card({
     title: 'Block a period',
-    description: 'Creating a block refuses to overlap a confirmed or completed reservation.',
+    description: 'Maintenance blocks cannot overlap existing confirmed reservations — any conflicting attempt is refused atomically.',
     body: html`<form method="post" action="/admin/maintenance" class="form-grid" data-maintenance-form>
         ${csrfField(csrfToken)}
         <input type="hidden" name="form_token" value="${formToken}">
         <div class="form-field form-field--full">
-          <label for="maintenance_space">Space</label>
+          <label for="maintenance_space">Space <span class="required-mark" aria-hidden="true">*</span></label>
           ${spaceSelect({ spaces, selectedId: values.space_id ?? '', id: 'maintenance_space', allowArchived: false })}
           ${fieldError(fieldErrors, 'space_id')}
         </div>
         <div class="form-field">
-          <label for="maintenance_date">Date</label>
+          <label for="maintenance_date">Date <span class="required-mark" aria-hidden="true">*</span></label>
           <input id="maintenance_date" name="date" type="date" value="${values.date ?? ''}" required>
         </div>
         <div class="form-field">
-          <label for="maintenance_start">Start time</label>
+          <label for="maintenance_start">Start time <span class="required-mark" aria-hidden="true">*</span></label>
           <input id="maintenance_start" name="start_time" type="time" value="${values.start_time ?? ''}" required>
         </div>
         <div class="form-field">
-          <label for="maintenance_end">End time</label>
+          <label for="maintenance_end">End time <span class="required-mark" aria-hidden="true">*</span></label>
           <input id="maintenance_end" name="end_time" type="time" value="${values.end_time ?? ''}" required>
           <p class="hint">An end earlier than the start rolls over to the next day.</p>
         </div>
         <div class="form-field form-field--full">
-          <label for="maintenance_reason">Reason (required)</label>
+          <label for="maintenance_reason">Reason (required) <span class="required-mark" aria-hidden="true">*</span></label>
           <input id="maintenance_reason" name="reason" type="text" maxlength="500" required value="${values.reason ?? ''}"
+                 placeholder="e.g. HVAC servicing, projector replacement"
                  ${raw(fieldErrors?.reason ? ' aria-invalid="true"' : '')}>
           ${fieldError(fieldErrors, 'reason')}
         </div>
@@ -730,13 +864,15 @@ export function renderMaintenancePage({
           </select>
           <p class="hint">Leave empty to block every unit of the chosen space. Selections for other spaces are ignored.</p>
         </div>
+        <p class="hint form-field--full">A maintenance block <strong>cannot</strong> be created over a confirmed reservation — the server rejects the conflict and writes nothing.</p>
         <div class="form-actions form-field--full">
           <button class="button button--primary" type="submit">Create maintenance block</button>
         </div>
       </form>`,
   })}
       </div>
-    </div>`;
+    </div>
+  </div>`;
 
   return adminShell({
     title: 'Maintenance',

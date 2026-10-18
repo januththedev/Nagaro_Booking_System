@@ -54,11 +54,11 @@ const FORBIDDEN_KEY_NAMES = Object.freeze([
 const CAVEAT = 'Provisional only — this check does not hold the space. '
   + 'A booking is confirmed only once Nagaro staff confirm it.';
 
-/** Simple line icons for the three space categories (inline SVG, no external assets). */
+/** Architectural line icons for the three space categories (inline SVG, no external assets). */
 const CATEGORY_ICON = Object.freeze({
-  [SPACE_CATEGORY.MEETING_ROOM]: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 20h8M12 17v3M7 12l2.5-3 2.5 3"/></svg>',
-  [SPACE_CATEGORY.AUDITORIUM]: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M5 5v5a4 4 0 0 0 8 0V5M13 5v5a4 4 0 0 0 8 0V5M8 20l1.5-4M16 20l-1.5-4"/></svg>',
-  [SPACE_CATEGORY.COWORKING]: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="8" height="12" rx="1.5"/><rect x="13" y="8" width="8" height="9" rx="1.5"/><path d="M3 21h18"/></svg>',
+  [SPACE_CATEGORY.MEETING_ROOM]: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 11l2.5-2.5L12 11l3-3"/></svg>',
+  [SPACE_CATEGORY.AUDITORIUM]: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M5 5v5a4 4 0 0 0 8 0V5M11 5v5a4 4 0 0 0 8 0V5M6 19c2-2 4-3 6-3s4 1 6 3M4 22c2.5-2 5.2-3 8-3s5.5 1 8 3"/></svg>',
+  [SPACE_CATEGORY.COWORKING]: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="8" height="11" rx="1.5"/><rect x="13" y="8" width="8" height="8" rx="1.5"/><path d="M2 20h20M7 16v4M17 16v4"/></svg>',
 });
 
 /** The one sentence every acknowledgement page must carry. */
@@ -120,7 +120,7 @@ function humaniseKey(key) {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-function humanMinutes(minutes) {
+function formatMinutes(minutes) {
   const total = Math.max(0, Math.round(Number(minutes) || 0));
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -129,9 +129,18 @@ function humanMinutes(minutes) {
   return `${m}m`;
 }
 
+const humanMinutes = formatMinutes;
+
 function attributeValue(value) {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   return text(value);
+}
+
+function locationLine(space) {
+  return [
+    space?.location || 'Trace Expert City',
+    space?.floor ? `Floor ${space.floor}` : null,
+  ].filter(Boolean).join(' · ');
 }
 
 function metaLine(parts) {
@@ -234,7 +243,7 @@ export function publicSpaceProjection(space, { images = [], availability = null,
 
 /** Cover image for a card, falling back to the first photograph. */
 function coverImage(space) {
-  const images = space.images ?? [];
+  const images = space?.images ?? [];
   return images.find((image) => image.isCover) ?? images[0] ?? null;
 }
 
@@ -245,29 +254,45 @@ function altFor(image, space) {
 
 function spaceCard(space) {
   const cover = coverImage(space);
+  const amenities = Array.isArray(space.amenities) ? space.amenities : [];
+  const visibleAmenities = amenities.slice(0, 3);
+  const extraAmenities = Math.max(0, amenities.length - visibleAmenities.length);
+  const kicker = locationLine(space);
+
   const media = cover
     ? html`<a class="space-card__media" href="/spaces/${space.code}" tabindex="-1" aria-hidden="true">
         <img src="${cover.url}" alt="${altFor(cover, space)}" loading="lazy">
         <span class="space-card__badge">${space.categoryLabel}</span>
+        ${space.capacity ? html`<span class="space-card__capacity">Up to ${space.capacity}</span>` : ''}
       </a>`
-    : html`<span class="space-card__media" aria-hidden="true">
+    : html`<a class="space-card__media space-card__media--empty" href="/spaces/${space.code}" tabindex="-1" aria-hidden="true">
         <span class="space-card__badge space-card__badge--empty">${space.categoryLabel}</span>
-      </span>`;
+        ${space.capacity ? html`<span class="space-card__capacity">Up to ${space.capacity}</span>` : ''}
+      </a>`;
 
   return html`<article class="space-card" data-space-code="${space.code}">
     ${media}
     <div class="space-card__body">
+      <p class="space-card__kicker">${kicker} · <code>${space.code}</code></p>
       <h3 class="space-card__title"><a href="/spaces/${space.code}">${space.name}</a></h3>
       ${metaLine([
     space.categoryLabel,
     space.capacity ? `Up to ${space.capacity} people` : null,
-    [space.location, space.floor ? `Floor ${space.floor}` : null].filter(Boolean).join(', ') || null,
+    space.openTime && space.closeTime ? `${space.openTime}–${space.closeTime} EAT` : null,
   ])}
-      ${space.shortDescription ? html`<p>${space.shortDescription}</p>` : ''}
-      <p class="price"><span class="price__label">From</span> ${space.rateSummary}</p>
-      <div class="space-card__actions">
-        <a class="button button--primary button--small" href="/spaces/${space.code}">View details</a>
-        <a class="button button--ghost button--small" href="/booking-request?space=${space.code}">Request</a>
+      ${space.shortDescription ? html`<p class="space-card__summary">${space.shortDescription}</p>` : ''}
+      ${visibleAmenities.length
+    ? html`<ul class="space-card__amenities" aria-label="Highlighted amenities">
+        ${visibleAmenities.map((item) => html`<li class="space-card__amenity">${item}</li>`)}
+        ${extraAmenities > 0 ? html`<li class="space-card__amenity space-card__amenity--more">+${extraAmenities} more</li>` : ''}
+      </ul>`
+    : ''}
+      <div class="space-card__footer">
+        <p class="price"><span class="price__label">From</span> ${space.rateSummary}</p>
+        <div class="space-card__actions">
+          <a class="button button--primary button--small" href="/spaces/${space.code}">View space</a>
+          <a class="button button--ghost button--small" href="/booking-request?space=${space.code}">Inquire</a>
+        </div>
       </div>
     </div>
   </article>`;
@@ -313,9 +338,9 @@ function fieldMessage(field, message) {
  * id list it must put in `aria-describedby`; errors get their own id so screen
  * readers announce them.
  */
-function field({ id, label, hint = null, error = null, required = false, control }) {
+function field({ id, label, hint = null, error = null, required = false, className = '', control }) {
   const described = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(' ');
-  return html`<div class="form-field">
+  return html`<div class="form-field ${className}">
     <label for="${id}">${label}${required ? html` <span class="required-mark" aria-hidden="true">*</span>` : ''}</label>
     ${control(described)}
     ${hint ? html`<p class="hint" id="${id}-hint">${hint}</p>` : ''}
@@ -330,6 +355,7 @@ function input({ id, name, type = 'text', value = '', describedBy = '', invalid 
     ${attr('min', rest.min ?? null)} ${attr('max', rest.max ?? null)}
     ${attr('step', rest.step ?? null)} ${attr('minlength', rest.minLength ?? null)}
     ${attr('maxlength', rest.maxLength ?? null)}
+    ${attr('placeholder', rest.placeholder ?? null)}
     ${attr('autocomplete', rest.autocomplete ?? null)}
     ${attr('inputmode', rest.inputMode ?? null)}>`;
 }
@@ -366,10 +392,88 @@ function paginationNav({ page, pageSize, total, basePath, pairs = [] }) {
 /* ==================================================================== pages */
 
 const CATEGORY_TAGLINE = Object.freeze({
-  [SPACE_CATEGORY.MEETING_ROOM]: 'Rooms for meetings, workshops and training, bookable by the hour or the day.',
-  [SPACE_CATEGORY.AUDITORIUM]: 'The large hall for launches, screenings and town halls, with stage and sound support.',
-  [SPACE_CATEGORY.COWORKING]: 'Individual desks and small team areas, bookable by the day, week or month.',
+  [SPACE_CATEGORY.MEETING_ROOM]: 'Architecturally quiet boardrooms, executive suites and modular training studios equipped with high-lumen projection, acoustic treatment and enterprise Wi-Fi.',
+  [SPACE_CATEGORY.AUDITORIUM]: 'A landmark tiered hall at Trace Expert City engineered for product keynotes, screenings, symposiums and full-company town halls with stage lighting and PA.',
+  [SPACE_CATEGORY.COWORKING]: 'Ergonomic individual workstations and dedicated team benches in a daylight-filled studio floor, ready for focused daily, weekly or monthly residencies.',
 });
+
+const CATEGORY_UNITS = Object.freeze({
+  [SPACE_CATEGORY.MEETING_ROOM]: 'Hourly · Half-day · Full-day',
+  [SPACE_CATEGORY.AUDITORIUM]: 'Hourly · Half-day · Full-day',
+  [SPACE_CATEGORY.COWORKING]: 'Daily · Weekly · Monthly',
+});
+
+function renderHeroShowcase(featured, totalPublished) {
+  const primary = featured[0] ?? null;
+  const secondary = featured[1] ?? null;
+
+  if (!primary) {
+    return html`<div class="hero__showcase">
+      <article class="hero-card">
+        <div class="hero-card__body">
+          <span class="tag tag--info">Trace Expert City · Addis Ababa</span>
+          <h2 class="hero-card__title">Curated Workspace &amp; Event Architecture</h2>
+          <p class="hero-card__meta">Boardrooms, executive training suites, grand auditorium &amp; co-working studios.</p>
+          <dl class="hero-spec-list">
+            <div><dt>Published venues</dt><dd>${totalPublished} venues</dd></div>
+            <div><dt>Time zone</dt><dd>East Africa Time (UTC+3)</dd></div>
+            <div><dt>Verification</dt><dd>Staff-verified scheduling</dd></div>
+          </dl>
+        </div>
+      </article>
+    </div>`;
+  }
+
+  const cover = coverImage(primary);
+  return html`<div class="hero__showcase">
+    <article class="hero-card">
+      ${cover
+    ? html`<a class="hero-card__media" href="/spaces/${primary.code}" tabindex="-1" aria-hidden="true">
+        <img src="${cover.url}" alt="${altFor(cover, primary)}">
+        <span class="hero-card__badge">${primary.categoryLabel}</span>
+      </a>`
+    : html`<div class="hero-card__media hero-card__media--empty">
+        <span class="hero-card__badge">${primary.categoryLabel}</span>
+      </div>`}
+      <div class="hero-card__body">
+        <div class="hero-card__header">
+          <p class="hero-card__kicker">${locationLine(primary)} · <code>${primary.code}</code></p>
+          <h2 class="hero-card__title"><a href="/spaces/${primary.code}">${primary.name}</a></h2>
+        </div>
+        <p class="hero-card__meta">
+          <span>Up to ${primary.capacity} people</span>
+          <span>·</span>
+          <span>${primary.openTime}–${primary.closeTime} EAT</span>
+        </p>
+        <div class="hero-card__footer">
+          <p class="price"><span class="price__label">From</span> ${primary.rateSummary}</p>
+          <a class="button button--ghost button--small" href="/spaces/${primary.code}">Inspect venue →</a>
+        </div>
+      </div>
+    </article>
+
+    <div class="hero-spec-card">
+      <div class="hero-spec-card__item">
+        <span class="hero-spec-card__label">Live Catalogue</span>
+        <strong class="hero-spec-card__value">${totalPublished} published ${totalPublished === 1 ? 'venue' : 'venues'}</strong>
+      </div>
+      <div class="hero-spec-card__item">
+        <span class="hero-spec-card__label">Campus Standard</span>
+        <strong class="hero-spec-card__value">East Africa Time (UTC+3)</strong>
+      </div>
+      <div class="hero-spec-card__item">
+        <span class="hero-spec-card__label">Booking Model</span>
+        <strong class="hero-spec-card__value">Staff-verified scheduling</strong>
+      </div>
+      ${secondary
+    ? html`<div class="hero-spec-card__item hero-spec-card__item--link">
+        <span class="hero-spec-card__label">Also featured</span>
+        <a href="/spaces/${secondary.code}" class="hero-spec-card__value">${secondary.name} →</a>
+      </div>`
+    : ''}
+    </div>
+  </div>`;
+}
 
 /** `GET /` — hero, three category entry points and up to six featured spaces. */
 export function renderHomePage({ featured = [], totalPublished = 0, categoryCounts = {} } = {}) {
@@ -377,52 +481,66 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
     category,
     label: SPACE_CATEGORY_LABEL[category] ?? category,
     tagline: CATEGORY_TAGLINE[category] ?? '',
+    units: CATEGORY_UNITS[category] ?? 'Flexible billing',
     count: categoryCounts[category] ?? 0,
   }));
 
-  const body = html`<section class="hero">
+  const body = html`<section class="hero hero--editorial">
     <div class="hero__inner">
-      <p class="hero__eyebrow">Nagaro · Trace Expert City</p>
-      <h1 class="hero__title">Meeting rooms, an auditorium and co-working desks at Trace Expert City</h1>
-      <p class="hero__subtitle">Nagaro rents out practical, well-equipped space in Trace Expert City, Addis Ababa.
-        Browse what is available, check a period, and send us a request to book.</p>
-      <p class="hero__subtitle"><strong>Availability shown here is provisional.</strong> A request does not hold the
-        space and is not a booking until Nagaro staff confirm it.</p>
-      <div class="hero__actions">
-        <a class="button button--primary" href="/spaces">Browse all spaces</a>
-        <a class="button button--ghost" href="/booking-request">Request a booking</a>
+      <div class="hero__grid">
+        <div class="hero__copy">
+          <p class="hero__eyebrow">Trace Expert City · Workspace &amp; Venue Collection</p>
+          <h1 class="hero__title">Architectural spaces for focused work, training and landmark events.</h1>
+          <p class="hero__subtitle">Nagaro manages the bookable meeting rooms, executive training suites, grand auditorium and co-working studios at Trace Expert City in Addis Ababa. Inspect real-time schedules, review spatial specifications and submit a booking inquiry directly to our operations desk.</p>
+          <div class="hero__actions">
+            <a class="button button--primary button--large" href="/spaces">Explore the spaces</a>
+            <a class="button button--ghost button--large" href="/booking-request">Submit a booking inquiry</a>
+          </div>
+          <div class="hero__notice">
+            <p><strong>Provisional availability notice:</strong> Online availability checks reflect current calendar state in real time, but submitting an inquiry does not automatically lock inventory. Every reservation is verified and confirmed by the Nagaro operations desk.</p>
+          </div>
+          <dl class="hero__stats">
+            <div class="hero__stat"><dt>Published venues</dt><dd>${totalPublished}</dd></div>
+            <div class="hero__stat"><dt>Spatial typologies</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
+            <div class="hero__stat"><dt>Operations desk</dt><dd>Mon–Sat · EAT</dd></div>
+          </dl>
+        </div>
+        ${renderHeroShowcase(featured, totalPublished)}
       </div>
-      <dl class="hero__stats">
-        <div class="hero__stat"><dt>Published spaces</dt><dd>${totalPublished}</dd></div>
-        <div class="hero__stat"><dt>Categories</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
-        <div class="hero__stat"><dt>Booking desk</dt><dd>Mon–Sat</dd></div>
-      </dl>
     </div>
   </section>
 
   <section class="container stack">
     <div class="section-head">
       <div>
+        <p class="section-eyebrow">Curated Typologies</p>
         <h2 class="section-title">What you can book</h2>
-        <p class="section-subtitle">Three kinds of space, ${totalPublished === 1 ? '1 space published' : `${totalPublished} spaces published`} right now.</p>
+        <p class="section-subtitle">Three distinct spatial categories across Trace Expert City, with ${totalPublished === 1 ? '1 venue published' : `${totalPublished} venues published`} right now.</p>
       </div>
     </div>
-    <div class="category-grid">
+    <div class="category-showcase-grid category-grid">
       ${categories.map((item) => html`<a class="category-card" href="/spaces?category=${item.category}">
-        <span class="category-card__icon" aria-hidden="true">${raw(CATEGORY_ICON[item.category] ?? '')}</span>
-        <span class="category-card__title">${item.label}</span>
-        <span class="category-card__meta">${item.tagline}</span>
-        <span class="category-card__count">${item.count === 1 ? '1 space available' : `${item.count} spaces available`}</span>
+        <div class="category-card__top">
+          <span class="category-card__icon" aria-hidden="true">${raw(CATEGORY_ICON[item.category] ?? '')}</span>
+          <span class="category-card__count">${item.count} published</span>
+        </div>
+        <h3 class="category-card__title">${item.label}</h3>
+        <p class="category-card__meta">${item.tagline}</p>
+        <div class="category-card__footer">
+          <span class="category-card__units">${item.units}</span>
+          <span class="category-card__cta">Explore category →</span>
+        </div>
       </a>`)}
     </div>
 
     <div class="section-head">
       <div>
+        <p class="section-eyebrow">Selected Inventory</p>
         <h2 class="section-title">Featured spaces</h2>
-        <p class="section-subtitle">Published spaces at Trace Expert City.</p>
+        <p class="section-subtitle">Published architectural rooms, halls and desk studios at Trace Expert City, with capacities and transparent ETB rates.</p>
       </div>
       <div class="section-actions">
-        <a class="button button--ghost button--small" href="/spaces">See everything</a>
+        <a class="button button--ghost button--small" href="/spaces">View full directory →</a>
       </div>
     </div>
     ${featured.length
@@ -432,21 +550,41 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
       'Nagaro staff are still preparing the catalogue. Please check back shortly.',
     )}
 
-    <div class="card">
+    <section class="process-section card">
       <div class="card__body stack">
-        <h2 class="section-title">How a request to book works</h2>
-        <ol>
-          <li>Check a space and a period on its page. The answer is provisional and does not hold the space.</li>
-          <li>Send a request with the form. We save it and Nagaro staff see it in the booking queue.</li>
-          <li>Staff check the calendar by hand, confirm the booking with you, and only then is the space reserved.</li>
-        </ol>
-        <p class="hint">Requests are not confirmed bookings, and posting the form never reserves inventory.</p>
-        <div class="cluster">
-          <a class="button button--primary" href="/booking-request">Request a booking</a>
-          <a class="button button--ghost" href="/spaces">Browse spaces</a>
+        <div class="section-head">
+          <div>
+            <p class="section-eyebrow">Concierge Verification Workflow</p>
+            <h2 class="section-title">How a request to book works</h2>
+            <p class="section-subtitle">We pair live calendar transparency with human operational review so every room setup, turnaround buffer and desk allocation is guaranteed.</p>
+          </div>
+        </div>
+        <div class="process-grid">
+          <article class="process-step">
+            <span class="process-step__num">01</span>
+            <h3 class="process-step__title">01 · Inspect Space &amp; Provisional Schedule</h3>
+            <p class="process-step__body">Explore room capacities, technical amenities, turnaround buffers and ETB rate schedules. Run a live provisional check for your preferred date and time window.</p>
+          </article>
+          <article class="process-step">
+            <span class="process-step__num">02</span>
+            <h3 class="process-step__title">02 · Submit a Booking Inquiry</h3>
+            <p class="process-step__body">Send your preferred schedule, attendee count and setup notes. You receive an immediate reference code (<code>INQ-YYYY-NNNNN</code>) and a private self-service withdrawal link.</p>
+          </article>
+          <article class="process-step">
+            <span class="process-step__num">03</span>
+            <h3 class="process-step__title">03 · Operations Desk Confirmation</h3>
+            <p class="process-step__body">Nagaro staff review the calendar, verify layout and catering or AV requirements with you, and issue a formal confirmed reservation that locks the inventory.</p>
+          </article>
+        </div>
+        <div class="process-footer cluster">
+          <p class="hint">Requests are not confirmed bookings, and submitting the inquiry form carries no automatic hold or online payment.</p>
+          <div class="cluster">
+            <a class="button button--primary" href="/booking-request">Request a booking</a>
+            <a class="button button--ghost" href="/spaces">Browse spaces</a>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   </section>`;
 
   return publicShell({
@@ -467,73 +605,117 @@ export function renderSpaceDirectoryPage({
   const pairs = filterPairs(filters);
   const selected = new Set(filters.amenities ?? []);
   const summary = filterSummary(filters);
+  const hasActiveFilters = pairs.length > 0;
+
+  const categoryQuickLinks = [
+    { code: '', label: `All venues (${publishedTotal})`, href: '/spaces' },
+    { code: SPACE_CATEGORY.MEETING_ROOM, label: 'Meeting & training rooms', href: `/spaces?category=${SPACE_CATEGORY.MEETING_ROOM}` },
+    { code: SPACE_CATEGORY.AUDITORIUM, label: 'Auditorium', href: `/spaces?category=${SPACE_CATEGORY.AUDITORIUM}` },
+    { code: SPACE_CATEGORY.COWORKING, label: 'Co-working desks', href: `/spaces?category=${SPACE_CATEGORY.COWORKING}` },
+  ];
 
   const body = html`<section class="container stack">
-    <div>
-      <h1 class="page-title">Spaces</h1>
-      <p class="section-subtitle">Every space Nagaro currently publishes at Trace Expert City.
-        Availability shown on a space page is provisional.</p>
-    </div>
+    <header class="directory-hero">
+      <div class="directory-hero__copy">
+        <p class="section-eyebrow">Trace Expert City · Venue Directory</p>
+        <h1 class="page-title">Spaces &amp; Architectural Venues</h1>
+        <p class="section-subtitle">Every published room, hall and co-working studio managed by Nagaro at Trace Expert City. Filter by capacity, billing unit or technical amenity. Availability shown on any venue page is provisional.</p>
+      </div>
+      <nav class="category-pills" aria-label="Quick category filter">
+        ${categoryQuickLinks.map((item) => {
+    const active = (filters.category ?? '') === item.code;
+    return html`<a href="${item.href}"
+            class="category-pill ${active ? 'is-active' : ''}"
+            ${active ? raw('aria-current="page"') : ''}>${item.label}</a>`;
+  })}
+      </nav>
+    </header>
 
-    <form class="filter-bar" method="get" action="/spaces" role="search" aria-label="Filter spaces">
-      <div class="filter-bar__field">
-        <label for="filter-q">Search</label>
-        <input id="filter-q" name="q" type="search" value="${filters.q ?? ''}"
-               placeholder="Name, code or location" maxlength="80">
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-category">Category</label>
-        <select id="filter-category" name="category">
-          <option value="">All categories</option>
-          ${SPACE_CATEGORY_ORDER.map((category) => html`<option value="${category}"
-            ${attr('selected', filters.category === category)}>${SPACE_CATEGORY_LABEL[category] ?? category}</option>`)}
-        </select>
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-capacity">Minimum capacity</label>
-        <input id="filter-capacity" name="min_capacity" type="number" min="1" max="100000"
-               value="${filters.minCapacity === null || filters.minCapacity === undefined ? '' : filters.minCapacity}">
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-pricing">Pricing unit</label>
-        <select id="filter-pricing" name="pricing_unit">
-          <option value="">Any pricing unit</option>
-          ${pricingUnitOptions.map((unit) => html`<option value="${unit}"
-            ${attr('selected', filters.pricingUnit === unit)}>${pricingUnitLabel(unit)}</option>`)}
-        </select>
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-sort">Sort by</label>
-        <select id="filter-sort" name="sort">
-          ${[['name', 'Name'], ['capacity', 'Capacity'], ['price', 'Price']].map(([value, label]) => html`<option value="${value}"
-            ${attr('selected', (filters.sort ?? 'name') === value)}>${label}</option>`)}
-        </select>
-      </div>
-      <details class="filter-bar__field">
-        <summary>Amenities${selected.size ? ` (${selected.size} selected)` : ''}</summary>
-        <div class="cluster">
-          ${amenityOptions.map((amenity) => html`<label class="hint" for="amenity-${slugId(amenity)}">
-            <input id="amenity-${slugId(amenity)}" type="checkbox" name="amenity" value="${amenity}"
-                   ${attr('checked', selected.has(amenity))}> ${amenity}
-          </label>`)}
+    <div class="directory-layout">
+      <aside class="directory-sidebar">
+        <form class="filter-panel filter-bar" method="get" action="/spaces" role="search" aria-label="Filter spaces">
+          <div class="filter-panel__head">
+            <h2 class="filter-panel__title">Refine venues</h2>
+            ${hasActiveFilters ? html`<a class="filter-panel__reset" href="/spaces">Clear all</a>` : ''}
+          </div>
+
+          <div class="filter-bar__field">
+            <label for="filter-q">Keyword search</label>
+            <input id="filter-q" name="q" type="search" value="${filters.q ?? ''}"
+                   placeholder="Name, code or building" maxlength="80">
+          </div>
+
+          <div class="filter-bar__field">
+            <label for="filter-category">Category</label>
+            <select id="filter-category" name="category">
+              <option value="">All categories</option>
+              ${SPACE_CATEGORY_ORDER.map((category) => html`<option value="${category}"
+                ${attr('selected', filters.category === category)}>${SPACE_CATEGORY_LABEL[category] ?? category}</option>`)}
+            </select>
+          </div>
+
+          <div class="filter-bar__field">
+            <label for="filter-capacity">Minimum capacity</label>
+            <input id="filter-capacity" name="min_capacity" type="number" min="1" max="100000"
+                   placeholder="e.g. 12 people"
+                   value="${filters.minCapacity === null || filters.minCapacity === undefined ? '' : filters.minCapacity}">
+          </div>
+
+          <div class="filter-bar__field">
+            <label for="filter-pricing">Pricing unit</label>
+            <select id="filter-pricing" name="pricing_unit">
+              <option value="">Any pricing unit</option>
+              ${pricingUnitOptions.map((unit) => html`<option value="${unit}"
+                ${attr('selected', filters.pricingUnit === unit)}>${pricingUnitLabel(unit)}</option>`)}
+            </select>
+          </div>
+
+          <div class="filter-bar__field">
+            <label for="filter-sort">Sort order</label>
+            <select id="filter-sort" name="sort">
+              ${[['name', 'Name (A–Z)'], ['capacity', 'Capacity (high to low)'], ['price', 'Starting rate (low to high)']].map(([value, label]) => html`<option value="${value}"
+                ${attr('selected', (filters.sort ?? 'name') === value)}>${label}</option>`)}
+            </select>
+          </div>
+
+          ${amenityOptions.length
+    ? html`<fieldset class="filter-bar__field filter-amenities">
+              <legend>Amenities${selected.size ? ` (${selected.size} selected)` : ''}</legend>
+              <div class="filter-amenities__list">
+                ${amenityOptions.map((amenity) => html`<label class="checkbox-label" for="amenity-${slugId(amenity)}">
+                  <input id="amenity-${slugId(amenity)}" type="checkbox" name="amenity" value="${amenity}"
+                         ${attr('checked', selected.has(amenity))}>
+                  <span>${amenity}</span>
+                </label>`)}
+              </div>
+            </fieldset>`
+    : ''}
+
+          <div class="filter-bar__actions">
+            <button class="button button--primary button--block" type="submit">Apply filters</button>
+            <a class="button button--ghost button--block" href="/spaces">Reset filters</a>
+          </div>
+        </form>
+      </aside>
+
+      <div class="directory-main stack">
+        <div class="directory-toolbar">
+          <p class="meta-line">
+            <strong>${total === 1 ? '1 space matches' : `${total} spaces match`}</strong>${summary ? ` ${summary}` : ''}
+            · ${publishedTotal} published in total.
+          </p>
+          ${hasActiveFilters
+    ? html`<a class="button button--ghost button--small" href="/spaces">Clear active filters</a>`
+    : ''}
         </div>
-      </details>
-      <div class="filter-bar__actions">
-        <button class="button button--primary" type="submit">Apply filters</button>
-        <a class="button button--ghost" href="/spaces">Clear</a>
-      </div>
-    </form>
 
-    <p class="meta-line">
-      ${total === 1 ? '1 space matches' : `${total} spaces match`}${summary ? ` ${summary}` : ''}
-      · ${publishedTotal} published in total.
-    </p>
-
-    ${spaces.length
+        ${spaces.length
     ? spaceGrid(spaces)
-    : emptyState('No spaces match those filters.', 'Try removing a filter, or browse every published space.')}
+    : emptyState('No spaces match those filters.', 'Try removing a filter, or reset to browse every published space at Trace Expert City.')}
 
-    ${paginationNav({ page, pageSize, total, basePath: '/spaces', pairs })}
+        ${paginationNav({ page, pageSize, total, basePath: '/spaces', pairs })}
+      </div>
+    </div>
   </section>`;
 
   return publicShell({
@@ -573,6 +755,48 @@ function filterSummary(filters) {
   return parts.length ? `(${parts.join(', ')})` : '';
 }
 
+function renderSelectedVenuePreview(chosen) {
+  if (!chosen) {
+    return html`<div class="card card--preview">
+      <div class="card__body stack">
+        <p class="section-eyebrow">Venue Selection</p>
+        <h2 class="section-title">Choosing the right space</h2>
+        <p class="hint">Select a published venue from the menu on the left to attach your inquiry to a specific room, auditorium or co-working desk pool.</p>
+        <dl class="detail-list detail-list--inline">
+          <dt>Meeting rooms</dt><dd>Hourly, half-day &amp; full-day sessions</dd>
+          <dt>Auditorium</dt><dd>Conferences, launches &amp; town halls</dd>
+          <dt>Co-working</dt><dd>1 or more desks by day, week or month</dd>
+        </dl>
+        <a class="button button--ghost button--small" href="/spaces">Compare spaces in directory →</a>
+      </div>
+    </div>`;
+  }
+
+  const cover = coverImage(chosen);
+  return html`<div class="card card--preview">
+    ${cover
+    ? html`<a class="space-card__media" href="/spaces/${chosen.code}">
+        <img src="${cover.url}" alt="${altFor(cover, chosen)}" loading="lazy">
+        <span class="space-card__badge">${chosen.categoryLabel}</span>
+      </a>`
+    : ''}
+    <div class="card__body stack">
+      <div>
+        <p class="section-eyebrow">Selected Venue · <code>${chosen.code}</code></p>
+        <h2 class="section-title"><a href="/spaces/${chosen.code}">${chosen.name}</a></h2>
+        <p class="hint">${chosen.categoryLabel}${chosen.location ? ` · ${locationLine(chosen)}` : ' · Trace Expert City'}</p>
+      </div>
+      <dl class="detail-list detail-list--inline">
+        ${chosen.capacity ? html`<dt>Capacity</dt><dd>Up to ${chosen.capacity} people</dd>` : ''}
+        <dt>Operating window</dt>
+        <dd>${chosen.openTime && chosen.closeTime ? `${chosen.openTime}–${chosen.closeTime} EAT` : 'Standard campus hours (EAT)'}</dd>
+        ${chosen.rateSummary ? html`<dt>Rates</dt><dd>${chosen.rateSummary}</dd>` : ''}
+      </dl>
+      <a class="button button--ghost button--small" href="/spaces/${chosen.code}">View venue photos &amp; live schedule →</a>
+    </div>
+  </div>`;
+}
+
 /** `GET /booking-request` — the request-to-book form (pre-fillable, re-renderable). */
 export function renderBookingRequestPage({
   spaces = [], values = {}, errors = null, problems = [], status = 200,
@@ -586,64 +810,33 @@ export function renderBookingRequestPage({
     : 'Only used for co-working desk requests.';
 
   const body = html`<section class="container stack">
-    <div>
-      <h1 class="page-title">Request a booking</h1>
-      <p class="section-subtitle">Tell us what you need. Nagaro staff check the calendar by hand and
-        confirm the booking with you — this form does not reserve the space and carries no payment.</p>
-    </div>
+    <header class="venue-header">
+      <div>
+        <p class="section-eyebrow">Nagaro Concierge Desk · Trace Expert City</p>
+        <h1 class="page-title">Request a booking</h1>
+        <p class="section-subtitle">Tell us which venue and schedule you need. Nagaro staff verify every calendar request by hand and confirm the reservation with you — submitting this inquiry does not lock inventory and carries no payment.</p>
+      </div>
+    </header>
 
-    <div class="card">
-      <div class="card__body">
-        ${problems.length
+    ${problems.length
     ? html`<div class="alert alert--error" role="alert" data-flash>
-            <p>Please check ${problems.length === 1 ? 'one field' : `${problems.length} fields`} below and send the request again.</p>
-            ${alertProblems.length ? html`<ul>${alertProblems.map((problem) => html`<li>${problem}</li>`)}</ul>` : ''}
-            <button type="button" class="alert__close" data-dismiss aria-label="Dismiss">×</button>
-          </div>`
+        <p>Please check ${problems.length === 1 ? 'one field' : `${problems.length} fields`} below and send the request again.</p>
+        ${alertProblems.length ? html`<ul>${alertProblems.map((problem) => html`<li>${problem}</li>`)}</ul>` : ''}
+        <button type="button" class="alert__close" data-dismiss aria-label="Dismiss">×</button>
+      </div>`
     : ''}
-        <form method="post" action="/booking-request" class="form-grid" autocomplete="on">
-          <h2 class="section-title form-field--full">Your details</h2>
-          ${field({
-    id: 'customer_name', label: 'Your name', required: true,
-    error: errorFor(errors, 'customer_name'),
-    control: (described) => input({
-      id: 'customer_name', name: 'customer_name', value: values.customer_name ?? '',
-      describedBy: described, required: true, maxLength: 160, autocomplete: 'name',
-      invalid: Boolean(errorFor(errors, 'customer_name')),
-    }),
-  })}
-          ${field({
-    id: 'email', label: 'Email address', required: true,
-    hint: 'We send the confirmation here.',
-    error: errorFor(errors, 'email'),
-    control: (described) => input({
-      id: 'email', name: 'email', type: 'email', value: values.email ?? '',
-      describedBy: described, required: true, maxLength: 254, autocomplete: 'email',
-      invalid: Boolean(errorFor(errors, 'email')),
-    }),
-  })}
-          ${field({
-    id: 'phone', label: 'Telephone (optional)', required: false,
-    error: errorFor(errors, 'phone'),
-    control: (described) => input({
-      id: 'phone', name: 'phone', type: 'tel', value: values.phone ?? '',
-      describedBy: described, maxLength: 40, autocomplete: 'tel',
-      invalid: Boolean(errorFor(errors, 'phone')),
-    }),
-  })}
-          ${field({
-    id: 'organization', label: 'Organisation (optional)', required: false,
-    error: errorFor(errors, 'organization'),
-    control: (described) => input({
-      id: 'organization', name: 'organization', value: values.organization ?? '',
-      describedBy: described, maxLength: 160, autocomplete: 'organization',
-      invalid: Boolean(errorFor(errors, 'organization')),
-    }),
-  })}
 
-          <h2 class="section-title form-field--full">What you need</h2>
-          ${field({
-    id: 'space_code', label: 'Space', required: true,
+    <div class="split-layout inquiry-layout">
+      <div class="inquiry-main">
+        <div class="card">
+          <div class="card__body">
+            <form method="post" action="/booking-request" class="stack" autocomplete="on">
+              <fieldset class="form-section">
+                <legend class="form-section__title">01 · Space &amp; Preferred Schedule</legend>
+                <p class="form-section__desc hint">All times are in East Africa Time (UTC+3). Single requests must start and finish on the same calendar day.</p>
+                <div class="form-grid">
+                  ${field({
+    id: 'space_code', label: 'Space', required: true, className: 'form-field--full',
     hint: 'Only published spaces can be requested.',
     error: errorFor(errors, 'space_code', 'space_id'),
     control: (described) => html`<select id="space_code" name="space_code" required
@@ -654,8 +847,8 @@ export function renderBookingRequestPage({
         ${attr('selected', space.code.toUpperCase() === chosenCode)}>${space.name} — ${space.categoryLabel}</option>`)}
     </select>`,
   })}
-          ${field({
-    id: 'date', label: 'Date', required: true,
+                  ${field({
+    id: 'date', label: 'Date', required: true, className: 'form-field--full',
     hint: 'Your booking cannot span more than one day in a single request.',
     error: errorFor(errors, 'date', 'start_at', 'end_at'),
     control: (described) => input({
@@ -664,7 +857,7 @@ export function renderBookingRequestPage({
       invalid: Boolean(errorFor(errors, 'date', 'start_at')),
     }),
   })}
-          ${field({
+                  ${field({
     id: 'start_time', label: 'Start time', required: true,
     error: errorFor(errors, 'start_time', 'start_at'),
     control: (described) => input({
@@ -673,7 +866,7 @@ export function renderBookingRequestPage({
       invalid: Boolean(errorFor(errors, 'start_time', 'start_at')),
     }),
   })}
-          ${field({
+                  ${field({
     id: 'end_time', label: 'End time', required: true,
     error: errorFor(errors, 'end_time', 'end_at'),
     control: (described) => input({
@@ -682,7 +875,7 @@ export function renderBookingRequestPage({
       invalid: Boolean(errorFor(errors, 'end_time', 'end_at')),
     }),
   })}
-          ${field({
+                  ${field({
     id: 'desks', label: 'Desks (optional)', required: false,
     hint: desksHint,
     error: errorFor(errors, 'desks', 'desk_quantity'),
@@ -692,7 +885,7 @@ export function renderBookingRequestPage({
       invalid: Boolean(errorFor(errors, 'desks', 'desk_quantity')),
     }),
   })}
-          ${field({
+                  ${field({
     id: 'attendees', label: 'Expected attendees (optional)', required: false,
     error: errorFor(errors, 'attendees'),
     control: (described) => input({
@@ -701,23 +894,93 @@ export function renderBookingRequestPage({
       invalid: Boolean(errorFor(errors, 'attendees')),
     }),
   })}
-          ${field({
-    id: 'message', label: 'Anything else? (optional)', required: false,
+                </div>
+              </fieldset>
+
+              <fieldset class="form-section">
+                <legend class="form-section__title">02 · Your Contact Details</legend>
+                <p class="form-section__desc hint">Used exclusively by Nagaro staff to verify and confirm this booking request.</p>
+                <div class="form-grid">
+                  ${field({
+    id: 'customer_name', label: 'Your name', required: true,
+    error: errorFor(errors, 'customer_name'),
+    control: (described) => input({
+      id: 'customer_name', name: 'customer_name', value: values.customer_name ?? '',
+      describedBy: described, required: true, maxLength: 160, autocomplete: 'name',
+      invalid: Boolean(errorFor(errors, 'customer_name')),
+    }),
+  })}
+                  ${field({
+    id: 'email', label: 'Email address', required: true,
+    hint: 'We send the confirmation here.',
+    error: errorFor(errors, 'email'),
+    control: (described) => input({
+      id: 'email', name: 'email', type: 'email', value: values.email ?? '',
+      describedBy: described, required: true, maxLength: 254, autocomplete: 'email',
+      invalid: Boolean(errorFor(errors, 'email')),
+    }),
+  })}
+                  ${field({
+    id: 'phone', label: 'Telephone (optional)', required: false,
+    error: errorFor(errors, 'phone'),
+    control: (described) => input({
+      id: 'phone', name: 'phone', type: 'tel', value: values.phone ?? '',
+      describedBy: described, maxLength: 40, autocomplete: 'tel',
+      invalid: Boolean(errorFor(errors, 'phone')),
+    }),
+  })}
+                  ${field({
+    id: 'organization', label: 'Organisation (optional)', required: false,
+    error: errorFor(errors, 'organization'),
+    control: (described) => input({
+      id: 'organization', name: 'organization', value: values.organization ?? '',
+      describedBy: described, maxLength: 160, autocomplete: 'organization',
+      invalid: Boolean(errorFor(errors, 'organization')),
+    }),
+  })}
+                </div>
+              </fieldset>
+
+              <fieldset class="form-section">
+                <legend class="form-section__title">03 · Event Notes &amp; Requirements</legend>
+                <div class="form-grid">
+                  ${field({
+    id: 'message', label: 'Anything else? (optional)', required: false, className: 'form-field--full',
     hint: 'Equipment, layout, accessibility needs, or a preferred contact time.',
     error: errorFor(errors, 'message'),
     control: (described) => html`<textarea id="message" name="message" rows="4" maxlength="2000"
         ${attr('aria-describedby', described || null)}
         ${attr('aria-invalid', errorFor(errors, 'message') ? 'true' : null)}>${values.message ?? ''}</textarea>`,
   })}
-
-          <div class="form-actions form-field--full">
-            <button class="button button--primary" type="submit">Send booking request</button>
-            <a class="button button--ghost" href="/spaces">Browse spaces</a>
+                </div>
+                <div class="form-actions">
+                  <button class="button button--primary button--large" type="submit">Send booking request</button>
+                  <a class="button button--ghost button--large" href="/spaces">Browse spaces</a>
+                </div>
+                <p class="hint">Sending this form saves a request for Nagaro staff. It is not a
+                  confirmed booking, does not reserve inventory, and nothing is charged.</p>
+              </fieldset>
+            </form>
           </div>
-          <p class="hint form-field--full">Sending this form saves a request for Nagaro staff. It is not a
-            confirmed booking, does not reserve inventory, and nothing is charged.</p>
-        </form>
+        </div>
       </div>
+
+      <aside class="inquiry-aside stack">
+        ${renderSelectedVenuePreview(chosen)}
+
+        <div class="card">
+          <div class="card__body stack">
+            <p class="section-eyebrow">Verification Protocol</p>
+            <h2 class="section-title">What happens next</h2>
+            <ol class="inquiry-steps">
+              <li><strong>Instant reference issued:</strong> Your request is recorded in the Nagaro operations queue with a unique <code>INQ-YYYY-NNNNN</code> reference.</li>
+              <li><strong>Calendar &amp; buffer review:</strong> Our team checks turnaround buffers, room configuration and desk pool capacity for your requested window.</li>
+              <li><strong>Direct confirmation:</strong> Staff contact you to finalise billing and issue a confirmed reservation. Only then is the space held.</li>
+            </ol>
+            <p class="hint">Need to cancel an inquiry before staff respond? Use the private withdrawal link provided on your acknowledgement screen.</p>
+          </div>
+        </div>
+      </aside>
     </div>
   </section>`;
 
@@ -740,12 +1003,17 @@ export function renderBookingReceivedPage({ inquiry, token = null } = {}) {
     : null;
 
   const body = html`<section class="container stack">
-    <div class="card">
+    <div class="card card--acknowledgement">
       <div class="card__body stack">
-        <p class="tag tag--info">Request received</p>
+        <div class="cluster">
+          <p class="tag tag--info">Request received</p>
+          <span class="hint">Reference <code>${reference}</code></span>
+        </div>
         <h1 class="page-title">Your booking request has been received</h1>
-        <p><strong>${NOT_CONFIRMED_NOTICE}</strong></p>
-        <p>${notice}</p>
+        <div class="alert alert--warning" role="status">
+          <p><strong>${NOT_CONFIRMED_NOTICE}</strong></p>
+          <p>${notice}</p>
+        </div>
 
         <dl class="detail-list">
           <dt>Reference</dt><dd><code>${reference}</code></dd>
@@ -791,6 +1059,7 @@ export function renderWithdrawFormPage({ reference = '', token = '' } = {}) {
   const body = html`<section class="container stack">
     <div class="card">
       <div class="card__body stack">
+        <p class="tag tag--warn">Self-service withdrawal</p>
         <h1 class="page-title">Withdraw a booking request</h1>
         <p>You are about to withdraw request <code>${reference}</code>.</p>
         <p>Withdrawing tells Nagaro staff you no longer need this space. It cannot be undone here —
@@ -823,6 +1092,7 @@ export function renderWithdrawalConfirmedPage({ reference = '', status = 'WITHDR
   const body = html`<section class="container stack">
     <div class="card">
       <div class="card__body stack">
+        <p class="tag">Request withdrawn</p>
         <h1 class="page-title">Booking request withdrawn</h1>
         <p>Request <code>${reference}</code> is now marked
           ${status === 'WITHDRAWN' ? html`<strong>withdrawn</strong>` : html`<strong>${status}</strong>`}.
@@ -858,30 +1128,50 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
   const main = coverImage(space);
   const attributes = Object.entries(space.attributes ?? {});
 
+  const durationText = `${formatMinutes(space.minDurationMinutes)}${space.maxDurationMinutes ? ` – ${formatMinutes(space.maxDurationMinutes)}` : ' min'}`;
+  const bufferText = space.bufferMinutes > 0 ? `${space.bufferMinutes}m prep buffer` : 'Back-to-back allowed';
+  const inventoryText = space.category === SPACE_CATEGORY.COWORKING
+    ? `${space.unitCount} individual desks`
+    : '1 exclusive venue';
+
   const body = html`<section class="container stack">
-    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol>
-      <li><a href="/">Home</a></li>
-      <li><a href="/spaces">Spaces</a></li>
-      <li><span aria-current="page">${space.name}</span></li>
-    </ol></nav>
+    <header class="venue-header">
+      <nav class="breadcrumbs" aria-label="Breadcrumb"><ol>
+        <li><a href="/">Home</a></li>
+        <li><a href="/spaces">Spaces</a></li>
+        <li><span aria-current="page">${space.name}</span></li>
+      </ol></nav>
 
-    <div>
-      <h1 class="page-title">${space.name}</h1>
-      <p class="section-subtitle">${[
-    space.categoryLabel,
-    space.location,
+      <div class="venue-header__main">
+        <div class="venue-header__copy">
+          <div class="venue-header__badges cluster">
+            <span class="tag tag--info">${space.categoryLabel}</span>
+            <span class="venue-code">Code <code>${space.code}</code></span>
+            ${space.isPublished ? '' : html`<span class="tag tag--warn">Not published</span>`}
+          </div>
+          <h1 class="page-title">${space.name}</h1>
+          <p class="section-subtitle">${[
+    space.location || 'Trace Expert City',
     space.floor ? `Floor ${space.floor}` : null,
-    space.isPublished ? null : 'Not published',
+    `Up to ${space.capacity} people`,
   ].filter(Boolean).join(' · ')}</p>
-    </div>
+        </div>
+        <div class="venue-header__actions cluster">
+          <a class="button button--primary" href="${requestHref}">Request this space</a>
+          <a class="button button--ghost" href="/spaces">All spaces</a>
+        </div>
+      </div>
+    </header>
 
-    <div class="split-layout">
-      <div class="stack">
-        ${images.length
-    ? html`<div class="gallery">
-            <img data-gallery-main class="${main ? '' : 'gallery__main'}"
-                 src="${(main ?? images[0]).url}" alt="${altFor(main ?? images[0], space)}">
-            ${images.map((image, index) => html`<button type="button" class="gallery__item"
+    ${images.length
+    ? html`<div class="gallery gallery--venue">
+        <div class="gallery__stage">
+          <img data-gallery-main class="gallery__main"
+               src="${(main ?? images[0]).url}" alt="${altFor(main ?? images[0], space)}">
+        </div>
+        ${images.length > 1
+    ? html`<div class="gallery__thumbs" role="group" aria-label="Venue photographs">
+            ${images.map((image, index) => html`<button type="button" class="gallery__item ${index === 0 ? 'is-active' : ''}"
               data-gallery-thumb data-src="${image.url}" data-alt="${altFor(image, space)}"
               aria-current="${index === 0 ? 'true' : 'false'}"
               aria-label="Show photograph ${index + 1} of ${images.length}">
@@ -889,40 +1179,78 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
               ${image.isCover ? html`<span class="gallery__cover">Cover</span>` : ''}
             </button>`)}
           </div>`
-    : html`<div class="gallery"><span class="hint">No photograph has been added for this space yet.</span></div>`}
+    : html`<div class="gallery__thumbs" hidden>
+            <button type="button" class="gallery__item is-active"
+              data-gallery-thumb data-src="${images[0].url}" data-alt="${altFor(images[0], space)}"
+              aria-current="true"
+              aria-label="Show photograph 1 of 1">
+              <img src="${images[0].url}" alt="${altFor(images[0], space)}" loading="lazy">
+            </button>
+          </div>`}
+      </div>`
+    : html`<div class="gallery gallery--venue gallery--empty"><span class="hint">No photograph has been added for this space yet.</span></div>`}
 
-        <div class="card">
+    <dl class="spec-ribbon" aria-label="Key venue specifications">
+      <div class="spec-ribbon__item">
+        <dt>Capacity</dt>
+        <dd>Up to ${space.capacity} people</dd>
+      </div>
+      <div class="spec-ribbon__item">
+        <dt>Inventory</dt>
+        <dd>${inventoryText}</dd>
+      </div>
+      <div class="spec-ribbon__item">
+        <dt>Operating Hours</dt>
+        <dd>${space.openTime}–${space.closeTime} EAT</dd>
+      </div>
+      <div class="spec-ribbon__item">
+        <dt>Booking Duration</dt>
+        <dd>${durationText}</dd>
+      </div>
+      <div class="spec-ribbon__item">
+        <dt>Turnaround Buffer</dt>
+        <dd>${bufferText}</dd>
+      </div>
+    </dl>
+
+    <div class="split-layout venue-layout">
+      <div class="venue-main stack">
+        <article class="card">
           <div class="card__body stack">
+            <p class="section-eyebrow">Architectural Overview</p>
             <h2 class="section-title">About this space</h2>
-            <p>${space.description || space.shortDescription || 'Nagaro staff will describe this space shortly.'}</p>
+            <p class="venue-lead">${space.description || space.shortDescription || 'Nagaro staff will describe this space shortly.'}</p>
           </div>
-        </div>
+        </article>
 
         ${space.amenities.length
-    ? html`<div class="card">
+    ? html`<article class="card">
             <div class="card__body stack">
-              <h2 class="section-title">Amenities</h2>
+              <p class="section-eyebrow">Included Equipment &amp; Services</p>
+              <h2 class="section-title">Facilities &amp; Amenities</h2>
               <ul class="amenity-list">
-                ${space.amenities.map((amenity) => html`<li>${amenity}</li>`)}
+                ${space.amenities.map((amenity) => html`<li class="amenity-list__item">${amenity}</li>`)}
               </ul>
             </div>
-          </div>`
+          </article>`
     : ''}
 
         ${attributes.length
-    ? html`<div class="card">
+    ? html`<article class="card">
             <div class="card__body stack">
+              <p class="section-eyebrow">Technical &amp; Spatial Specifications</p>
               <h2 class="section-title">Good to know</h2>
               <dl class="detail-list">
                 ${attributes.map(([key, value]) => html`<dt>${humaniseKey(key)}</dt><dd>${attributeValue(value)}</dd>`)}
               </dl>
             </div>
-          </div>`
+          </article>`
     : ''}
 
-        <div class="card">
+        <article class="card">
           <div class="card__body stack">
-            <h2 class="section-title">Rates</h2>
+            <p class="section-eyebrow">Transparent Pricing</p>
+            <h2 class="section-title">Rate Schedule</h2>
             ${space.rateList.length
     ? html`<table class="rate-table">
                 <caption class="hint">Rates are quoted in ETB and exclude any agreed extras.</caption>
@@ -930,23 +1258,26 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
                   <tr><th scope="col">Billing unit</th><th scope="col">Rate</th></tr>
                 </thead>
                 <tbody>
-                  ${space.rateList.map((rate) => html`<tr>
-                    <th scope="row">${rate.unitLabel}${rate.isDefault ? html` <span class="hint">(default)</span>` : ''}</th>
-                    <td>${rate.amountLabel}</td>
+                  ${space.rateList.map((rate) => html`<tr class="${rate.isDefault ? 'rate-table__default' : ''}">
+                    <th scope="row">${rate.unitLabel}${rate.isDefault ? html` <span class="tag tag--info">Default unit</span>` : ''}</th>
+                    <td><strong>${rate.amountLabel}</strong></td>
                   </tr>`)}
                 </tbody>
               </table>`
     : html`<p>Rate on request — mention what you need in your request and Nagaro staff will quote you.</p>`}
             <p class="hint">A request to book is not a confirmed booking and carries no payment.</p>
           </div>
-        </div>
+        </article>
       </div>
 
-      <aside class="stack">
-        <div class="card">
+      <aside class="venue-aside stack">
+        <div class="card card--concierge">
           <div class="card__body stack">
-            <h2 class="section-title">Check availability</h2>
-            <p class="price price--accent">${space.rateSummary}</p>
+            <div>
+              <p class="section-eyebrow">Provisional Schedule Check</p>
+              <h2 class="section-title">Check availability &amp; inquire</h2>
+              <p class="price price--accent">${space.rateSummary}</p>
+            </div>
             <form class="availability-checker" method="get" action="/spaces/${space.code}"
                   data-availability-form data-space="${space.code}" data-space-code="${space.code}">
               ${field({
@@ -956,20 +1287,22 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
       describedBy: described, min: check.today ?? null,
     }),
   })}
-              ${field({
+              <div class="form-grid">
+                ${field({
     id: 'check-start', label: 'From', required: false,
     control: (described) => input({
       id: 'check-start', name: 'start_time', type: 'time', value: values.startTime ?? '',
       describedBy: described, step: '900',
     }),
   })}
-              ${field({
+                ${field({
     id: 'check-end', label: 'To', required: false,
     control: (described) => input({
       id: 'check-end', name: 'end_time', type: 'time', value: values.endTime ?? '',
       describedBy: described, step: '900',
     }),
   })}
+              </div>
               ${field({
     id: 'check-desks', label: 'Desks (co-working only)', required: false,
     control: (described) => input({
@@ -978,19 +1311,21 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
     }),
   })}
               <div class="form-actions">
-                <button class="button button--primary" type="submit">Check availability</button>
+                <button class="button button--ghost button--block" type="submit">Check availability</button>
               </div>
               ${availabilityResult(check.result)}
             </form>
             <div class="cluster">
               <a class="button button--primary button--block" href="${requestHref}">Request this space</a>
             </div>
+            <p class="hint">Checking a window or submitting an inquiry does not lock the room. Nagaro operations staff confirm all bookings.</p>
           </div>
         </div>
 
         <div class="card">
           <div class="card__body stack">
-            <h2 class="section-title">Booking details</h2>
+            <p class="section-eyebrow">Operational Rules</p>
+            <h2 class="section-title">Booking conditions</h2>
             <dl class="detail-list detail-list--inline">
               <dt>Opening hours</dt><dd>${space.openTime}–${space.closeTime} (East Africa Time)</dd>
               <dt>Minimum booking</dt><dd>${humanMinutes(space.minDurationMinutes)}</dd>
@@ -1058,4 +1393,3 @@ export function publicErrorPage({
     body,
   });
 }
-

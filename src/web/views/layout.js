@@ -13,6 +13,11 @@ function brandMark() {
   </span>`;
 }
 
+/** Crisp 18x18 inline SVG line icon for admin navigation and chrome controls. */
+function navIcon(paths) {
+  return raw(`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`);
+}
+
 const PUBLIC_NAV = [
   { href: '/', label: 'Home' },
   { href: '/spaces', label: 'Spaces' },
@@ -21,18 +26,50 @@ const PUBLIC_NAV = [
 
 const ADMIN_NAV = [
   { group: 'Operations', items: [
-    { href: '/admin', label: 'Dashboard', icon: '▤' },
-    { href: '/admin/calendar', label: 'Calendar', icon: '▦' },
-    { href: '/admin/reservations', label: 'Reservations', icon: '▣' },
-    { href: '/admin/inquiries', label: 'Inquiries', icon: '✉' },
+    {
+      href: '/admin',
+      label: 'Dashboard',
+      icon: navIcon('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
+    },
+    {
+      href: '/admin/calendar',
+      label: 'Calendar',
+      icon: navIcon('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>'),
+    },
+    {
+      href: '/admin/reservations',
+      label: 'Reservations',
+      icon: navIcon('<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>'),
+    },
+    {
+      href: '/admin/inquiries',
+      label: 'Inquiries',
+      icon: navIcon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'),
+    },
   ] },
   { group: 'Catalogue', items: [
-    { href: '/admin/spaces', label: 'Spaces', icon: '▢' },
-    { href: '/admin/maintenance', label: 'Maintenance', icon: '⚙' },
+    {
+      href: '/admin/spaces',
+      label: 'Spaces',
+      icon: navIcon('<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4"/>'),
+    },
+    {
+      href: '/admin/maintenance',
+      label: 'Maintenance',
+      icon: navIcon('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
+    },
   ] },
   { group: 'Records', items: [
-    { href: '/admin/customers', label: 'Customers', icon: '◍' },
-    { href: '/admin/audit', label: 'Activity log', icon: '⎙' },
+    {
+      href: '/admin/customers',
+      label: 'Customers',
+      icon: navIcon('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
+    },
+    {
+      href: '/admin/audit',
+      label: 'Activity log',
+      icon: navIcon('<path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>'),
+    },
   ] },
 ];
 
@@ -78,7 +115,7 @@ ${documentHead({ title: `${title} · Nagaro Space Booking`, description })}
         <span class="brand__sub">Trace Expert City</span>
       </span>
     </a>
-    <nav class="site-nav" aria-label="Main">
+    <nav class="site-nav" id="public-nav" aria-label="Main">
       ${PUBLIC_NAV.map((item) => html`<a href="${item.href}"
         class="site-nav__link ${activePath === item.href ? 'is-active' : ''}"
         ${activePath === item.href ? raw('aria-current="page"') : ''}>${item.label}</a>`)}
@@ -94,9 +131,36 @@ ${body}
 </main>
 <footer class="site-footer">
   <div class="site-footer__inner">
-    <p>Nagaro space booking · Trace Expert City, Addis Ababa</p>
-    <p class="site-footer__note">Availability shown on this site is provisional. A booking is only confirmed once Nagaro staff confirm it.</p>
-    ${version ? html`<p class="site-footer__version">Build ${version}</p>` : ''}
+    <div class="site-footer__grid">
+      <div class="site-footer__col">
+        <div class="brand">
+          ${brandMark()}
+          <span class="brand__text">
+            <span class="brand__name">Nagaro</span>
+            <span class="brand__sub">Trace Expert City, Addis Ababa</span>
+          </span>
+        </div>
+        <p>Nagaro space booking · Trace Expert City, Addis Ababa</p>
+        <p class="site-footer__note">Availability shown on this site is provisional. A booking is only confirmed once Nagaro staff confirm it.</p>
+      </div>
+      <div class="site-footer__col">
+        <h2 class="admin-nav__heading">Spaces &amp; Booking</h2>
+        <ul class="admin-nav__list">
+          <li><a href="/">Home</a></li>
+          <li><a href="/spaces">All spaces</a></li>
+          <li><a href="/booking-request">Request a booking</a></li>
+          <li><a href="/spaces?category=MEETING_ROOM">Meeting rooms</a></li>
+          <li><a href="/spaces?category=AUDITORIUM">Auditoriums &amp; event halls</a></li>
+          <li><a href="/spaces?category=COWORKING">Co-working desks</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h2 class="admin-nav__heading">Operations Desk</h2>
+        <p class="site-footer__note">All booking times are shown in East Africa Time (UTC+03:00).</p>
+        <p><a href="/admin">Staff operations portal →</a></p>
+        ${version ? html`<p class="site-footer__version">Build ${version}</p>` : ''}
+      </div>
+    </div>
   </div>
 </footer>
 <script type="module" src="/assets/public.js"></script>
@@ -121,7 +185,7 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
       ${brandMark()}
       <span class="brand__text">
         <span class="brand__name">Nagaro</span>
-        <span class="brand__sub">Admin</span>
+        <span class="brand__sub">Operations Console</span>
       </span>
     </div>
     <nav class="admin-nav" aria-label="Administration">
@@ -152,7 +216,9 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
   </aside>
   <div class="admin-main">
     <header class="admin-topbar">
-      <button class="admin-topbar__menu" type="button" data-sidebar-toggle aria-expanded="false" aria-controls="admin-sidebar">☰</button>
+      <button class="admin-topbar__menu" type="button" data-sidebar-toggle aria-expanded="false" aria-controls="admin-sidebar" aria-label="Toggle navigation">
+        ${navIcon('<path d="M4 6h16M4 12h16M4 18h16"/>')}
+      </button>
       ${breadcrumbs.length
     ? html`<nav class="breadcrumbs" aria-label="Breadcrumb"><ol>
           ${breadcrumbs.map((crumb, index) => html`<li>
@@ -163,6 +229,7 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
         </ol></nav>`
     : html`<span class="breadcrumbs breadcrumbs--empty"></span>`}
       <div class="admin-topbar__actions">
+        <span class="tag" title="Business timezone: Africa/Addis_Ababa">EAT · UTC+03:00</span>
         <a class="button button--ghost button--small" href="/" target="_blank" rel="noopener">View public site</a>
         ${pageActions ?? ''}
       </div>

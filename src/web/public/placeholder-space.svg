@@ -1,26 +1,114 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180"
-     role="img" aria-label="Photograph not available" preserveAspectRatio="xMidYMid slice">
-  <!-- Neutral 16:9 stand-in for a published space with no photograph yet.
-       Inline styles only; the prefers-color-scheme block applies when the file
-       is loaded through <img>, which is the intended use. -->
-  <title>Photograph not available</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500"
+     role="img" aria-label="Architectural space illustration" preserveAspectRatio="xMidYMid slice">
+  <!-- Architectural interior line-and-tone stand-in for a space awaiting photography.
+       Self-contained inline styles only; supports light and dark schemes. -->
+  <title>Architectural space preview</title>
   <style>
-    .bg { fill: #ece9e3; }
-    .frame { fill: none; stroke: #a9b1b8; stroke-width: 3; stroke-linejoin: round; }
-    .sun { fill: #a9b1b8; }
-    .hills { fill: #c3c8cd; }
-    .plate { fill: #7f8a93; font: 600 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .wall-back { fill: #EAE2D3; }
+    .wall-left { fill: #E2D8C5; }
+    .wall-right { fill: #DFD5C2; }
+    .ceiling { fill: #F4EFE6; }
+    .coffer { fill: #E6DDD0; }
+    .floor { fill: #D5C5AE; }
+    .window-sky { fill: #D3E4E6; }
+    .window-foliage { fill: #7E9F8F; }
+    .sunbeam { fill: #FFFDF7; fill-opacity: 0.35; }
+    .table-top { fill: #6D4C33; }
+    .table-side { fill: #4E3522; }
+    .chair { fill: #244440; }
+    .screen { fill: #192B2E; }
+    .screen-accent { fill: #C89648; }
+    .glow { fill: #F7DFA8; fill-opacity: 0.45; }
+    .line-struct { fill: none; stroke: #8C7F6E; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .line-detail { fill: none; stroke: #0B3B36; stroke-width: 1.75; stroke-opacity: 0.45; stroke-linecap: round; stroke-linejoin: round; }
+    .line-gold { fill: none; stroke: #C89648; stroke-width: 2; stroke-linecap: round; }
+    .badge-bg { fill: #0B3B36; fill-opacity: 0.88; }
+    .badge-text { fill: #F5EFE6; font: 600 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: 0.08em; }
     @media (prefers-color-scheme: dark) {
-      .bg { fill: #1b262e; }
-      .frame { stroke: #6d7d88; }
-      .sun { fill: #6d7d88; }
-      .hills { fill: #3d4e59; }
-      .plate { fill: #9aa9b3; }
+      .wall-back { fill: #172826; }
+      .wall-left { fill: #12211F; }
+      .wall-right { fill: #142422; }
+      .ceiling { fill: #1C302D; }
+      .coffer { fill: #132220; }
+      .floor { fill: #231F1B; }
+      .window-sky { fill: #244247; }
+      .window-foliage { fill: #2F5E4E; }
+      .sunbeam { fill: #F5E6C4; fill-opacity: 0.08; }
+      .table-top { fill: #593D28; }
+      .table-side { fill: #3B2719; }
+      .chair { fill: #2E524D; }
+      .screen { fill: #0D181A; }
+      .line-struct { stroke: #465E59; }
+      .line-detail { stroke: #9AB8B2; stroke-opacity: 0.4; }
     }
   </style>
-  <rect class="bg" width="320" height="180"/>
-  <rect class="frame" x="96" y="46" width="128" height="88" rx="8"/>
-  <circle class="sun" cx="126" cy="72" r="10"/>
-  <path class="hills" d="M104 126l34-38 24 26 20-20 34 32v0a8 8 0 0 1-8 8H112a8 8 0 0 1-8-8z"/>
-  <text class="plate" x="160" y="160" text-anchor="middle">No photograph yet</text>
+
+  <!-- Room envelope: ceiling, left window wall, back wall, right presentation wall, floor -->
+  <polygon class="ceiling" points="0,0 800,0 620,110 190,110"/>
+  <polygon class="coffer" points="120,18 680,18 585,92 225,92"/>
+  <polygon class="wall-left" points="0,0 190,110 190,340 0,430"/>
+  <rect class="wall-back" x="190" y="110" width="430" height="230"/>
+  <polygon class="wall-right" points="620,110 800,0 800,430 620,340"/>
+  <polygon class="floor" points="0,430 190,340 620,340 800,430 800,500 0,500"/>
+
+  <!-- Left mullioned window with sky & botanical silhouette -->
+  <polygon class="window-sky" points="28,48 168,122 168,318 28,382"/>
+  <polygon class="window-foliage" points="28,250 75,230 125,248 168,232 168,318 28,382"/>
+  <line class="line-detail" x1="98" y1="85" x2="98" y2="350"/>
+  <line class="line-detail" x1="28" y1="190" x2="168" y2="225"/>
+  <line class="line-detail" x1="28" y1="295" x2="168" y2="282"/>
+  <polygon class="line-detail" points="28,48 168,122 168,318 28,382"/>
+
+  <!-- Soft daylight shaft across room -->
+  <polygon class="sunbeam" points="28,190 168,225 560,420 180,455"/>
+
+  <!-- Structural perspective lines -->
+  <line class="line-struct" x1="0" y1="0" x2="190" y2="110"/>
+  <line class="line-struct" x1="800" y1="0" x2="620" y2="110"/>
+  <line class="line-struct" x1="190" y1="110" x2="620" y2="110"/>
+  <line class="line-struct" x1="190" y1="110" x2="190" y2="340"/>
+  <line class="line-struct" x1="620" y1="110" x2="620" y2="340"/>
+  <line class="line-struct" x1="190" y1="340" x2="620" y2="340"/>
+  <line class="line-struct" x1="0" y1="430" x2="190" y2="340"/>
+  <line class="line-struct" x1="800" y1="430" x2="620" y2="340"/>
+
+  <!-- Back wall architectural acoustic panels & display -->
+  <rect class="line-struct" x="230" y="145" width="95" height="145"/>
+  <rect class="line-struct" x="485" y="145" width="95" height="145"/>
+  <rect class="screen" x="342" y="162" width="126" height="78" rx="3"/>
+  <line class="line-gold" x1="362" y1="190" x2="415" y2="190"/>
+  <line class="line-struct" x1="362" y1="206" x2="446" y2="206"/>
+  <line class="line-struct" x1="362" y1="218" x2="430" y2="218"/>
+
+  <!-- Right wall glass whiteboard -->
+  <polygon class="window-sky" points="648,140 765,92 765,288 648,295" fill-opacity="0.45"/>
+  <polygon class="line-detail" points="648,140 765,92 765,288 648,295"/>
+
+  <!-- Linear suspended pendant lamp and glow -->
+  <ellipse class="glow" cx="405" cy="118" rx="145" ry="26"/>
+  <line class="line-struct" x1="320" y1="56" x2="320" y2="112"/>
+  <line class="line-struct" x1="490" y1="56" x2="490" y2="112"/>
+  <rect class="screen" x="295" y="110" width="220" height="8" rx="3"/>
+  <line class="line-gold" x1="302" y1="118" x2="508" y2="118"/>
+
+  <!-- Architectural chairs behind table -->
+  <rect class="chair" x="285" y="295" width="46" height="36" rx="6"/>
+  <rect class="chair" x="382" y="292" width="46" height="36" rx="6"/>
+  <rect class="chair" x="479" y="295" width="46" height="36" rx="6"/>
+
+  <!-- Perspective conference table -->
+  <polygon class="table-top" points="250,322 560,322 645,412 165,412"/>
+  <polygon class="table-side" points="165,412 645,412 645,424 165,424"/>
+  <line class="line-detail" x1="220" y1="424" x2="205" y2="478"/>
+  <line class="line-detail" x1="590" y1="424" x2="605" y2="478"/>
+  <polygon class="line-struct" points="355,356 455,356 468,370 342,370"/>
+
+  <!-- Foreground chair silhouettes -->
+  <path class="chair" d="M235,392 h62 a8,8 0 0 1 8,8 v38 h-78 v-38 a8,8 0 0 1 8,-8 z"/>
+  <path class="chair" d="M369,396 h62 a8,8 0 0 1 8,8 v40 h-78 v-40 a8,8 0 0 1 8,-8 z"/>
+  <path class="chair" d="M503,392 h62 a8,8 0 0 1 8,8 v38 h-78 v-38 a8,8 0 0 1 8,-8 z"/>
+
+  <!-- Subtle architectural caption plate -->
+  <rect class="badge-bg" x="280" y="454" width="240" height="28" rx="14"/>
+  <text class="badge-text" x="400" y="472" text-anchor="middle">ARCHITECTURAL PREVIEW</text>
 </svg>

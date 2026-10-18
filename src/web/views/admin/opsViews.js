@@ -17,7 +17,7 @@
  * never invented.
  */
 import {
-  html, statusBadge, tag, periodLabel, relativeDayLabel, emptyState, pagination,
+  html, RawHtml, statusBadge, tag, periodLabel, relativeDayLabel, emptyState, pagination,
   availabilityPill, categoryLabel, dateLabel, timeLabel, businessDateKey,
   businessTimeLabel, businessDateTimeLabel,
 } from '../../lib/html.js';
@@ -50,7 +50,7 @@ function statCard({ label, value, caption, tone = null }) {
 }
 
 function statGrid(items) {
-  return html`<div class="stat-grid">${items.map(statCard)}</div>`;
+  return html`<div class="stat-grid">${items.map((item) => item instanceof RawHtml ? item : statCard(item))}</div>`;
 }
 
 /** Delivery badge. `title` carries the failure reason so the queue is usable

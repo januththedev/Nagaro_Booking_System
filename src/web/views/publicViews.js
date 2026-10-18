@@ -21,7 +21,7 @@
  * Views receive plain objects (already projected) and never query the database.
  */
 import {
-  html, attr, categoryLabel, pricingUnitLabel, money,
+  html, raw, attr, categoryLabel, pricingUnitLabel, money,
   periodLabel, emptyState, problemList, statusBadge,
 } from '../lib/html.js';
 import { publicShell } from './layout.js';
@@ -53,6 +53,13 @@ const FORBIDDEN_KEY_NAMES = Object.freeze([
 
 const CAVEAT = 'Provisional only — this check does not hold the space. '
   + 'A booking is confirmed only once Nagaro staff confirm it.';
+
+/** Simple line icons for the three space categories (inline SVG, no external assets). */
+const CATEGORY_ICON = Object.freeze({
+  [SPACE_CATEGORY.MEETING_ROOM]: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 20h8M12 17v3M7 12l2.5-3 2.5 3"/></svg>',
+  [SPACE_CATEGORY.AUDITORIUM]: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M5 5v5a4 4 0 0 0 8 0V5M13 5v5a4 4 0 0 0 8 0V5M8 20l1.5-4M16 20l-1.5-4"/></svg>',
+  [SPACE_CATEGORY.COWORKING]: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="8" height="12" rx="1.5"/><rect x="13" y="8" width="8" height="9" rx="1.5"/><path d="M3 21h18"/></svg>',
+});
 
 /** The one sentence every acknowledgement page must carry. */
 export const NOT_CONFIRMED_NOTICE = 'This request is not a confirmed booking yet. '
@@ -241,8 +248,11 @@ function spaceCard(space) {
   const media = cover
     ? html`<a class="space-card__media" href="/spaces/${space.code}" tabindex="-1" aria-hidden="true">
         <img src="${cover.url}" alt="${altFor(cover, space)}" loading="lazy">
+        <span class="space-card__badge">${space.categoryLabel}</span>
       </a>`
-    : html`<span class="space-card__media" aria-hidden="true"></span>`;
+    : html`<span class="space-card__media" aria-hidden="true">
+        <span class="space-card__badge space-card__badge--empty">${space.categoryLabel}</span>
+      </span>`;
 
   return html`<article class="space-card" data-space-code="${space.code}">
     ${media}
@@ -254,7 +264,7 @@ function spaceCard(space) {
     [space.location, space.floor ? `Floor ${space.floor}` : null].filter(Boolean).join(', ') || null,
   ])}
       ${space.shortDescription ? html`<p>${space.shortDescription}</p>` : ''}
-      <p class="price">${space.rateSummary}</p>
+      <p class="price"><span class="price__label">From</span> ${space.rateSummary}</p>
       <div class="space-card__actions">
         <a class="button button--primary button--small" href="/spaces/${space.code}">View details</a>
         <a class="button button--ghost button--small" href="/booking-request?space=${space.code}">Request</a>
@@ -372,6 +382,7 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
 
   const body = html`<section class="hero">
     <div class="hero__inner">
+      <p class="hero__eyebrow">Nagaro · Trace Expert City</p>
       <h1 class="hero__title">Meeting rooms, an auditorium and co-working desks at Trace Expert City</h1>
       <p class="hero__subtitle">Nagaro rents out practical, well-equipped space in Trace Expert City, Addis Ababa.
         Browse what is available, check a period, and send us a request to book.</p>
@@ -381,6 +392,11 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
         <a class="button button--primary" href="/spaces">Browse all spaces</a>
         <a class="button button--ghost" href="/booking-request">Request a booking</a>
       </div>
+      <dl class="hero__stats">
+        <div class="hero__stat"><dt>Published spaces</dt><dd>${totalPublished}</dd></div>
+        <div class="hero__stat"><dt>Categories</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
+        <div class="hero__stat"><dt>Booking desk</dt><dd>Mon–Sat</dd></div>
+      </dl>
     </div>
   </section>
 
@@ -393,9 +409,10 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
     </div>
     <div class="category-grid">
       ${categories.map((item) => html`<a class="category-card" href="/spaces?category=${item.category}">
+        <span class="category-card__icon" aria-hidden="true">${raw(CATEGORY_ICON[item.category] ?? '')}</span>
         <span class="category-card__title">${item.label}</span>
         <span class="category-card__meta">${item.tagline}</span>
-        <span class="category-card__meta">${item.count === 1 ? '1 space available' : `${item.count} spaces available`}</span>
+        <span class="category-card__count">${item.count === 1 ? '1 space available' : `${item.count} spaces available`}</span>
       </a>`)}
     </div>
 

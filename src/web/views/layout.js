@@ -4,6 +4,15 @@
  */
 import { html, raw, join } from '../lib/html.js';
 
+/** Geometric "workspace skyline" brand mark. */
+function brandMark() {
+  return html`<span class="brand__mark" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 20V9M10 20V4M16 20v-7M21 20H3" />
+    </svg>
+  </span>`;
+}
+
 const PUBLIC_NAV = [
   { href: '/', label: 'Home' },
   { href: '/spaces', label: 'Spaces' },
@@ -63,7 +72,7 @@ ${documentHead({ title: `${title} · Nagaro Space Booking`, description })}
 <header class="site-header">
   <div class="site-header__inner">
     <a class="brand" href="/">
-      <span class="brand__mark" aria-hidden="true">N</span>
+      ${brandMark()}
       <span class="brand__text">
         <span class="brand__name">Nagaro</span>
         <span class="brand__sub">Trace Expert City</span>
@@ -109,7 +118,7 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
 <div class="admin-shell">
   <aside class="admin-sidebar" id="admin-sidebar">
     <div class="admin-sidebar__brand">
-      <span class="brand__mark" aria-hidden="true">N</span>
+      ${brandMark()}
       <span class="brand__text">
         <span class="brand__name">Nagaro</span>
         <span class="brand__sub">Admin</span>

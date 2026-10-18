@@ -10,7 +10,7 @@
 - Node.js v24.22.0 (portable install) + built-in `node:sqlite` (SQLite 3.53.4).
 - Zero native build toolchain, no Docker, no PostgreSQL. One runtime dependency: `nodemailer@6.9.16`.
 - Hand-written HTTP layer, server-rendered HTML, no client framework.
-- Time zone: all timestamps stored as epoch ms (UTC); displayed in `Africa/Addis_Ababa` (fixed UTC+03:00) via `src/server/domain/time.js`.
+- Time zone: all timestamps stored as epoch ms (UTC); displayed in `Asia/Colombo` (fixed UTC+05:30) via `src/server/domain/time.js`.
 
 ## 2. Architecture
 
@@ -76,12 +76,14 @@ Covered flows:
 
 | Suite | Files | Tests | Pass | Fail |
 |---|---|---|---|---|
-| Unit + integration | `tests/unit`, `tests/integration` | 176 | 176 | 0 |
+| Unit + integration | `tests/unit`, `tests/integration` | 190 | 190 | 0 |
 | Concurrency (multi-process) | `tests/concurrency` | 37 | 37 | 0 |
 | End-to-end acceptance | `scripts/e2e-verify.js` | 63 checks | 63 | 0 |
-| **Total** | | **276** | **276** | **0** |
+| **Total** | | **290** | **290** | **0** |
 
-Unit/integration command: `.\tools\node.cmd --test --test-concurrency=1 "tests/unit/*.test.js" "tests/integration/*.test.js"`.
+Unit/integration command: `npm test` (globs `tests/unit/**/*.test.js` and
+`tests/integration/**/*.test.js`). Concurrency: `npm run test:concurrency`. End-to-end:
+`npm run test:e2e`.
 
 ## 7. Requirement coverage (P0 / P1 / P2)
 
@@ -117,8 +119,8 @@ Unit/integration command: `.\tools\node.cmd --test --test-concurrency=1 "tests/u
 - Email is `NOT_CONFIGURED` unless `SMTP_HOST` is set; inquiries are still persisted and the UI states honestly that no email was delivered.
 - Queue delivery filter and audit filters operate inside the newest-200-row window (service hard cap); the UI states this.
 - `GET /admin/maintenance` is registered by both `adminBookingRoutes` (mounted first) and `adminOpsRoutes`; the booking module's page wins. Maintenance POSTs are owned by the booking module.
-- `node --test tests/concurrency` (bare directory form) fails on Node 24; use the glob form `tests/concurrency/*.test.js`.
-- Pixel-level rendering at 360/768/1280 px was not measured with a live browser in this session; a static audit of every width/min-width/`nowrap` rule was performed instead.
+- `node --test tests/concurrency` (bare directory form) fails on Node 24; the `package.json` scripts now use the glob form (`tests/concurrency/**/*.test.js`) so `npm test` / `npm run test:concurrency` work on the required Node version.
+- Pixel-level rendering was measured natively in a real browser at 390/768/1440 CSS px during the Phase 2 pass (54 route × width combinations, 0 overflow); screenshots could not be rasterised in that environment (no visible desktop window). Lighthouse accessibility is 1.00 on every audited route. See `UI_UX_IMPLEMENTATION_REPORT.md`.
 
 ## 10. Key files
 

@@ -203,7 +203,7 @@ function createFields(overrides = {}) {
     location: 'Trace Expert City, Building A',
     floor: '2nd floor',
     capacity: '4',
-    currency: 'ETB',
+    currency: 'LKR',
     pricing_unit: 'HOUR',
     min_duration_minutes: '60',
     max_duration_minutes: '',

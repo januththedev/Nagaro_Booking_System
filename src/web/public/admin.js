@@ -36,8 +36,8 @@
 
 var DEBOUNCE_MS = 400;
 var SEARCH_DEBOUNCE_MS = 200;
-var DEFAULT_TZ_OFFSET = '+03:00';
-var BUSINESS_TIME_ZONE = 'Africa/Addis_Ababa';
+var DEFAULT_TZ_OFFSET = '+05:30';
+var BUSINESS_TIME_ZONE = 'Asia/Colombo';
 
 /* ------------------------------------------------------------------ helpers */
 

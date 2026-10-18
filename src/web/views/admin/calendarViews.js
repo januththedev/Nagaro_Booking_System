@@ -31,7 +31,7 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /* ------------------------------------------------------------------ helpers */
 
-/** UTC-stable epoch for a `YYYY-MM-DD` business date key (03:00 EAT same day). */
+/** UTC-stable epoch for a `YYYY-MM-DD` business date key (weekday maths only). */
 function epochFromDateKey(dateKey) {
   const parsed = Date.parse(`${dateKey}T00:00:00Z`);
   return Number.isFinite(parsed) ? parsed : Date.now();
@@ -143,7 +143,7 @@ function calendarToolbar({ filters, spaces, nav, heading }) {
         </select>
       </div>
       <div class="filter-bar__field">
-        <label for="calendar-date">Date (EAT)</label>
+        <label for="calendar-date">Date (SLST)</label>
         <input id="calendar-date" name="date" type="date" value="${filters.date ?? ''}">
       </div>
       <div class="filter-bar__field">
@@ -294,13 +294,13 @@ export function renderCalendarPage({
 
     ${card({
     title: `Hourly Occupancy Timeline \u00b7 ${dayHeading(dayKey)}`,
-    description: 'One row per hour of the space\u2019s opening hours (East Africa Time). Rows tinted green are free; striped rows are fully booked for that hour.',
+    description: 'One row per hour of the space\u2019s opening hours (Sri Lanka Standard Time). Rows tinted green are free; striped rows are fully booked for that hour.',
     actions: calendarNavBar(nav),
     body: html`<div class="stack"
                     data-calendar-events-url="${eventsUrl}"
                     data-calendar-date="${dayKey}"
                     data-calendar-view="day"
-                    data-tz-offset="+03:00">
+                    data-tz-offset="+05:30">
         ${hasSpaces
       ? dayGrids.map(({ space, grid }) => spaceDayCard({ space, grid }))
       : emptyState(
@@ -396,7 +396,7 @@ export function renderCalendarWeekPage({
         <summary class="hint">Daily schedule list (${daysWithEntries.length} active ${daysWithEntries.length === 1 ? 'day' : 'days'} this week)</summary>
         <div class="stack">
           ${daysWithEntries.map((day) => html`<div>
-            <h4 class="card__title">${dayHeading(day.dateKey)}</h4>
+            <h3 class="card__title">${dayHeading(day.dateKey)}</h3>
             ${weekDayCell(day, todayKey)}
           </div>`)}
         </div>
@@ -415,7 +415,7 @@ export function renderCalendarWeekPage({
                     data-calendar-events-url="${eventsUrl}"
                     data-calendar-date="${firstDayKey}"
                     data-calendar-view="week"
-                    data-tz-offset="+03:00">
+                    data-tz-offset="+05:30">
         ${days.length
       ? table({
         columns,

@@ -1,6 +1,6 @@
 # Nagaro Space Booking System
 
-A centralized space-booking and rental-management system for Nagaro at **Trace Expert City**, Addis Ababa. It replaces an Excel-based process that caused double bookings, missed inquiries and no shared view of availability.
+A centralized space-booking and rental-management system for Nagaro at **Trace Expert City**, Maradana, Colombo, Sri Lanka. It replaces an Excel-based process that caused double bookings, missed inquiries and no shared view of availability.
 
 Two experiences:
 
@@ -58,6 +58,7 @@ The password is read from the prompt, `--password`, or `NAGARO_NEW_ADMIN_PASSWOR
 | `npm run admin:create` | Provision a staff account |
 | `npm test` | Unit + integration tests |
 | `npm run test:concurrency` | Multi-process booking-integrity tests (slower) |
+| `npm run test:e2e` | End-to-end acceptance harness (real forms, CSRF, upload) |
 | `npm run test:all` | Everything |
 | `npm run demo:double-booking` | Live demonstration that conflicting bookings are refused |
 
@@ -91,6 +92,7 @@ data/          the SQLite database (created at runtime, not committed)
 | `DATA_MODEL.md` | Tables, relationships, constraints, indexes, retention and the concurrency proof |
 | `API_CONTRACTS.md` | Frozen shared vocabulary, service signatures, object shapes, route inventory, error codes |
 | `docs/BOOKING_RULES.md` | Business rules in plain language, plus every documented assumption |
+| `docs/IMAGE_PROVENANCE.md` | Where demo imagery comes from and why it is not a photograph of the venue |
 | `REQUIREMENT_TEST_MATRIX.md` | Requirement → implementation → test traceability |
 | `SECURITY_REVIEW.md` | Security findings and their resolution |
 | `docs/UX_GUIDE.md` | Palette, contrast ratios, breakpoints, client-side feature contracts |
@@ -110,5 +112,6 @@ The two that matter most operationally:
 ## Time zone
 
 Timestamps are stored in UTC and every local calculation pins the business zone to
-`Africa/Addis_Ababa` (UTC+03:00, no daylight saving). The server's own time zone is
-never used, so the application behaves identically wherever it runs.
+`Asia/Colombo` — Sri Lanka Standard Time (UTC+05:30, no daylight saving). The
+server's own time zone is never used, so the application behaves identically
+wherever it runs.

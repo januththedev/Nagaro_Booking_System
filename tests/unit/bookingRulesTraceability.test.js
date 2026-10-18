@@ -43,7 +43,7 @@ const RAW_SPACE = Object.freeze({
 
 const at = (dateKey, clock) => businessLocalToEpoch(dateKey, clock);
 
-/** Mouthful-free alias: 2026-11-10 09:00 EAT. */
+/** Mouthful-free alias: 2026-11-10 09:00 SLST. */
 const D = '2026-11-10';
 const D1 = '2026-11-11';
 const D7 = '2026-11-17';
@@ -73,7 +73,7 @@ function seedSpaceWithUnit(db, { code = 'TRACE-01' } = {}) {
       (code, name, category, capacity, status, currency, pricing_unit,
        min_duration_minutes, buffer_minutes, open_time, close_time,
        amenities, attributes, created_at, updated_at)
-    VALUES (?, ?, 'MEETING_ROOM', 10, 'PUBLISHED', 'ETB', 'HOUR', 60, 0, '08:00', '18:00',
+    VALUES (?, ?, 'MEETING_ROOM', 10, 'PUBLISHED', 'LKR', 'HOUR', 60, 0, '08:00', '18:00',
             '[]', '{}', ?, ?)
   `).run(code, 'Trace Room 1', now, now);
   const spaceId = Number(db.prepare('SELECT id FROM space WHERE code = ?').get(code).id);
@@ -181,7 +181,7 @@ test('R-AVAIL-003 adjacency is accepted by the database trigger; a one-minute ov
 
 /* ------------------------------------------------------------- R-AVAIL-004 */
 
-test('R-AVAIL-004 opening hours are enforced in East Africa Time', () => {
+test('R-AVAIL-004 opening hours are enforced in Sri Lanka Standard Time', () => {
   // Entirely inside 08:00-18:00.
   assert.deepEqual(
     checkBookingRules(RAW_SPACE, { startAt: at(D, '09:00'), endAt: at(D, '17:00'), attendees: 4 }),
@@ -198,7 +198,7 @@ test('R-AVAIL-004 opening hours are enforced in East Africa Time', () => {
   });
   assert.equal(problems.length, 1);
   assert.match(problems[0], /08:00-18:00/);
-  assert.match(problems[0], /East Africa Time/);
+  assert.match(problems[0], /Sri Lanka Standard Time/);
 });
 
 /* ------------------------------------------------------------- R-AVAIL-005 */
@@ -374,7 +374,7 @@ test('R-BOOK-012 HOUR quantity matches the worked example in docs/BOOKING_RULES.
       `${label} must bill ${expected} hour(s)`,
     );
   }
-  // The rate itself, from the same document: ETB 1,500.00/hour.
+  // The rate itself, from the same document: LKR 1,500.00/hour.
   assert.equal(
     150000 * billingQuantityFor({ unit: 'HOUR', startAt: at(D, '09:00'), endAt: at(D, '11:30') }),
     450000,
@@ -440,7 +440,7 @@ test('R-SEC-012 both occupancy triggers exist after migrations', () => {
   // The migration ledger must agree that the schema was applied.
   assert.deepEqual(
     db.prepare('SELECT name FROM schema_migrations').all().map((row) => row.name),
-    ['0001_init.sql', '0002_blob_columns.sql'],
+    ['0001_init.sql', '0002_blob_columns.sql', '0003_currency_sri_lanka.sql'],
   );
   db.close();
 });

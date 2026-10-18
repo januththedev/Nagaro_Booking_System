@@ -52,7 +52,7 @@ const FORBIDDEN_KEY_NAMES = [
 
 /** Strings that exist only inside the staff-facing records. */
 const FORBIDDEN_VALUES = [
-  'Ama Tesfaye', 'ama@example.com', '+251911000022', 'Ada Labs', 'internal only', 'Board planning',
+  'Ama Tesfaye', 'ama@example.com', '+94911000022', 'Ada Labs', 'internal only', 'Board planning',
 ];
 
 /** A reservation reference: `NG-2030-00001`. Never an inquiry (`INQ-...`). */
@@ -127,7 +127,7 @@ function fixtureSpace() {
     floor: '2',
     capacity: 8,
     status: 'PUBLISHED',
-    currency: 'ETB',
+    currency: 'LKR',
     pricingUnit: 'HOUR',
     minDurationMinutes: 60,
     maxDurationMinutes: 240,
@@ -241,7 +241,7 @@ before(() => {
     payload: {
       full_name: 'Ama Tesfaye',
       email: 'ama@example.com',
-      phone: '+251911000022',
+      phone: '+94911000022',
       organization: 'Ada Labs',
       notes: 'internal only',
     },
@@ -298,7 +298,7 @@ describe('publicSpaceProjection()', () => {
     const projection = publicSpaceProjection(fixtureSpace(), { images: fixtureImages() });
     assert.equal(projection.code, 'MEET-HORIZON');
     assert.equal(projection.isPublished, true);
-    assert.equal(projection.rateSummary, 'ETB 1,500.00 per hour · ETB 4,500.00 per half day');
+    assert.equal(projection.rateSummary, 'LKR 1,500.00 per hour · LKR 4,500.00 per half day');
     assert.equal(JSON.stringify(projection).includes('Call reception'), false);
     assert.equal(projection.contactNote, undefined);
     assert.equal(projection.status, undefined);

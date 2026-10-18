@@ -4,7 +4,7 @@
  * These pin down the two places where a dashboard silently goes wrong:
  *   1. hour bucketing (partial hours, midnight-spanning open ranges), and
  *   2. business-local day boundaries - the classic `Date.now() % 86400000`
- *      bug attributes early-morning EAT bookings to the previous day and
+ *      bug attributes early-morning SLST bookings to the previous day and
  *      late-afternoon bookings to the wrong window.
  */
 import test from 'node:test';
@@ -17,7 +17,7 @@ import {
   MS, businessDateKey, businessLocalToEpoch, startOfBusinessDay,
 } from '../../src/server/domain/time.js';
 
-const DATE = '2026-11-10'; // a Tuesday, in EAT (UTC+03:00)
+const DATE = '2026-11-10'; // a Tuesday, in SLST (UTC+05:30)
 
 /* ------------------------------------------------------------ hourlyBuckets */
 
@@ -156,36 +156,36 @@ test('summariseSpaces: occupancy for unknown units is clamped to the unit count'
 
 /* ------------------------------------------------------ business-day edges */
 
-test('business day: a 23:00 EAT booking lands on day N, not day N+1', () => {
+test('business day: a 23:00 SLST booking lands on day N, not day N+1', () => {
   const lateAt = businessLocalToEpoch(DATE, '23:00'); // 20:00 UTC on 2026-11-10
   const dayStart = startOfBusinessDay(lateAt);
   const dayEnd = dayStart + MS.DAY;
 
   assert.equal(businessDateKey(lateAt), DATE);
   assert.equal(dayStart, businessLocalToEpoch(DATE, '00:00'));
-  assert.ok(lateAt >= dayStart && lateAt < dayEnd, '23:00 EAT is inside its own business day');
-  assert.ok(lateAt < dayEnd, '23:00 EAT must not spill into day N+1');
+  assert.ok(lateAt >= dayStart && lateAt < dayEnd, '23:00 SLST is inside its own business day');
+  assert.ok(lateAt < dayEnd, '23:00 SLST must not spill into day N+1');
 });
 
 test('business day: the naive UTC-midnight window is not the business day (Date.now() % 86400000 bug)', () => {
-  // 01:00 EAT on day N is 22:00 UTC on day N-1: the classic off-by-one case.
+  // 01:00 SLST on day N is 22:00 UTC on day N-1: the classic off-by-one case.
   const earlyAt = businessLocalToEpoch(DATE, '01:00');
   const naiveStart = earlyAt - (earlyAt % MS.DAY); // the buggy boundary
   const trueStart = businessLocalToEpoch(businessDateKey(earlyAt), '00:00');
 
   assert.equal(businessDateKey(earlyAt), DATE);
   assert.equal(trueStart, businessLocalToEpoch(DATE, '00:00'));
-  assert.notEqual(naiveStart, trueStart, 'UTC midnight and EAT midnight are different instants');
+  assert.notEqual(naiveStart, trueStart, 'UTC midnight and SLST midnight are different instants');
   assert.ok(earlyAt >= trueStart && earlyAt < trueStart + MS.DAY);
 
-  // The naive window includes the whole previous EAT afternoon ...
+  // The naive window includes the whole previous SLST afternoon ...
   const previousAfternoon = businessLocalToEpoch('2026-11-09', '15:00');
   assert.ok(previousAfternoon >= naiveStart && previousAfternoon < naiveStart + MS.DAY);
   // ... whereas the business-local window correctly excludes it.
   assert.ok(!(previousAfternoon >= trueStart && previousAfternoon < trueStart + MS.DAY));
 });
 
-test('business day: hourly buckets keep an 01:00 EAT booking on its own day', () => {
+test('business day: hourly buckets keep an 01:00 SLST booking on its own day', () => {
   const buckets = hourlyBuckets({ dateKey: DATE, openTime: '00:00', closeTime: '03:00' });
   assert.equal(buckets.length, 3);
 
@@ -193,7 +193,7 @@ test('business day: hourly buckets keep an 01:00 EAT booking on its own day', ()
   const bookingEnd = businessLocalToEpoch(DATE, '02:00');
   const bucket = buckets.find((b) => b.startAt <= bookingStart && bookingStart < b.endAt);
 
-  assert.ok(bucket, 'a bucket covers 01:00 EAT');
+  assert.ok(bucket, 'a bucket covers 01:00 SLST');
   assert.ok(bookingEnd <= bucket.endAt);
   assert.equal(businessDateKey(bucket.startAt), DATE, 'the bucket is labelled with day N');
   assert.equal(bucket.endAt - bucket.startAt, MS.HOUR);

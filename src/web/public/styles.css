@@ -310,6 +310,13 @@ textarea:focus {
   grid-template-columns: 1fr;
 }
 
+/* Grid items default to `min-width: auto`, which makes a wide data table push
+   the whole page sideways on narrow screens. Allowing them to shrink lets the
+   inner .table-wrap scroll horizontally instead. */
+.split-layout > * {
+  min-width: 0;
+}
+
 .visually-hidden,
 .visually-hidden * {
   position: absolute !important;
@@ -1109,13 +1116,34 @@ details[open] > summary {
   background: var(--ng-primary);
 }
 
-.meter__fill--warn {
-  background: var(--ng-warning);
-}
+/* Tone is chosen by the server from the occupancy figure. */
+.meter--warning .meter__fill { background: var(--ng-warning); }
+.meter--danger .meter__fill { background: var(--ng-danger); }
 
-.meter__fill--danger {
-  background: var(--ng-danger);
-}
+/* Width comes from 5%-bucket classes rather than an inline style attribute,
+   so the pages never require `style-src 'unsafe-inline'`. The exact figure is
+   exposed to assistive technology through aria-valuenow. */
+.meter__fill--0 { width: 0%; }
+.meter__fill--5 { width: 5%; }
+.meter__fill--10 { width: 10%; }
+.meter__fill--15 { width: 15%; }
+.meter__fill--20 { width: 20%; }
+.meter__fill--25 { width: 25%; }
+.meter__fill--30 { width: 30%; }
+.meter__fill--35 { width: 35%; }
+.meter__fill--40 { width: 40%; }
+.meter__fill--45 { width: 45%; }
+.meter__fill--50 { width: 50%; }
+.meter__fill--55 { width: 55%; }
+.meter__fill--60 { width: 60%; }
+.meter__fill--65 { width: 65%; }
+.meter__fill--70 { width: 70%; }
+.meter__fill--75 { width: 75%; }
+.meter__fill--80 { width: 80%; }
+.meter__fill--85 { width: 85%; }
+.meter__fill--90 { width: 90%; }
+.meter__fill--95 { width: 95%; }
+.meter__fill--100 { width: 100%; }
 
 /* Space thumbnail inside admin tables */
 .space-thumb {
@@ -1716,6 +1744,18 @@ body.nav-open .site-nav,
 
 .site-footer a {
   color: var(--ng-shell-text);
+}
+
+/* The footer is a dark surface: the shared brand lockup defaults to dark body
+   text, so it must be re-coloured here or it becomes unreadable (≈1.05:1). */
+.site-footer .brand,
+.site-footer .brand:visited,
+.site-footer .brand:hover {
+  color: var(--ng-shell-text);
+}
+
+.site-footer .brand__sub {
+  color: var(--ng-shell-text-muted);
 }
 
 /* ==========================================================================

@@ -2,12 +2,12 @@
  * Business time helpers.
  *
  * Storage: epoch milliseconds, UTC.
- * Business time zone: Trace Expert City operates on EAT (Africa/Addis_Ababa),
- * a fixed UTC+03:00 offset with no daylight saving. We never rely on the
- * server process time zone.
+ * Business time zone: Trace Expert City (Maradana, Colombo) operates on
+ * Sri Lanka Standard Time (Asia/Colombo), a fixed UTC+05:30 offset with no
+ * daylight saving. We never rely on the server process time zone.
  */
-export const BUSINESS_TZ = 'Africa/Addis_Ababa';
-export const BUSINESS_TZ_OFFSET_MINUTES = 180; // fixed UTC+03:00
+export const BUSINESS_TZ = 'Asia/Colombo';
+export const BUSINESS_TZ_OFFSET_MINUTES = 330; // fixed UTC+05:30
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -82,7 +82,7 @@ export function businessTimeLabel(epochMs) {
 
 /**
  * Convert a business-local calendar date + clock time into epoch ms.
- * Uses the fixed EAT offset, so no DST ambiguity can occur.
+ * Uses the fixed SLST offset, so no DST ambiguity can occur.
  */
 export function businessLocalToEpoch(dateKey, clock = '00:00') {
   const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey ?? '').trim());

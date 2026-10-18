@@ -255,7 +255,7 @@ function insertSpaceRow(db, { code = 'MEDIA-ROOM', name = 'Media Room' } = {}) {
       (code, name, category, short_description, description, location, floor, capacity,
        status, currency, pricing_unit, min_duration_minutes, max_duration_minutes,
        buffer_minutes, open_time, close_time, amenities, attributes, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,'DRAFT','ETB','HOUR',60,NULL,0,'08:00','18:00','[]','{}',?,?)
+    VALUES (?,?,?,?,?,?,?,?,'DRAFT','LKR','HOUR',60,NULL,0,'08:00','18:00','[]','{}',?,?)
   `).run(
     code, name, 'MEETING_ROOM', 'A short summary', 'A longer description for the room.',
     'Trace Expert City', '2', 10, now, now,

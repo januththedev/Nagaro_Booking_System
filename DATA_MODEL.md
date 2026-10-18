@@ -3,7 +3,7 @@
 **Engine:** SQLite 3.53.4 via `node:sqlite` (`DatabaseSync`).
 **Schema source of truth:** `src/server/db/migrations/0001_init.sql` (applied by `src/server/db/migrate.js`).
 **Time convention:** every `*_at` column is `INTEGER` **Unix epoch milliseconds, UTC**.
-**Business time zone:** `Africa/Addis_Ababa` (EAT, fixed UTC+03:00, no DST).
+**Business time zone:** `Asia/Colombo` (SLST, fixed UTC+05:30, no DST).
 **Interval convention:** half-open `[start_at, end_at)`; two intervals conflict exactly when
 `a.start_at < b.end_at AND a.end_at > b.start_at`.
 
@@ -126,13 +126,13 @@ Nullable columns are marked. "Unit / time zone" states what the value means phys
 | `floor` | TEXT | **yes** | — | Free text. |
 | `capacity` | INTEGER | no | headcount | `CHECK (capacity >= 1)`. Maximum number of **people**. Not bookable inventory. |
 | `status` | TEXT | no | — | `DRAFT` (default) · `PUBLISHED` · `ARCHIVED`. Only `PUBLISHED` is visible publicly. |
-| `currency` | TEXT | no | ISO code | Default `ETB`. |
+| `currency` | TEXT | no | ISO code | Default `LKR`. |
 | `pricing_unit` | TEXT | no | — | Default billing unit: `HOUR` · `HALF_DAY` · `DAY` · `WEEK` · `MONTH`. Constrained per category in the service layer. |
 | `min_duration_minutes` | INTEGER | no | minutes | Default 60. `CHECK (min_duration_minutes > 0)`. |
 | `max_duration_minutes` | INTEGER | **yes** | minutes | Null means "no maximum". When set, `CHECK (> 0)`. |
 | `buffer_minutes` | INTEGER | no | minutes | Default 0. `CHECK (buffer_minutes >= 0)`. Turnaround gap between reservations. |
-| `open_time` | TEXT | no | `HH:MM` **EAT** | Default `08:00`. Local clock time, not an epoch. |
-| `close_time` | TEXT | no | `HH:MM` **EAT** | Default `18:00`. Must be strictly later than `open_time` (service-enforced). |
+| `open_time` | TEXT | no | `HH:MM` **SLST** | Default `08:00`. Local clock time, not an epoch. |
+| `close_time` | TEXT | no | `HH:MM` **SLST** | Default `18:00`. Must be strictly later than `open_time` (service-enforced). |
 | `amenities` | TEXT | no | JSON array | Default `[]`. Subset of `AMENITY_CATALOG`. Used by public amenity filtering. |
 | `attributes` | TEXT | no | JSON object | Default `{}`. Category-specific extras (key `[a-z0-9_]{1,40}`); only relevant keys are demanded per category. |
 | `contact_note` | TEXT | **yes** | — | Shown on the public detail page. |
@@ -159,7 +159,7 @@ Nullable columns are marked. "Unit / time zone" states what the value means phys
 | `billing_quantity` | INTEGER | no | units | `CHECK (>= 1)`. Derived (see `BOOKING_RULES.md` §8) or overridden by staff. |
 | `rate_cents` | INTEGER | no | cents | `CHECK (>= 0)`. Rate **at the time of booking**; immune to later rate changes. |
 | `total_cents` | INTEGER | no | cents | `CHECK (>= 0)`. `rate_cents × billing_quantity × unit_count`. |
-| `currency` | TEXT | no | ISO code | Default `ETB`. |
+| `currency` | TEXT | no | ISO code | Default `LKR`. |
 | `idempotency_key` | TEXT | **yes** | — | `UNIQUE`. Nulls do not collide, so ordinary bookings may omit it. Retry safety for one-shot callers. |
 | `created_by` | INTEGER | no | FK → `admin_user.id` | `ON DELETE RESTRICT`. |
 | `created_at` | INTEGER | no | epoch ms UTC | — |
@@ -303,7 +303,7 @@ Nullable columns are marked. "Unit / time zone" states what the value means phys
 | `space.code` | `UNIQUE COLLATE NOCASE` | Public identifiers are unambiguous — `/spaces/trc-mr-01` and `/spaces/TRC-MR-01` are the same space. **Verified** in §9: inserting `s1` when `S1` exists is rejected. |
 | `space_rate (space_id, unit)` | `UNIQUE` | One rate per pricing unit per space; no ambiguity about which price applies. |
 | `space_image.stored_name` | `UNIQUE` | Two photographs can never share a file; also stops a crafted upload from overwriting another space's image. |
-| **`ux_image_cover`** | `CREATE UNIQUE INDEX ux_image_cover ON space_image(space_id) WHERE is_cover = 1` | **At most one cover photograph per space, enforced by the database.** This is a *partial* unique index: it indexes only the rows where `is_cover = 1`, so a space may legally have many `is_cover = 0` rows. Verified in §9: a second cover row for the same space is rejected with `UNIQUE constraint failed: space_image.space_id`. It is what lets `setCoverImage()` clear-then-set inside one transaction and still be crash-safe: a half-applied change cannot leave two covers. Note SQLite does not allow a partial unique *constraint*, only a partial unique index — the behaviour is identical. |
+| **`ux_image_cover`** | `CRSLSTE UNIQUE INDEX ux_image_cover ON space_image(space_id) WHERE is_cover = 1` | **At most one cover photograph per space, enforced by the database.** This is a *partial* unique index: it indexes only the rows where `is_cover = 1`, so a space may legally have many `is_cover = 0` rows. Verified in §9: a second cover row for the same space is rejected with `UNIQUE constraint failed: space_image.space_id`. It is what lets `setCoverImage()` clear-then-set inside one transaction and still be crash-safe: a half-applied change cannot leave two covers. Note SQLite does not allow a partial unique *constraint*, only a partial unique index — the behaviour is identical. |
 | `resource_unit (space_id, code)` | `UNIQUE` | Desk codes are unique within a space. Note these are unique *per space*, not globally, so `DESK-01` exists in every co-working space. |
 | **`reservation.reference`** | `UNIQUE` | **Human-facing reference uniqueness.** Two bookings can never share `NG-2026-00042` even if `app_sequence` were reset; the index is the last line of defence behind the sequence allocation. Verified in §9: a duplicate reference is rejected. |
 | **`reservation.idempotency_key`** | `UNIQUE` (nullable) | **Retry safety.** A client that resends the same create request cannot book twice: the second attempt hits the unique index and `handleBookingFailure()` returns the original reservation instead of an error. Because the column is nullable and SQLite allows many NULLs in a unique index, ordinary bookings that omit a key never collide. Verified in §9: a duplicate key is rejected, two NULL keys coexist. |
@@ -403,7 +403,7 @@ an overlapping `ACTIVE` row regardless of how it was constructed.
 From `src/server/db/migrations/0001_init.sql`:
 
 ```sql
-CREATE TRIGGER trg_occupancy_no_overlap_insert
+CRSLSTE TRIGGER trg_occupancy_no_overlap_insert
 BEFORE INSERT ON occupancy
 FOR EACH ROW WHEN NEW.status = 'ACTIVE'
 BEGIN
@@ -418,7 +418,7 @@ BEGIN
   );
 END;
 
-CREATE TRIGGER trg_occupancy_no_overlap_update
+CRSLSTE TRIGGER trg_occupancy_no_overlap_update
 BEFORE UPDATE ON occupancy
 FOR EACH ROW WHEN NEW.status = 'ACTIVE'
 BEGIN
@@ -579,7 +579,7 @@ Intervals are `[start, end)`. The start instant is inside the interval; the end 
 would make every back-to-back hand-over impossible and would force staff to book "09:00–10:59" and
 "11:01–13:00", leaking a fake two-minute gap into every calendar and every price.
 
-The same convention, in SQLite integer milliseconds, is exact: `11:00` EAT is `08:00Z`, i.e. the epoch
+The same convention, in SQLite integer milliseconds, is exact: `11:00` SLST is `05:30Z`, i.e. the epoch
 millisecond `businessLocalToEpoch('2026-11-10', '11:00')`. There is no rounding, no floating point and no
 DST.
 
@@ -709,6 +709,11 @@ rows to `RELEASED`. Again, nothing is deleted.
    existing one take the same code path.
 5. **Never edit an applied migration.** Editing `0001_init.sql` after it has been applied changes nothing on
    existing databases and creates a permanent divergence between fresh and existing installs.
+   One deliberate exception is recorded here: when the venue locale was corrected from Addis Ababa to
+   Colombo, `0001_init.sql`'s currency default was changed from `ETB` to `LKR` **and** the forward
+   migration `0003_currency_sri_lanka.sql` was added to upgrade rows in databases that had already been
+   seeded under the old default. The forward migration is what keeps existing installs honest; the
+   in-place default only affects brand-new databases.
 6. **Any new write path must not bypass the triggers.** Concretely, new code that touches inventory must:
    - open with `withWriteTransaction()` (`BEGIN IMMEDIATE`);
    - call the availability service rather than issuing inserts itself;
@@ -869,7 +874,7 @@ serialised write path short.
 ### 9.5 The migration ledger is honest
 
 ```sql
-SELECT name FROM schema_migrations;   -- expected: 0001_init.sql
+SELECT name FROM schema_migrations;   -- expected: 0001_init.sql, 0002_blob_columns.sql, 0003_currency_sri_lanka.sql
 ```
 
 If a migration is missing from this list, it did not run; if a file exists on disk but not in the ledger,

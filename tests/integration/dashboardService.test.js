@@ -27,7 +27,7 @@ import {
 } from '../../src/server/services/bookingService.js';
 import { MS, businessLocalToEpoch } from '../../src/server/domain/time.js';
 
-const DATE = '2026-11-10';   // day N (EAT)
+const DATE = '2026-11-10';   // day N (SLST)
 const NEXT = '2026-11-11';   // day N+1
 const LATER = '2026-11-20';  // day N+10
 const HOUR = MS.HOUR;

@@ -127,7 +127,7 @@ function seedFixture() {
     payload: {
       full_name: 'Hanna Tesfaye',
       email: 'hanna@example.com',
-      phone: '+251 91 123 4567',
+      phone: '+94 91 123 4567',
       organization: 'Blue Nile Consulting',
       notes: 'Prefers morning bookings. Invoiced to head office.',
     },
@@ -320,7 +320,7 @@ test("with an actor, searching a seeded customer's surname returns exactly that 
   assert.equal(item.id, fixture.customer.id);
   assert.equal(item.fullName, 'Hanna Tesfaye');
   assert.equal(item.email, 'hanna@example.com');
-  assert.equal(item.phone, '+251 91 123 4567');
+  assert.equal(item.phone, '+94 91 123 4567');
   assert.equal(item.organization, 'Blue Nile Consulting');
   assert.equal(item.confirmedReservations, 1, 'the cancelled booking is not counted as confirmed');
   assert.equal(
@@ -407,8 +407,8 @@ test('POST /admin/customers with a fresh email creates the customer without any 
     form: {
       full_name: 'Marta Girma',
       email: 'marta@example.com',
-      phone: '+251 92 000 1111',
-      organization: 'Addis Analytics',
+      phone: '+94 92 000 1111',
+      organization: 'Lanka Analytics',
       notes: '',
     },
   });
@@ -418,8 +418,8 @@ test('POST /admin/customers with a fresh email creates the customer without any 
   assert.equal(countCustomers(), before + 1);
   const created = db.prepare('SELECT * FROM customer WHERE email_normalized = ?').get('marta@example.com');
   assert.equal(created.full_name, 'Marta Girma');
-  assert.equal(created.organization, 'Addis Analytics');
-  assert.equal(created.phone, '+251 92 000 1111');
+  assert.equal(created.organization, 'Lanka Analytics');
+  assert.equal(created.phone, '+94 92 000 1111');
 });
 
 test('POST /admin/customers with an invalid email returns 422 with a field error and creates no row', async () => {
@@ -448,7 +448,7 @@ test('POST /admin/customers/:id with another customer email returns 409 and leav
     form: {
       full_name: 'Hanna Tesfaye',
       email: 'yonas@example.com',
-      phone: '+251 91 123 4567',
+      phone: '+94 91 123 4567',
       organization: 'Blue Nile Consulting',
       notes: '',
     },
@@ -517,14 +517,14 @@ test('GET /admin/customers filters by hasUpcoming', async () => {
 
 test('GET /admin/customers/new pre-fills from an inquiry and offers no duplicate checkbox', async () => {
   const response = await request(
-    '/admin/customers/new?name=Hanna%20Tesfaye&email=hanna%40example.com&phone=%2B251911234567&organization=Blue%20Nile%20Consulting',
+    '/admin/customers/new?name=Hanna%20Tesfaye&email=hanna%40example.com&phone=%2B94911234567&organization=Blue%20Nile%20Consulting',
   );
   const body = await response.text();
 
   assert.equal(response.status, 200);
   assert.match(body, /value="Hanna Tesfaye"/);
   assert.match(body, /value="hanna@example.com"/);
-  assert.match(body, /value="\+251911234567"/);
+  assert.match(body, /value="\+94911234567"/);
   assert.match(body, /value="Blue Nile Consulting"/);
   assert.match(body, /for="full_name"/);
   assert.equal(

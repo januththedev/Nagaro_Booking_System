@@ -22,7 +22,7 @@ import {
 } from '../layout.js';
 
 /** The system default currency; spaces may override it, customers do not. */
-const CURRENCY = 'ETB';
+const CURRENCY = 'LKR';
 
 const PRIVACY_NOTE = 'Customer details are visible only to signed-in staff. They never appear on the public site.';
 
@@ -370,7 +370,7 @@ export function customerProfileView({
               <div class="cluster">
                 <span class="brand__mark" aria-hidden="true">${monogram}</span>
                 <div>
-                  <h4 class="card__title">${customer.fullName}</h4>
+                  <h3 class="card__title">${customer.fullName}</h3>
                   <p class="meta-line">${customer.organization || 'Independent / no organisation listed'}</p>
                 </div>
               </div>

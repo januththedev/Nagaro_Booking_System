@@ -95,7 +95,7 @@ export function newFormToken() {
 
 /* --------------------------------------------------------- calendar date maths */
 
-/** `dateKey` shifted by whole business-local days (no DST in EAT). */
+/** `dateKey` shifted by whole business-local days (no DST in SLST). */
 export function addDaysToDateKey(dateKey, days) {
   const [y, m, d] = String(dateKey).split('-').map(Number);
   const shifted = new Date(Date.UTC(y, m - 1, d + days));

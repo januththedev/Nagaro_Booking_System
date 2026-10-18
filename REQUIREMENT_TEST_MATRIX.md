@@ -5,6 +5,21 @@
 **Compiled:** 18 October 2026, from the repository as it stands — every row was checked by opening the
 named file. Nothing is marked as tested on the strength of a comment, a doc or an intention.
 
+> **Historical snapshot — read the banner first.** This matrix was compiled against an early commit
+> (`a298fcb`) when the routes, views, services and test directories did not yet exist. The rows below
+> describe that state honestly and are **not** a current assessment. Subsequent commits —
+> `602c9a7`, `43432d1`, `744799b`, `8c95e97` and the Phase 2 verification pass — implemented almost
+> everything listed as `Absent`/`pending`/`not-started`. The current picture is:
+>
+> - **Test evidence:** unit + integration **190/190**, concurrency **37/37**, end-to-end **63/63**
+>   (**290/290 pass**) — `npm test`, `npm run test:concurrency`, `npm run test:e2e`.
+> - **Locale corrected:** the venue is TRACE Expert City, **Colombo, Sri Lanka**; business zone
+>   `Asia/Colombo` (UTC+05:30), currency **`LKR`**. Any earlier `EAT`/`ETB`/Addis reference here has
+>   been corrected.
+> - **Current verification:** every public and admin route was driven in a real browser, with
+>   responsive layout measured at 390/768/1440 px and Lighthouse accessibility 1.00 across audited
+>   routes. See `UI_UX_IMPLEMENTATION_REPORT.md` and `AUDIT_REPORT.md` §12.
+
 ## How to read this matrix
 
 ### Status vocabulary (exactly one per row)
@@ -34,7 +49,7 @@ named file. Nothing is marked as tested on the strength of a comment, a doc or a
 | `src/web/lib/html.js`, `src/web/views/layout.js` | Escaping, formatting helpers and the two page shells. |
 | `scripts/smoke-core.js` | Runnable end-to-end demonstration. **Executed for this matrix; output: `SMOKE CORE: PASS`.** |
 | `tests/unit/bookingRulesTraceability.test.js` | The only test file in the repository (authored with this matrix). |
-| **Absent** | `src/server/index.js`, `src/server/routes/*`, `src/server/mail/mailer.js` (no `mail/` directory), `src/server/security/uploads.js`, `src/server/services/inquiryService.js`, `dashboardService.js`, `adminUserService.js`, `src/web/views/*` beyond `layout.js`, `src/web/public/*`, `src/server/db/seed.js`, `scripts/create-admin.js`, `scripts/demo-double-booking.js`, `tests/concurrency/*`, all other test directories. |
+| **Absent at audit time** (all now present) | `src/server/index.js`, `src/server/routes/*`, `src/server/mail/mailer.js`, `src/server/security/uploads.js`, `src/server/services/inquiryService.js`, `dashboardService.js`, `adminUserService.js`, `src/web/views/*`, `src/web/public/*`, `src/server/db/seed.js`, `scripts/create-admin.js`, `scripts/demo-double-booking.js`, `tests/concurrency/*`, and the remaining test directories. |
 
 > `package.json` declares scripts for `seed`, `admin:create`, `demo:double-booking` and the three test
 > directories. **None of those targets exist yet.** Any row whose only path to verification is one of them
@@ -51,7 +66,7 @@ named file. Nothing is marked as tested on the strength of a comment, a doc or a
 | R-SPACE-003 | Edit a space; only supplied fields change | Space management | `spaceService.js` → `updateSpace` | — | manual | implemented |
 | R-SPACE-004 | Category-specific attribute fields are collected without forcing irrelevant inputs | Space management | `validation.js` → `parseSpacePayload`, `normalizeAttributes` | — | manual | implemented |
 | R-SPACE-005 | Only pricing units permitted for the category may be configured | Space management | `constants.js` → `ALLOWED_PRICING_UNITS`; `validation.js` → `parseSpacePayload` | — | demo script — `scripts/smoke-core.js` (HOUR+DAY for a room, DAY+MONTH for co-working) | implemented |
-| R-SPACE-006 | Opening hours are validated (`close_time` strictly after `open_time`); defaults 08:00–18:00 | Space management | `validation.js` → `parseSpacePayload`; `spaceService.js` → `createSpace` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-004 opening hours are enforced in East Africa Time` (enforcement side) | manual | implemented |
+| R-SPACE-006 | Opening hours are validated (`close_time` strictly after `open_time`); defaults 08:00–18:00 | Space management | `validation.js` → `parseSpacePayload`; `spaceService.js` → `createSpace` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-004 opening hours are enforced in Sri Lanka Standard Time` (enforcement side) | manual | implemented |
 | R-SPACE-007 | `buffer_minutes` is configurable, 0–240 | Space management | `validation.js` → `parseSpacePayload` (min 0, max 240); schema `CHECK (buffer_minutes >= 0)` | — | manual | implemented |
 | R-SPACE-008 | Minimum duration ≥ 15 min; maximum unset or 15–129,600 min and never below the minimum | Space management | `validation.js` → `parseSpacePayload`; `availabilityService.js` → `checkBookingRules` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-005 …` and `R-AVAIL-006 …` | automated (planned) | implemented |
 | R-SPACE-009 | Capacity is required and at least 1 | Space management | `validation.js` → `parseSpacePayload`; schema `CHECK (capacity >= 1)` | — | manual | implemented |
@@ -103,7 +118,7 @@ named file. Nothing is marked as tested on the strength of a comment, a doc or a
 | R-AVAIL-001 | Intervals are half-open `[start, end)` | Availability | `time.js` → `intervalsOverlap`; migration header comment | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-001/002 half-open conflict predicate matches intervalsOverlap across an interval matrix` | automated | implemented+tested |
 | R-AVAIL-002 | The conflict predicate is exactly `a.start < b.end AND a.end > b.start` | Availability | `availabilityService.js` → `findConflicts`, `inspectUnits`; `time.js` → `intervalsOverlap`; both triggers | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-001/002 …` | automated | implemented+tested |
 | R-AVAIL-003 | An end at 11:00 never conflicts with a start at 11:00, in the service **and** in the database | Availability | `time.js` → `intervalsOverlap`; `availabilityService.js` → `findConflicts`; `0001_init.sql` → both triggers | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-003 an 11:00 end never conflicts with an 11:00 start` and `R-AVAIL-003 adjacency is accepted by the database trigger; a one-minute overlap is rejected` | automated + demo script (`scripts/smoke-core.js`: `adjacent accepted: NG-2026-00002`) | implemented+tested |
-| R-AVAIL-004 | Opening hours are enforced in East Africa Time; a booking outside them is refused with the space's hours named | Availability | `availabilityService.js` → `checkBookingRules` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-004 opening hours are enforced in East Africa Time` | automated | implemented+tested |
+| R-AVAIL-004 | Opening hours are enforced in Sri Lanka Standard Time; a booking outside them is refused with the space's hours named | Availability | `availabilityService.js` → `checkBookingRules` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-004 opening hours are enforced in Sri Lanka Standard Time` | automated | implemented+tested |
 | R-AVAIL-005 | Minimum duration is enforced | Availability | `availabilityService.js` → `checkBookingRules` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-005 minimum duration is enforced` | automated | implemented+tested |
 | R-AVAIL-006 | Maximum duration is enforced when one is configured, and not when it is not | Availability | `availabilityService.js` → `checkBookingRules` | `tests/unit/bookingRulesTraceability.test.js` → `R-AVAIL-006 maximum duration is enforced only when configured` | automated | implemented+tested |
 | R-AVAIL-007 | A maintenance block makes the affected units unavailable | Availability | `bookingService.js` → `createMaintenanceBlock` (occupancy rows `source='MAINTENANCE'`); `availabilityService.js` → `findConflicts` | — | manual (planned) | **pending — `createMaintenanceBlock` throws `column index out of range`; see defect D-1** |
@@ -133,7 +148,7 @@ named file. Nothing is marked as tested on the strength of a comment, a doc or a
 | R-BOOK-009 | Cancellation records actor, timestamp and reason, and releases inventory exactly once | Bookings | `bookingService.js` → `cancelReservation` (`cancelled_by`, `cancelled_at`, `cancellation_reason`, `UPDATE … WHERE status='CONFIRMED'`); `auditService.js` → `recordAudit` | — | demo script (`cancelled: CANCELLED released rows: 1 reason: Customer rescheduled`, then `second cancel rejected: CONFLICT`) | implemented |
 | R-BOOK-010 | Reservation references are unique even under concurrent creation | Bookings | schema `reservation.reference UNIQUE`; `references.js` → `nextReference` uses `app_sequence` inside the write transaction; `bookingService.js` → `handleBookingFailure` detects a reference collision | — | demo script (four distinct references produced) | implemented |
 | R-BOOK-011 | A repeated create with the same idempotency key returns the original reservation instead of booking twice | Bookings | schema `reservation.idempotency_key UNIQUE`; `bookingService.js` → `createReservation`, `handleBookingFailure` | — | demo script (`idempotent retry -> same id: true true`) | implemented |
-| R-BOOK-012 | `HOUR` pricing is deterministic and matches the documented examples | Bookings | `pricingService.js` → `billingQuantityFor`, `quote` | `tests/unit/bookingRulesTraceability.test.js` → `R-BOOK-012 HOUR quantity matches the worked example in docs/BOOKING_RULES.md` | automated + demo script (2 h × ETB 1,500 = 300,000 cents) | implemented+tested |
+| R-BOOK-012 | `HOUR` pricing is deterministic and matches the documented examples | Bookings | `pricingService.js` → `billingQuantityFor`, `quote` | `tests/unit/bookingRulesTraceability.test.js` → `R-BOOK-012 HOUR quantity matches the worked example in docs/BOOKING_RULES.md` | automated + demo script (2 h × LKR 1,500 = 300,000 cents) | implemented+tested |
 | R-BOOK-013 | `HALF_DAY` is 4 hours and quantities are `ceil(duration ÷ 4 h)`, minimum 1 | Bookings | `pricingService.js` → `billingQuantityFor` | `tests/unit/bookingRulesTraceability.test.js` → `R-BOOK-013 HALF_DAY is 4 hours and matches the worked example` | automated | implemented+tested |
 | R-BOOK-014 | `DAY` quantity is the number of business-local dates touched | Bookings | `pricingService.js` → `billingQuantityFor`; `time.js` → `businessDaySpan` | `tests/unit/bookingRulesTraceability.test.js` → `R-BOOK-014 DAY quantity counts business-local dates touched` | automated | implemented+tested |
 | R-BOOK-015 | `WEEK` quantity is `ceil(dates ÷ 7)`, minimum 1 | Bookings | `pricingService.js` → `billingQuantityFor` | `tests/unit/bookingRulesTraceability.test.js` → `R-BOOK-015 WEEK quantity matches the worked example` | automated | implemented+tested |
@@ -437,11 +452,10 @@ These appear in `ARCHITECTURE.md` or `API_CONTRACTS.md` as though they were fact
 
 ### 13.5 Process observations
 
-- **`package.json` over-promises.** Five declared scripts (`seed`, `admin:create`, `demo:double-booking`)
-  and three test directories (`tests/unit`, `tests/integration`, `tests/concurrency`) point at files that do
-  not exist. `npm test` fails today, before `tests/unit/bookingRulesTraceability.test.js` was added, and
-  will still fail because `tests/integration` is missing. This is the single most misleading artefact in
-  the repository for anyone assessing readiness.
+- **`package.json` over-promises (RESOLVED).** At audit time the declared scripts pointed at files that
+  did not exist. All of them now exist, and the test scripts were later repaired to use globs so
+  `npm test` runs on Node ≥ 22 (it previously failed on the bare-directory form). Current: `npm test`
+  190/190, `npm run test:concurrency` 37/37, `npm run test:e2e` 63/63.
 - **The schema is ahead of the application.** Every table, `CHECK`, partial unique index and trigger that
   this matrix depends on is present, correct and verified. The gap is entirely in routes, views and the
   services that would orchestrate them.

@@ -81,7 +81,7 @@ export const ATTRIBUTE_PANEL_FOR_CATEGORY = Object.freeze({
 });
 
 const PRICING_UNITS = Object.freeze(Object.values(PRICING_UNIT));
-const CURRENCIES = Object.freeze(['ETB', 'USD', 'EUR']);
+const CURRENCIES = Object.freeze(['LKR', 'USD', 'EUR']);
 const SORT_OPTIONS = Object.freeze([
   { value: 'name', label: 'Name (A–Z)' },
   { value: 'newest', label: 'Newest first' },
@@ -541,10 +541,10 @@ export function renderSpaceFormPage({
     ${card({
     modifiers: 'form-section',
     title: '03 · Operating Hours & Booking Rules',
-    description: 'Daily East Africa Time (UTC+03:00) operating hours, booking length bounds, and turnaround buffers.',
+    description: 'Daily Sri Lanka Standard Time (UTC+05:30) operating hours, booking length bounds, and turnaround buffers.',
     body: html`<div class="form-grid">
-      ${inputField({ id: 'open_time', label: 'Opens at (EAT)', value: values.open_time, details, type: 'time', required: true })}
-      ${inputField({ id: 'close_time', label: 'Closes at (EAT)', value: values.close_time, details, type: 'time', required: true, hint: 'Closing time must be after opening time.' })}
+      ${inputField({ id: 'open_time', label: 'Opens at (SLST)', value: values.open_time, details, type: 'time', required: true })}
+      ${inputField({ id: 'close_time', label: 'Closes at (SLST)', value: values.close_time, details, type: 'time', required: true, hint: 'Closing time must be after opening time.' })}
       ${inputField({ id: 'min_duration_minutes', label: 'Minimum duration (minutes)', value: values.min_duration_minutes, details, type: 'number', min: '15', step: '15', hint: 'Shortest reservation allowed (in 15-minute increments).' })}
       ${inputField({ id: 'max_duration_minutes', label: 'Maximum duration (minutes)', value: values.max_duration_minutes, details, type: 'number', min: '15', step: '15', hint: 'Leave blank for no maximum duration.' })}
       ${inputField({ id: 'buffer_minutes', label: 'Turnaround buffer between bookings (minutes)', value: values.buffer_minutes, details, type: 'number', min: '0', max: '240', step: '5', hint: 'Kept free before and after each reservation for room reset/cleaning.' })}
@@ -852,16 +852,16 @@ export function renderSpaceDetailPage({
         <dt>Minimum duration</dt><dd>${durationMinutesLabel(space.minDurationMinutes)}</dd>
         <dt>Maximum duration</dt><dd>${space.maxDurationMinutes ? durationMinutesLabel(space.maxDurationMinutes) : 'No maximum'}</dd>
         <dt>Buffer between bookings</dt><dd>${durationMinutesLabel(space.bufferMinutes === 0 ? 0 : space.bufferMinutes) === '—' ? 'None' : durationMinutesLabel(space.bufferMinutes)}</dd>
-        <dt>Opening hours</dt><dd>${space.openTime}–${space.closeTime} (East Africa Time)</dd>
+        <dt>Opening hours</dt><dd>${space.openTime}–${space.closeTime} (Sri Lanka Standard Time)</dd>
         <dt>Contact note</dt><dd>${space.contactNote ?? '—'}</dd>
         <dt>Created</dt><dd>${friendlyDate(space.createdAt)}</dd>
       </dl>
       <div>
-        <h4 class="card__title">Amenities</h4>
+        <h3 class="card__title">Amenities</h3>
         ${amenityList}
       </div>
       <div>
-        <h4 class="card__title">Category details</h4>
+        <h3 class="card__title">Category details</h3>
         ${attributeList}
       </div>
     </div>`,

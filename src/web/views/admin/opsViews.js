@@ -3,7 +3,7 @@
  * the maintenance list and the activity log.
  *
  * Rules that live in this file (and only here):
- *   - every timestamp is rendered through the East Africa Time helpers in
+ *   - every timestamp is rendered through the Sri Lanka Standard Time helpers in
  *     `lib/html.js` and wrapped in `<time datetime="...">`; the server's own
  *     locale is never consulted;
  *   - every number shown comes from the props the route handler passes in,
@@ -29,7 +29,7 @@ import {
 /* ------------------------------------------------------------- primitives */
 
 /** `<time datetime="…">` for an instant. `datetime` is ISO-8601 UTC, the
- *  visible text is the East Africa Time label. */
+ *  visible text is the Sri Lanka Standard Time label. */
 export function timeTag(epochMs, label = null) {
   if (!epochMs) return html`—`;
   const text = label ?? businessDateTimeLabel(epochMs);
@@ -54,12 +54,15 @@ function statGrid(items, modifier = '') {
   return html`<div class="stat-grid ${modifier}">${items.map((item) => item instanceof RawHtml ? item : statCard(item))}</div>`;
 }
 
-/** Visual occupancy progress bar (0–100%). */
+/** Visual occupancy progress bar (0–100%). Width comes from a 5%-bucket
+ *  class so the markup carries no inline style and the page needs no
+ *  `style-src 'unsafe-inline'`. The exact figure stays in aria-valuenow. */
 function occupancyMeter(percentage, label = null) {
   const pct = Math.max(0, Math.min(100, Math.round(Number(percentage) || 0)));
   const tone = pct >= 90 ? 'meter--danger' : pct >= 65 ? 'meter--warning' : 'meter--ok';
+  const bucket = Math.round(pct / 5) * 5;
   return html`<div class="meter ${tone}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${label ?? `${pct}% occupied`}">
-    <span class="meter__fill" style="width: ${pct}%"></span>
+    <span class="meter__fill meter__fill--${bucket}"></span>
   </div>`;
 }
 
@@ -70,7 +73,7 @@ export function deliveryBadge(inquiry) {
   let title;
   if (status === 'SENT') {
     title = inquiry.emailAttemptedAt
-      ? `Notification email delivered ${businessDateTimeLabel(inquiry.emailAttemptedAt)} (East Africa Time).`
+      ? `Notification email delivered ${businessDateTimeLabel(inquiry.emailAttemptedAt)} (Sri Lanka Standard Time).`
       : 'Notification email delivered.';
   } else if (status === 'NOT_CONFIGURED') {
     title = inquiry.emailError
@@ -154,7 +157,7 @@ export function renderDashboardPage({
     statCard({
       label: "Today's bookings",
       value: summary.today.bookings,
-      caption: `Business day ${businessDate} (EAT) · cancelled excluded`,
+      caption: `Business day ${businessDate} (SLST) · cancelled excluded`,
       actionHref: `/admin/calendar?date=${businessDate}`,
       actionLabel: 'Open day schedule',
     }),
@@ -199,7 +202,7 @@ export function renderDashboardPage({
     statCard({
       label: "Today's attendees",
       value: summary.today.attendees,
-      caption: `Business day ${businessDate} (EAT) · cancelled excluded`,
+      caption: `Business day ${businessDate} (SLST) · cancelled excluded`,
     }),
     statCard({
       label: 'Bookings in the next 7 days',
@@ -221,7 +224,7 @@ export function renderDashboardPage({
 
   return adminShell({
     title: 'Dashboard',
-    subtitle: `Live operations view for business day ${businessDate} (East Africa Time).`,
+    subtitle: `Live operations view for business day ${businessDate} (Sri Lanka Standard Time).`,
     actor,
     csrfToken,
     flash,
@@ -235,7 +238,7 @@ export function renderDashboardPage({
       ${statGrid(secondaryMetrics, 'stat-grid--secondary')}
 
       <p class="hint">All figures are read live from the booking database. Generated
-        ${timeTag(summary.generatedAt)} (East Africa Time).</p>
+        ${timeTag(summary.generatedAt)} (Sri Lanka Standard Time).</p>
 
       ${card({
     title: 'Available now',
@@ -712,7 +715,7 @@ export function renderInquiryDetailPage({
     : html`<span>The requested space is no longer in the catalogue.</span>`}</dd>
         <dt>Requested window</dt><dd>${periodLabel(inquiry.startAt, inquiry.endAt)}
           <span class="meta-line">${dateLabel(inquiry.startAt)}
-            ${timeLabel(inquiry.startAt)}–${timeLabel(inquiry.endAt)} (East Africa Time)</span></dd>
+            ${timeLabel(inquiry.startAt)}–${timeLabel(inquiry.endAt)} (Sri Lanka Standard Time)</span></dd>
         <dt>Attendees</dt><dd>${inquiry.attendees === null ? 'Not stated' : inquiry.attendees}</dd>
         <dt>Desks requested</dt><dd>${inquiry.deskQuantity === null ? 'Not stated' : inquiry.deskQuantity}</dd>
         <dt>Visitor message</dt><dd>${inquiry.message ? html`<blockquote>${inquiry.message}</blockquote>` : html`<span class="meta-line">No message sent.</span>`}</dd>

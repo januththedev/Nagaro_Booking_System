@@ -136,7 +136,7 @@ const ACTIONS = {
         (reference, space_id, customer_id, status, start_at, end_at, unit_count,
          billing_unit, billing_quantity, rate_cents, total_cents, currency,
          created_by, created_at, updated_by, updated_at)
-      VALUES (?,?,?, 'CONFIRMED', ?,?,1, 'HOUR',1,0,0, 'ETB', ?,?,?,?)
+      VALUES (?,?,?, 'CONFIRMED', ?,?,1, 'HOUR',1,0,0, 'LKR', ?,?,?,?)
     `).run(reference, payload.spaceId, payload.customerId, payload.startAt, payload.endAt,
       payload.actorId ?? 1, now, payload.actorId ?? 1, now);
     const reservationId = Number(db.prepare('SELECT id FROM reservation WHERE reference = ?').get(reference).id);

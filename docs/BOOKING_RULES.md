@@ -16,10 +16,10 @@ Requirement identifiers (`R-*`) are defined in `API_CONTRACTS.md` §9 and traced
 Every instant in this system is stored as an integer: **milliseconds since the Unix epoch, in UTC**.
 Nothing is stored as a string date or a wall-clock time.
 
-Humans work in **East Africa Time (EAT)**. The business time zone is pinned to
-`Africa/Addis_Ababa` (UTC+03:00, no daylight saving, ever) in `src/server/domain/time.js`.
+Humans work in **Sri Lanka Standard Time (SLST)**. The business time zone is pinned to
+`Asia/Colombo` (UTC+05:30, no daylight saving, ever) in `src/server/domain/time.js`.
 The clock and time zone of the server machine are never consulted for a business calculation.
-When staff type `09:00`, the stored value is `06:00 UTC`.
+When staff type `09:00`, the stored value is `03:30 UTC`.
 
 ### 1.1 Half-open intervals
 
@@ -91,9 +91,9 @@ operation is rejected — so a repeated cancel cannot release the same inventory
 
 ---
 
-## 3. Opening hours (East Africa Time)
+## 3. Opening hours (Sri Lanka Standard Time)
 
-Each space declares `open_time` and `close_time` as `HH:MM` **local EAT** clock values
+Each space declares `open_time` and `close_time` as `HH:MM` **local SLST** clock values
 (stored as text, never as epochs). The default is **08:00–18:00**.
 
 A requested booking window must fall inside opening hours:
@@ -107,7 +107,7 @@ A requested booking window must fall inside opening hours:
 A window that falls outside these hours is rejected with a message naming the offending date and clock
 time, for example:
 
-> This space is available 08:00-18:00 (East Africa Time). Requested time 18:00 falls outside opening hours on 2026-11-10.
+> This space is available 08:00-18:00 (Sri Lanka Standard Time). Requested time 18:00 falls outside opening hours on 2026-11-10.
 
 Because the message tells staff the space's own hours, an operations manager should read it as
 "this request is outside what the space is configured for", not necessarily as a policy refusal —
@@ -178,7 +178,7 @@ Rules:
 5. No booking window may exceed **400 days**; that cap is a safety limit, not a product rule.
 
 Durations are measured in absolute elapsed minutes, so a booking across a clock change would be measured
-correctly — though EAT has no clock changes.
+correctly — though SLST has no clock changes.
 
 ---
 
@@ -263,7 +263,7 @@ configured** — `ALLOWED_PRICING_UNITS` in `src/server/domain/constants.js`:
 | `COWORKING` | `DAY`, `WEEK`, `MONTH` |
 
 Rates are stored in **cents** (`space_rate.amount_cents`, integer, ≥ 0) with the currency on the space
-(default `ETB`). Nothing in this system is stored as a floating-point amount of money.
+(default `LKR`). Nothing in this system is stored as a floating-point amount of money.
 
 ### 8.1 Quantity derivation
 
@@ -291,27 +291,27 @@ single most important pricing property in the system.
 
 ### 8.2 Worked example — `HOUR`
 
-Rate: **ETB 1,500.00 per hour** (`rate_cents = 150000`).
+Rate: **LKR 1,500.00 per hour** (`rate_cents = 150000`).
 
 | Request | Duration | Quantity | Arithmetic | Total |
 |---|---|---|---|---|
-| 09:00–10:00 | 60 min | 1 | `ceil(60/60)` = 1 | 1 × 150,000 = **ETB 1,500.00** |
-| 09:00–10:01 | 61 min | 2 | `ceil(61/60)` = 2 | 2 × 150,000 = **ETB 3,000.00** |
-| 09:00–11:30 | 150 min | 3 | `ceil(150/60)` = 3 | 3 × 150,000 = **ETB 4,500.00** |
-| 09:00–13:00 | 240 min | 4 | `ceil(240/60)` = 4 | 4 × 150,000 = **ETB 6,000.00** |
+| 09:00–10:00 | 60 min | 1 | `ceil(60/60)` = 1 | 1 × 150,000 = **LKR 1,500.00** |
+| 09:00–10:01 | 61 min | 2 | `ceil(61/60)` = 2 | 2 × 150,000 = **LKR 3,000.00** |
+| 09:00–11:30 | 150 min | 3 | `ceil(150/60)` = 3 | 3 × 150,000 = **LKR 4,500.00** |
+| 09:00–13:00 | 240 min | 4 | `ceil(240/60)` = 4 | 4 × 150,000 = **LKR 6,000.00** |
 
 One minute past the hour is a full extra hour. Staff who want a rounded total should agree the end time
 up front rather than expecting the system to round down.
 
 ### 8.3 Worked example — `HALF_DAY`
 
-Rate: **ETB 4,000.00 per half day** (`rate_cents = 400000`). A half day is 240 minutes.
+Rate: **LKR 4,000.00 per half day** (`rate_cents = 400000`). A half day is 240 minutes.
 
 | Request | Duration | Quantity | Arithmetic | Total |
 |---|---|---|---|---|
-| 09:00–13:00 | 240 min | 1 | `ceil(240/240)` = 1 | 1 × 400,000 = **ETB 4,000.00** |
-| 09:00–13:01 | 241 min | 2 | `ceil(241/240)` = 2 | 2 × 400,000 = **ETB 8,000.00** |
-| 09:00–17:00 | 480 min | 2 | `ceil(480/240)` = 2 | 2 × 400,000 = **ETB 8,000.00** |
+| 09:00–13:00 | 240 min | 1 | `ceil(240/240)` = 1 | 1 × 400,000 = **LKR 4,000.00** |
+| 09:00–13:01 | 241 min | 2 | `ceil(241/240)` = 2 | 2 × 400,000 = **LKR 8,000.00** |
+| 09:00–17:00 | 480 min | 2 | `ceil(480/240)` = 2 | 2 × 400,000 = **LKR 8,000.00** |
 
 Note the 241-minute case: a booking that runs one minute into the second half day is charged for
 two half days. This is deliberate and predictable; the alternative (pro-rating) would make the same room
@@ -319,15 +319,15 @@ cost an arbitrary amount.
 
 ### 8.4 Worked example — `DAY`
 
-Rate: **ETB 4,500.00 per day** (`rate_cents = 450000`).
+Rate: **LKR 4,500.00 per day** (`rate_cents = 450000`).
 
 | Request | Dates touched | Quantity | Arithmetic | Total |
 |---|---|---|---|---|
-| 09:00–17:00, one date | 1 | 1 | `span` = 1 | 1 × 450,000 = **ETB 4,500.00** |
-| 09:00 Tue → 17:00 Wed | 2 | 2 | `span` = 2 | 2 × 450,000 = **ETB 9,000.00** |
-| Three desks, 09:00–17:00 | 1 | 1 | 1 × 3 desks | 450,000 × 1 × 3 = **ETB 13,500.00** |
+| 09:00–17:00, one date | 1 | 1 | `span` = 1 | 1 × 450,000 = **LKR 4,500.00** |
+| 09:00 Tue → 17:00 Wed | 2 | 2 | `span` = 2 | 2 × 450,000 = **LKR 9,000.00** |
+| Three desks, 09:00–17:00 | 1 | 1 | 1 × 3 desks | 450,000 × 1 × 3 = **LKR 13,500.00** |
 
-A day is a **calendar date in EAT**, not 24 hours. A booking from 09:00 to 17:00 on one date is one day,
+A day is a **calendar date in SLST**, not 24 hours. A booking from 09:00 to 17:00 on one date is one day,
 which is the intended behaviour for a desk rented for the working day.
 
 > **Careful:** a rental that starts at 09:00 on Monday and ends at 09:00 on the following Monday touches
@@ -337,24 +337,24 @@ which is the intended behaviour for a desk rented for the working day.
 
 ### 8.5 Worked example — `WEEK`
 
-Rate: **ETB 8,000.00 per week** (`rate_cents = 800000`).
+Rate: **LKR 8,000.00 per week** (`rate_cents = 800000`).
 
 | Request | Dates touched | Quantity | Arithmetic | Total |
 |---|---|---|---|---|
-| 09:00 Tue → 17:00 the following Monday | 7 | 1 | `ceil(7/7)` = 1 | 1 × 800,000 = **ETB 8,000.00** |
-| 09:00 Tue → 09:00 eight days later | 8 | 2 | `ceil(8/7)` = 2 | 2 × 800,000 = **ETB 16,000.00** |
-| 09:00 on the 1st → 17:00 on the 29th | 29 | 5 | `ceil(29/7)` = 5 | 5 × 800,000 = **ETB 40,000.00** |
+| 09:00 Tue → 17:00 the following Monday | 7 | 1 | `ceil(7/7)` = 1 | 1 × 800,000 = **LKR 8,000.00** |
+| 09:00 Tue → 09:00 eight days later | 8 | 2 | `ceil(8/7)` = 2 | 2 × 800,000 = **LKR 16,000.00** |
+| 09:00 on the 1st → 17:00 on the 29th | 29 | 5 | `ceil(29/7)` = 5 | 5 × 800,000 = **LKR 40,000.00** |
 
 ### 8.6 Worked example — `MONTH`
 
-Rate: **ETB 25,000.00 per month** (`rate_cents = 2500000`). A "month" here is **30 dates**.
+Rate: **LKR 25,000.00 per month** (`rate_cents = 2500000`). A "month" here is **30 dates**.
 
 | Request | Dates touched | Quantity | Arithmetic | Total |
 |---|---|---|---|---|
-| 1 Nov 00:00 → 30 Nov 00:00 | 30 | 1 | `ceil(30/30)` = 1 | 1 × 2,500,000 = **ETB 25,000.00** |
-| 1 Nov 00:00 → 1 Dec 00:00 | 30 | 1 | `ceil(30/30)` = 1 | 1 × 2,500,000 = **ETB 25,000.00** |
-| 1 Nov 00:00 → 2 Dec 00:00 | 31 | 2 | `ceil(31/30)` = 2 | 2 × 2,500,000 = **ETB 50,000.00** |
-| 1 Nov 00:00 → 31 Dec 00:00 | 60 | 2 | `ceil(60/30)` = 2 | 2 × 2,500,000 = **ETB 50,000.00** |
+| 1 Nov 00:00 → 30 Nov 00:00 | 30 | 1 | `ceil(30/30)` = 1 | 1 × 2,500,000 = **LKR 25,000.00** |
+| 1 Nov 00:00 → 1 Dec 00:00 | 30 | 1 | `ceil(30/30)` = 1 | 1 × 2,500,000 = **LKR 25,000.00** |
+| 1 Nov 00:00 → 2 Dec 00:00 | 31 | 2 | `ceil(31/30)` = 2 | 2 × 2,500,000 = **LKR 50,000.00** |
+| 1 Nov 00:00 → 31 Dec 00:00 | 60 | 2 | `ceil(60/30)` = 2 | 2 × 2,500,000 = **LKR 50,000.00** |
 
 A real calendar month (November, 30 dates) is exactly one month-unit. December (31 dates) from the 1st to
 the 31st is 31 dates and therefore **two** month-units. If Nagaro wants "one calendar month = one month
@@ -432,7 +432,7 @@ question.** They are numbered so they can be cited, challenged and changed. Each
 *can* be reversed — but reversing it means changing the code, this document and the traceability matrix
 together.
 
-**A1 — Default opening hours are 08:00–18:00 EAT.** Every space is created with `open_time = '08:00'`
+**A1 — Default opening hours are 08:00–18:00 SLST.** Every space is created with `open_time = '08:00'`
 and `close_time = '18:00'`, and `close_time` must be strictly later than `open_time`. A space that is
 genuinely staffed at other times must have its hours changed; the default is not a claim about Nagaro's
 actual opening hours.
@@ -471,7 +471,7 @@ rate changes never alter. Before a reservation exists, a price is a quotation st
 
 **A10 — Public holidays are not modelled.** No holiday calendar is stored and no date is treated
 specially. If a space is unavailable on a public holiday, staff create a maintenance block for it. This
-keeps pricing arithmetic independent of an Ethiopian holiday calendar that changes from year to year.
+keeps pricing arithmetic independent of a Sri Lankan public-holiday calendar that changes from year to year.
 
 **A11 — `attendees` is optional, and the capacity check only runs when it is supplied.** An empty
 attendee count is not an error. A supplied count greater than `space.capacity` is an error.
@@ -506,7 +506,7 @@ if such a route existed. Spaces are archived.
 **A18 — Inventory is consumed by exactly the `CONFIRMED` and `COMPLETED` statuses.** `CONSUMING_RESERVATION_STATUSES`
 in `src/server/domain/constants.js` is the single declaration of this list.
 
-**A19 — The business time zone is `Africa/Addis_Ababa`, fixed at UTC+03:00 with no daylight saving**, and
+**A19 — The business time zone is `Asia/Colombo`, fixed at UTC+05:30 with no daylight saving**, and
 the server's own clock and time zone are never used for a business calculation. All display formatting,
 date arithmetic, opening-hours checks and pricing span calculations go through
 `src/server/domain/time.js`.

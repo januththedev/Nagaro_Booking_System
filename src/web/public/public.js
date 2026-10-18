@@ -28,12 +28,12 @@
 
 'use strict';
 
-/* Ethiopia has observed UTC+03:00 with no DST since 1936; the server resolves
+/* Sri Lanka has observed UTC+05:30 with no DST since 2006; the server resolves
    the business zone through Intl and we mirror it here so wall-clock form
    values can be turned into unambiguous instants. Overridable per form or on
-   <body data-tz-offset="+03:00"> should the deployment ever move. */
-var DEFAULT_TZ_OFFSET = '+03:00';
-var BUSINESS_TIME_ZONE = 'Africa/Addis_Ababa';
+   <body data-tz-offset="+05:30"> should the deployment ever move. */
+var DEFAULT_TZ_OFFSET = '+05:30';
+var BUSINESS_TIME_ZONE = 'Asia/Colombo';
 
 /* ------------------------------------------------------------------ helpers */
 

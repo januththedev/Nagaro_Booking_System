@@ -41,7 +41,7 @@ export function applySecurityHeaders(res, { isHtml = false, isMedia = false } = 
     res.setHeader('Content-Security-Policy', [
       "default-src 'self'",
       "img-src 'self' data:",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self'",
       "script-src 'self'",
       "form-action 'self'",
       "base-uri 'none'",

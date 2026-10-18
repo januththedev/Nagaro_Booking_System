@@ -62,7 +62,7 @@ function insertSpace(db, {
        status, currency, pricing_unit, min_duration_minutes, max_duration_minutes,
        buffer_minutes, open_time, close_time, amenities, attributes,
        created_at, updated_at, published_at)
-    VALUES (?,?,?,?,?,?,?,?,?,'ETB','HOUR',30,NULL,0,'07:00','21:00','[]','{}',?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,'LKR','HOUR',30,NULL,0,'07:00','21:00','[]','{}',?,?,?)
   `).run(
     code, name, category, 'A short description', 'A longer description',
     'Trace Expert City', '2', capacity, status, now, now,
@@ -94,7 +94,7 @@ function basePayload(spaceCode, window, overrides = {}) {
   return {
     customer_name: 'Jane Visitor',
     email: 'jane@example.com',
-    phone: '+251 911 000 000',
+    phone: '+94 911 000 000',
     organization: 'Example Ltd',
     space_code: spaceCode,
     requested_start_at: window.startAt,
@@ -134,7 +134,7 @@ function insertReservation(db, {
       (reference, space_id, customer_id, status, start_at, end_at, unit_count, attendees,
        billing_unit, billing_quantity, rate_cents, total_cents, currency,
        created_by, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,1,6,'HOUR',2,1000,2000,'ETB',?,?,?)
+    VALUES (?,?,?,?,?,?,1,6,'HOUR',2,1000,2000,'LKR',?,?,?)
   `).run(reference, spaceId, customerId, status, startAt, endAt, actorId, now, now);
   return Number(info.lastInsertRowid);
 }
@@ -509,7 +509,7 @@ test('parseInquiryPayload normalises the public form and reports every missing f
   const parsed = parseInquiryPayload({
     customer_name: '  Jane Visitor ',
     email: ' Jane@Example.COM ',
-    phone: '+251 911 000 000',
+    phone: '+94 911 000 000',
     space_code: 'aurora',
     requested_start_at: Date.now() + DAY,
     requested_end_at: Date.now() + DAY + 3600 * 1000,

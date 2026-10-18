@@ -49,11 +49,11 @@ export function join(list, separator = '') {
 
 /* ------------------------------------------------------------- formatting */
 
-export function money(cents, currency = 'ETB') {
+export function money(cents, currency = 'LKR') {
   return formatMoney(cents, currency);
 }
 
-export function moneyCompact(cents, currency = 'ETB') {
+export function moneyCompact(cents, currency = 'LKR') {
   return formatMoneyCompact(cents, currency);
 }
 

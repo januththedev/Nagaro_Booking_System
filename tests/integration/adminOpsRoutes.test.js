@@ -193,7 +193,7 @@ function insertInquiry(db, {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     reference, spaceId, customerName, email, email.trim().toLowerCase(),
-    '+251 911 222 333', 'Example Ltd', startAt, endAt, atendees, deskQuantity, message,
+    '+94 911 222 333', 'Example Ltd', startAt, endAt, atendees, deskQuantity, message,
     status, null, emailStatus, emailError, attemptedAt, null, null, createdAt, createdAt,
   );
   return Number(info.lastInsertRowid);
@@ -214,7 +214,7 @@ function seed(db, actor) {
       category: 'MEETING_ROOM',
       short_description: 'Bright meeting room at Trace Expert City',
       description: 'A bright meeting room with projector, whiteboard and video conferencing.',
-      location: 'Trace Expert City, Addis Ababa',
+      location: 'Trace Expert City, Colombo',
       floor: '2',
       capacity: 12,
       pricing_unit: 'HOUR',
@@ -240,7 +240,7 @@ function seed(db, actor) {
     payload: {
       full_name: 'Selam Bekele',
       email: 'selam@example.com',
-      phone: '+251 911 111 111',
+      phone: '+94 911 111 111',
       organization: 'Example Ltd',
     },
   });

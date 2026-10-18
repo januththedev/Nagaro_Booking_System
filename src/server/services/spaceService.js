@@ -239,7 +239,7 @@ export function createSpace(db, { actor, payload } = {}) {
     `).run(
       value.code, value.name, value.category, value.short_description, value.description,
       value.location, value.floor ?? null, value.capacity,
-      value.currency ?? 'ETB', value.pricing_unit ?? ALLOWED_PRICING_UNITS[value.category][0],
+      value.currency ?? 'LKR', value.pricing_unit ?? ALLOWED_PRICING_UNITS[value.category][0],
       value.min_duration_minutes ?? 60, value.max_duration_minutes ?? null,
       value.buffer_minutes ?? 0, value.open_time ?? '08:00', value.close_time ?? '18:00',
       JSON.stringify(value.amenities ?? []), JSON.stringify(value.attributes ?? {}),

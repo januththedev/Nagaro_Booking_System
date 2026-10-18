@@ -8,7 +8,7 @@
  * src/web/public/admin.js are documented next to the markup that provides them.
  */
 import {
-  csrfField, dateTimeLabel, durationLabel, emptyState, fieldError, friendlyDate, html, money,
+  businessDateKey, csrfField, dateTimeLabel, durationLabel, emptyState, fieldError, friendlyDate, html, money,
   pagination, periodLabel, pricingUnitLabel, problemList, raw, relativeDayLabel, statusBadge, tag, timeLabel,
 } from '../../lib/html.js';
 import { adminShell, card, table } from '../layout.js';
@@ -145,7 +145,7 @@ export function renderReservationListPage({
         html`<span><strong>${reservation.customerName}</strong></span>
           <div class="meta-line">${reservation.customerOrganization ?? NOT_SET}</div>`,
         html`<span>${periodLabel(reservation.startAt, reservation.endAt)}</span>
-          <div class="meta-line">${tag(durationLabel(reservation.startAt, reservation.endAt))} · EAT</div>`,
+          <div class="meta-line">${tag(durationLabel(reservation.startAt, reservation.endAt))} · SLST</div>`,
         unitSummary(reservation),
         html`<span class="price nowrap">${money(reservation.totalCents, reservation.currency)}</span>`,
         statusBadge(reservation.status),
@@ -224,7 +224,7 @@ export function renderReservationListPage({
     body: html`${table({
       columns: [
         { label: 'Reference' }, { label: 'Space' }, { label: 'Customer' },
-        { label: 'Period (EAT)' }, { label: 'Units / attendees' },
+        { label: 'Period (SLST)' }, { label: 'Units / attendees' },
         { label: 'Total', align: 'right' }, { label: 'Status' }, { label: 'Actions' },
       ],
       rows,
@@ -276,7 +276,7 @@ export function renderBookingFormPage({
 
     <form method="post" action="${isEdit ? `/admin/reservations/${reservation.id}` : '/admin/reservations'}"
           class="split-layout" data-reservation-form data-booking-form
-          data-availability-url="/api/admin/availability" data-tz-offset="+03:00"
+          data-availability-url="/api/admin/availability" data-tz-offset="+05:30"
           data-space-code="${selectedSpace?.code ?? ''}"
           data-available-desks="${selectedSpace?.unitCount ?? ''}">
       ${csrfField(csrfToken)}
@@ -286,7 +286,7 @@ export function renderBookingFormPage({
         ${card({
     modifiers: 'form-section',
     title: '01 · Space & Time Window',
-    description: 'Select the space, business date, and East Africa Time (UTC+03:00) window.',
+    description: 'Select the space, business date, and Sri Lanka Standard Time (UTC+05:30) window.',
     body: html`<div class="form-grid">
       <div class="form-field form-field--full">
         <label for="space_id">Space <span class="required-mark" aria-hidden="true">*</span></label>
@@ -301,12 +301,12 @@ export function renderBookingFormPage({
                ${raw(windowError ? ' aria-invalid="true"' : '')}>
       </div>
       <div class="form-field">
-        <label for="start_time">Start time (EAT) <span class="required-mark" aria-hidden="true">*</span></label>
+        <label for="start_time">Start time (SLST) <span class="required-mark" aria-hidden="true">*</span></label>
         <input id="start_time" name="start_time" type="time" value="${values.start_time ?? ''}" required
                ${raw(windowError ? ' aria-invalid="true"' : '')}>
       </div>
       <div class="form-field">
-        <label for="end_time">End time (EAT) <span class="required-mark" aria-hidden="true">*</span></label>
+        <label for="end_time">End time (SLST) <span class="required-mark" aria-hidden="true">*</span></label>
         <input id="end_time" name="end_time" type="time" value="${values.end_time ?? ''}" required
                ${raw(windowError ? ' aria-invalid="true"' : '')}>
         <p class="hint">An end time earlier than the start time rolls over to the next day (overnight bookings).</p>
@@ -440,7 +440,7 @@ export function renderBookingFormPage({
     title: 'Booking Rules & Safeguards',
     body: html`<div class="stack">
       <dl class="detail-list detail-list--inline">
-        <dt>Time zone</dt><dd>East Africa Time (UTC+03:00)</dd>
+        <dt>Time zone</dt><dd>Sri Lanka Standard Time (UTC+05:30)</dd>
         ${selectedSpace ? html`
           <dt>Operating hours</dt><dd>${selectedSpace.openTime}–${selectedSpace.closeTime}</dd>
           <dt>Turnaround buffer</dt><dd>${selectedSpace.bufferMinutes > 0 ? `${selectedSpace.bufferMinutes} min` : 'None'}</dd>
@@ -618,7 +618,7 @@ export function renderReservationDetailPage({
     : html`${reservation.spaceCode} \u2014 ${reservation.spaceName}`}
         <span class="hint"> · ${categoryLabelText(reservation.category)} · space status ${reservation.spaceStatus}</span></dd>
       <dt>Period</dt><dd>${periodLabel(reservation.startAt, reservation.endAt)}
-        <span class="hint"> · ${durationLabel(reservation.startAt, reservation.endAt)} · time zone EAT (UTC+03:00)</span></dd>
+        <span class="hint"> · ${durationLabel(reservation.startAt, reservation.endAt)} · time zone SLST (UTC+05:30)</span></dd>
       <dt>Start</dt><dd>${dateTimeLabel(reservation.startAt)}</dd>
       <dt>End</dt><dd>${dateTimeLabel(reservation.endAt)}</dd>
       <dt>Units</dt><dd>${reservation.unitCount} (${reservation.units.length ? reservation.units.map((unit) => unit.code).join(', ') : 'no active allocation'})</dd>
@@ -774,8 +774,8 @@ export function renderReservationDetailPage({
 }
 
 function startDateKey(reservation) {
-  // Business time zone is EAT (UTC+03:00): shift before slicing the ISO date.
-  return new Date(reservation.startAt + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Business-local calendar date (Asia/Colombo, UTC+05:30), not the UTC date.
+  return businessDateKey(reservation.startAt);
 }
 
 /* -------------------------------------------------------- maintenance page */
@@ -815,7 +815,7 @@ export function renderMaintenancePage({
     description: 'A block claims the space\'s units as occupancy, so the same database rule that stops double bookings also stops maintenance over a confirmed reservation.',
     body: html`${table({
       columns: [
-        { label: 'Space' }, { label: 'Period (EAT)' }, { label: 'Duration' }, { label: 'Reason' },
+        { label: 'Space' }, { label: 'Period (SLST)' }, { label: 'Duration' }, { label: 'Reason' },
         { label: 'Units' }, { label: 'Status' }, { label: 'Created' }, { label: 'Action' },
       ],
       rows,

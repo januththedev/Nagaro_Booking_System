@@ -13,9 +13,10 @@
     "migrate": "node src/server/db/migrate.js",
     "seed": "node src/server/db/seed.js",
     "admin:create": "node scripts/create-admin.js",
-    "test": "node --test --test-concurrency=1 tests/unit tests/integration",
-    "test:concurrency": "node --test --test-concurrency=1 tests/concurrency",
-    "test:all": "node --test --test-concurrency=1 tests/unit tests/integration tests/concurrency",
+    "test": "node --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/**/*.test.js\"",
+    "test:concurrency": "node --test --test-concurrency=1 \"tests/concurrency/**/*.test.js\"",
+    "test:all": "node --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/**/*.test.js\" \"tests/concurrency/**/*.test.js\"",
+    "test:e2e": "node scripts/e2e-verify.js",
     "demo:double-booking": "node scripts/demo-double-booking.js"
   },
   "dependencies": {

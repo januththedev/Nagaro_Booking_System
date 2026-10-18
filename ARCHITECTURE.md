@@ -24,7 +24,7 @@ Inspected before choosing anything (see `IMPLEMENTATION_REPORT.md` for raw evide
 | PostgreSQL / Docker | **Not installed, not reachable** | PostgreSQL exclusion constraints are NOT available; design must be correct on SQLite |
 | npm registry | Reachable | Exactly one runtime dependency (`nodemailer`) |
 | Build toolchain | None | No transpiling, bundling or native compilation anywhere |
-| `Intl` time zones | Working | `Africa/Addis_Ababa` resolved through `Intl`, not the server clock |
+| `Intl` time zones | Working | `Asia/Colombo` resolved through `Intl`, not the server clock |
 
 **Decision:** Node 24 + built-in SQLite + a hand-written HTTP layer + server-rendered HTML. Rationale: the environment has no build toolchain and no PostgreSQL, so a stack with a native module dependency or a bundler is a delivery risk with no compensating benefit. The result runs from `node src/server/index.js` with one `npm install`.
 
@@ -133,7 +133,7 @@ Evidence: `tests/concurrency/*` spawn real OS processes against the real databas
 
 ## 9. Time zone
 
-All timestamps are stored as epoch milliseconds in UTC. Every local calculation goes through `src/server/domain/time.js`, which pins the business zone to `Africa/Addis_Ababa` (fixed UTC+03:00, no DST) via `Intl`. The server's own time zone is never consulted.
+All timestamps are stored as epoch milliseconds in UTC. Every local calculation goes through `src/server/domain/time.js`, which pins the business zone to `Asia/Colombo` (fixed UTC+05:30, no DST) via `Intl`. The server's own time zone is never consulted.
 
 ## 10. Email
 

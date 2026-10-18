@@ -608,7 +608,7 @@ function defaultFormValues() {
     location: '',
     floor: '',
     capacity: '',
-    currency: 'ETB',
+    currency: 'LKR',
     // DAY is allowed by every category, so a fresh form cannot be rejected for
     // a category/unit mismatch before the administrator has chosen.
     pricing_unit: PRICING_UNIT.DAY,
@@ -658,7 +658,7 @@ function formValuesFromSpace(space) {
     location: space.location ?? '',
     floor: space.floor ?? '',
     capacity: String(space.capacity),
-    currency: space.currency ?? 'ETB',
+    currency: space.currency ?? 'LKR',
     pricing_unit: space.pricingUnit,
     min_duration_minutes: String(space.minDurationMinutes),
     max_duration_minutes: space.maxDurationMinutes === null || space.maxDurationMinutes === undefined
@@ -699,7 +699,7 @@ function formValuesFromBody(body) {
     location: rawText(body.location),
     floor: rawText(body.floor),
     capacity: rawText(body.capacity),
-    currency: rawText(body.currency) || 'ETB',
+    currency: rawText(body.currency) || 'LKR',
     pricing_unit: rawText(body.pricing_unit),
     min_duration_minutes: rawText(body.min_duration_minutes),
     max_duration_minutes: rawText(body.max_duration_minutes),

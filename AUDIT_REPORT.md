@@ -33,7 +33,7 @@ The reported claim of "176 unit/integration + 37 concurrency + 63 e2e" is **veri
 - **Public PII boundary** — `getPublicAvailability()` only; `tests/unit/publicPrivacy.test.js` 40+ assertions pass.
 - **Auth** — scrypt, DB-resolved roles, HttpOnly session cookie, CSRF double-submit, rate-limited login. Verified by `tests/integration/adminCustomerRoutes.test.js` (unauthenticated → 401).
 - **Email honesty** — `NOT_CONFIGURED`/`FAILED`/`SENT` recorded; inquiry persisted regardless; verified by e2e §13 and `tests/unit/mailer.test.js`.
-- **Time zone** — `Africa/Addis_Ababa` pinned in `src/server/domain/time.js`; `dashboardService.dashboardSummary` rejects any other zone.
+- **Time zone** — `Asia/Colombo` pinned in `src/server/domain/time.js`; `dashboardService.dashboardSummary` rejects any other zone.
 - **Server boot** — `src/server/index.js` applies migrations, integrity gate, trigger gate, and starts cleanly; verified by boot check.
 - **Triggers present** — 2 triggers; `PRAGMA integrity_check` / `foreign_key_check` clean.
 
@@ -103,3 +103,28 @@ The migration runner (`src/server/db/migrate.js`) is SQLite-specific; a PostgreS
 ## 11. Agents deployed
 
 This session used the orchestrator directly (no subagents) due to the prior rate-limit incident; all work was verified by reproducible commands listed above. Subagent deployment is recommended for the remaining PostgreSQL concurrency and browser UX verification once credentials are available.
+
+## 12. Addendum — Phase 2 verification pass (2026-10-18, later than §1–§11)
+
+This section records what changed after the audit above. The audit in §1–§11 stands as the
+state of commit `602c9a7`; the figures below supersede §2 and §5 for the current tree.
+
+- **Location corrected.** TRACE Expert City is in Colombo, Sri Lanka, not Addis Ababa. The business
+  zone is `Asia/Colombo` (UTC+05:30) and the currency is `LKR`. This corrected a real defect: the
+  audit's §3 "Time zone" line was only true *after* the locale was fixed. See
+  `UI_UX_IMPLEMENTATION_REPORT.md` §3.
+- **Reproduced test suites (current).** Unit + integration **190/190**, concurrency **37/37**,
+  end-to-end **63/63** — **290/290 pass**. (`npm test`, `npm run test:concurrency`, `npm run test:e2e`.)
+- **Browser verification now performed.** Every public and admin route was driven in a real Chromium
+  browser: navigation, form submission, accessibility-tree snapshots, console/network capture and
+  Lighthouse. Responsive layout was measured natively at 390/768/1440 CSS px — **54 route × width
+  combinations, 0 page-level overflow, 0 console errors/warnings** — addressing the §5 limitation.
+  Lighthouse accessibility is **1.00 on every audited route**. Screenshots could not be rasterised
+  in this environment (no visible desktop window); no screenshots are fabricated.
+- **Defects found and fixed this pass:** mobile overflow on `/admin/maintenance`; footer brand text at
+  1.05:1 contrast; admin heading-order skips; non-focusable scrollable tables; gallery
+  accessible-name mismatch; the CSP `style-src 'unsafe-inline'` relaxation; `npm test` not running on
+  Node ≥ 22; and a stale `nagaro.et` placeholder.
+- **CSP tightened, not relaxed.** `src/server/http/response.js` now sends `style-src 'self'`; the one
+  inline style that required `unsafe-inline` was removed at the root.
+

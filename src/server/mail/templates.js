@@ -34,7 +34,7 @@ function windowText(inquiry) {
   const start = startOf(inquiry);
   const end = endOf(inquiry);
   if (start === null || end === null) return 'Not specified';
-  return `${businessDateTimeLabel(start)} to ${businessDateTimeLabel(end)} (East Africa Time)`;
+  return `${businessDateTimeLabel(start)} to ${businessDateTimeLabel(end)} (Sri Lanka Standard Time)`;
 }
 
 function durationText(inquiry) {

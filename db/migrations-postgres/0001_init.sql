@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS space (
   floor                 text,
   capacity              integer NOT NULL CHECK (capacity >= 1),
   status                text NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED')),
-  currency              text NOT NULL DEFAULT 'ETB',
+  currency              text NOT NULL DEFAULT 'LKR',
   pricing_unit          text NOT NULL CHECK (pricing_unit IN ('HOUR','HALF_DAY','DAY','WEEK','MONTH')),
   min_duration_minutes  integer NOT NULL DEFAULT 60 CHECK (min_duration_minutes >= 15),
   max_duration_minutes  integer,

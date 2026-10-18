@@ -47,7 +47,7 @@ export function renderLoginPage({
               <path d="M4 20V9M10 20V4M16 20v-7M21 20H3" />
             </svg>
           </span>
-          <span class="auth-showcase__eyebrow">Nagaro Operations · Addis Ababa</span>
+          <span class="auth-showcase__eyebrow">Nagaro Operations · Colombo</span>
         </div>
         <h1 class="auth-showcase__title">Operations &amp; Inventory Console — Trace Expert City</h1>
         <p class="auth-showcase__lead">Manage published venue schedules, convert visitor inquiries into confirmed reservations, and coordinate room turnarounds across Trace Expert City.</p>
@@ -58,7 +58,7 @@ export function renderLoginPage({
           </div>
           <div class="auth-highlights__item">
             <dt>Live unit occupancy tracking</dt>
-            <dd>Real-time desk pool allocation and maintenance blocking across East Africa Time (UTC+3) operating windows.</dd>
+            <dd>Real-time desk pool allocation and maintenance blocking across Sri Lanka Standard Time (UTC+5:30) operating windows.</dd>
           </div>
           <div class="auth-highlights__item">
             <dt>Manual inquiry verification</dt>
@@ -87,7 +87,7 @@ export function renderLoginPage({
               <div class="form-field form-field--full">
                 <label for="email">Email address</label>
                 <input id="email" name="email" type="email" required autocomplete="username"
-                       value="${email}" autofocus aria-describedby="email-hint" placeholder="staff@nagaro.et">
+                       value="${email}" autofocus aria-describedby="email-hint" placeholder="staff@nagaro.lk">
                 <p class="hint" id="email-hint">Use the address your administrator registered.</p>
               </div>
               <div class="form-field form-field--full">
@@ -108,7 +108,7 @@ export function renderLoginPage({
 </main>
 <footer class="site-footer">
   <div class="site-footer__inner">
-    <p>Nagaro space booking · Trace Expert City, Addis Ababa</p>
+    <p>Nagaro space booking · Trace Expert City, Colombo</p>
   </div>
 </footer>
 </body>

@@ -176,7 +176,7 @@ function projectRateList(space, rates) {
         unit: rate.unit,
         unitLabel: pricingUnitLabel(rate.unit),
         amountCents,
-        amountLabel: money(amountCents, space.currency ?? 'ETB'),
+        amountLabel: money(amountCents, space.currency ?? 'LKR'),
         isDefault: (rate.is_default ?? rate.isDefault ?? 0) === 1 || (rate.is_default ?? rate.isDefault) === true,
       };
     })
@@ -230,7 +230,7 @@ export function publicSpaceProjection(space, { images = [], availability = null,
     bufferMinutes: space.bufferMinutes ?? 0,
     rates,
     rateList,
-    rateSummary: spaceRateSummary({ rates, currency: space.currency ?? 'ETB' }),
+    rateSummary: spaceRateSummary({ rates, currency: space.currency ?? 'LKR' }),
     amenities,
     attributes: safeAttributes(space.attributes),
     images: projectedImages,
@@ -278,7 +278,7 @@ function spaceCard(space) {
       ${metaLine([
     space.categoryLabel,
     space.capacity ? `Up to ${space.capacity} people` : null,
-    space.openTime && space.closeTime ? `${space.openTime}–${space.closeTime} EAT` : null,
+    space.openTime && space.closeTime ? `${space.openTime}–${space.closeTime} SLST` : null,
   ])}
       ${space.shortDescription ? html`<p class="space-card__summary">${space.shortDescription}</p>` : ''}
       ${visibleAmenities.length
@@ -411,12 +411,12 @@ function renderHeroShowcase(featured, totalPublished) {
     return html`<div class="hero__showcase">
       <article class="hero-card">
         <div class="hero-card__body">
-          <span class="tag tag--info">Trace Expert City · Addis Ababa</span>
+          <span class="tag tag--info">Trace Expert City · Colombo</span>
           <h2 class="hero-card__title">Curated Workspace &amp; Event Architecture</h2>
           <p class="hero-card__meta">Boardrooms, executive training suites, grand auditorium &amp; co-working studios.</p>
           <dl class="hero-spec-list">
             <div><dt>Published venues</dt><dd>${totalPublished} venues</dd></div>
-            <div><dt>Time zone</dt><dd>East Africa Time (UTC+3)</dd></div>
+            <div><dt>Time zone</dt><dd>Sri Lanka Standard Time (UTC+5:30)</dd></div>
             <div><dt>Verification</dt><dd>Staff-verified scheduling</dd></div>
           </dl>
         </div>
@@ -443,7 +443,7 @@ function renderHeroShowcase(featured, totalPublished) {
         <p class="hero-card__meta">
           <span>Up to ${primary.capacity} people</span>
           <span>·</span>
-          <span>${primary.openTime}–${primary.closeTime} EAT</span>
+          <span>${primary.openTime}–${primary.closeTime} SLST</span>
         </p>
         <div class="hero-card__footer">
           <p class="price"><span class="price__label">From</span> ${primary.rateSummary}</p>
@@ -459,7 +459,7 @@ function renderHeroShowcase(featured, totalPublished) {
       </div>
       <div class="hero-spec-card__item">
         <span class="hero-spec-card__label">Campus Standard</span>
-        <strong class="hero-spec-card__value">East Africa Time (UTC+3)</strong>
+        <strong class="hero-spec-card__value">Sri Lanka Standard Time (UTC+5:30)</strong>
       </div>
       <div class="hero-spec-card__item">
         <span class="hero-spec-card__label">Booking Model</span>
@@ -491,7 +491,7 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
         <div class="hero__copy">
           <p class="hero__eyebrow">Trace Expert City · Workspace &amp; Venue Collection</p>
           <h1 class="hero__title">Architectural spaces for focused work, training and landmark events.</h1>
-          <p class="hero__subtitle">Nagaro manages the bookable meeting rooms, executive training suites, grand auditorium and co-working studios at Trace Expert City in Addis Ababa. Inspect real-time schedules, review spatial specifications and submit a booking inquiry directly to our operations desk.</p>
+          <p class="hero__subtitle">Nagaro manages the bookable meeting rooms, executive training suites, grand auditorium and co-working studios at Trace Expert City in Colombo. Inspect real-time schedules, review spatial specifications and submit a booking inquiry directly to our operations desk.</p>
           <div class="hero__actions">
             <a class="button button--primary button--large" href="/spaces">Explore the spaces</a>
             <a class="button button--ghost button--large" href="/booking-request">Submit a booking inquiry</a>
@@ -502,7 +502,7 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
           <dl class="hero__stats">
             <div class="hero__stat"><dt>Published venues</dt><dd>${totalPublished}</dd></div>
             <div class="hero__stat"><dt>Spatial typologies</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
-            <div class="hero__stat"><dt>Operations desk</dt><dd>Mon–Sat · EAT</dd></div>
+            <div class="hero__stat"><dt>Operations desk</dt><dd>Mon–Sat · SLST</dd></div>
           </dl>
         </div>
         ${renderHeroShowcase(featured, totalPublished)}
@@ -537,7 +537,7 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
       <div>
         <p class="section-eyebrow">Selected Inventory</p>
         <h2 class="section-title">Featured spaces</h2>
-        <p class="section-subtitle">Published architectural rooms, halls and desk studios at Trace Expert City, with capacities and transparent ETB rates.</p>
+        <p class="section-subtitle">Published architectural rooms, halls and desk studios at Trace Expert City, with capacities and transparent LKR rates.</p>
       </div>
       <div class="section-actions">
         <a class="button button--ghost button--small" href="/spaces">View full directory →</a>
@@ -563,7 +563,7 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
           <article class="process-step">
             <span class="process-step__num">01</span>
             <h3 class="process-step__title">01 · Inspect Space &amp; Provisional Schedule</h3>
-            <p class="process-step__body">Explore room capacities, technical amenities, turnaround buffers and ETB rate schedules. Run a live provisional check for your preferred date and time window.</p>
+            <p class="process-step__body">Explore room capacities, technical amenities, turnaround buffers and LKR rate schedules. Run a live provisional check for your preferred date and time window.</p>
           </article>
           <article class="process-step">
             <span class="process-step__num">02</span>
@@ -589,7 +589,7 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
 
   return publicShell({
     title: 'Nagaro spaces at Trace Expert City',
-    description: 'Book meeting rooms, the auditorium and co-working desks at Nagaro, Trace Expert City, Addis Ababa. '
+    description: 'Book meeting rooms, the auditorium and co-working desks at Nagaro, Trace Expert City, Colombo. '
       + 'Check availability and send a request to book.',
     activePath: '/',
     pageClass: 'page--home',
@@ -789,10 +789,10 @@ function renderSelectedVenuePreview(chosen) {
       <dl class="detail-list detail-list--inline">
         ${chosen.capacity ? html`<dt>Capacity</dt><dd>Up to ${chosen.capacity} people</dd>` : ''}
         <dt>Operating window</dt>
-        <dd>${chosen.openTime && chosen.closeTime ? `${chosen.openTime}–${chosen.closeTime} EAT` : 'Standard campus hours (EAT)'}</dd>
+        <dd>${chosen.openTime && chosen.closeTime ? `${chosen.openTime}–${chosen.closeTime} SLST` : 'Standard campus hours (SLST)'}</dd>
         ${chosen.rateSummary ? html`<dt>Rates</dt><dd>${chosen.rateSummary}</dd>` : ''}
       </dl>
-      <a class="button button--ghost button--small" href="/spaces/${chosen.code}">View venue photos &amp; live schedule →</a>
+      <a class="button button--ghost button--small" href="/spaces/${chosen.code}">View venue images &amp; live schedule →</a>
     </div>
   </div>`;
 }
@@ -833,7 +833,7 @@ export function renderBookingRequestPage({
             <form method="post" action="/booking-request" class="stack" autocomplete="on">
               <fieldset class="form-section">
                 <legend class="form-section__title">01 · Space &amp; Preferred Schedule</legend>
-                <p class="form-section__desc hint">All times are in East Africa Time (UTC+3). Single requests must start and finish on the same calendar day.</p>
+                <p class="form-section__desc hint">All times are in Sri Lanka Standard Time (UTC+5:30). Single requests must start and finish on the same calendar day.</p>
                 <div class="form-grid">
                   ${field({
     id: 'space_code', label: 'Space', required: true, className: 'form-field--full',
@@ -1020,7 +1020,7 @@ export function renderBookingReceivedPage({ inquiry, token = null } = {}) {
           <dt>Space</dt><dd>${inquiry?.spaceName ?? '—'}${inquiry?.categoryLabel ? html` (${inquiry.categoryLabel})` : ''}</dd>
           <dt>Requested period</dt>
           <dd>${inquiry?.startAt && inquiry?.endAt ? periodLabel(inquiry.startAt, inquiry.endAt) : '—'}
-            <span class="hint">East Africa Time</span></dd>
+            <span class="hint">Sri Lanka Standard Time</span></dd>
           ${inquiry?.deskQuantity
     ? html`<dt>Desks requested</dt><dd>${inquiry.deskQuantity}</dd>`
     : ''}
@@ -1170,11 +1170,11 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
                src="${(main ?? images[0]).url}" alt="${altFor(main ?? images[0], space)}">
         </div>
         ${images.length > 1
-    ? html`<div class="gallery__thumbs" role="group" aria-label="Venue photographs">
+    ? html`<div class="gallery__thumbs" role="group" aria-label="Venue images">
             ${images.map((image, index) => html`<button type="button" class="gallery__item ${index === 0 ? 'is-active' : ''}"
               data-gallery-thumb data-src="${image.url}" data-alt="${altFor(image, space)}"
               aria-current="${index === 0 ? 'true' : 'false'}"
-              aria-label="Show photograph ${index + 1} of ${images.length}">
+              aria-label="Show image ${index + 1} of ${images.length}: ${altFor(image, space)}${image.isCover ? ' (Cover)' : ''}">
               <img src="${image.url}" alt="${altFor(image, space)}" loading="lazy">
               ${image.isCover ? html`<span class="gallery__cover">Cover</span>` : ''}
             </button>`)}
@@ -1183,12 +1183,12 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
             <button type="button" class="gallery__item is-active"
               data-gallery-thumb data-src="${images[0].url}" data-alt="${altFor(images[0], space)}"
               aria-current="true"
-              aria-label="Show photograph 1 of 1">
+              aria-label="Show image 1 of 1: ${altFor(images[0], space)}">
               <img src="${images[0].url}" alt="${altFor(images[0], space)}" loading="lazy">
             </button>
           </div>`}
       </div>`
-    : html`<div class="gallery gallery--venue gallery--empty"><span class="hint">No photograph has been added for this space yet.</span></div>`}
+    : html`<div class="gallery gallery--venue gallery--empty"><span class="hint">No image has been added for this space yet.</span></div>`}
 
     <dl class="spec-ribbon" aria-label="Key venue specifications">
       <div class="spec-ribbon__item">
@@ -1201,7 +1201,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
       </div>
       <div class="spec-ribbon__item">
         <dt>Operating Hours</dt>
-        <dd>${space.openTime}–${space.closeTime} EAT</dd>
+        <dd>${space.openTime}–${space.closeTime} SLST</dd>
       </div>
       <div class="spec-ribbon__item">
         <dt>Booking Duration</dt>
@@ -1253,7 +1253,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
             <h2 class="section-title">Rate Schedule</h2>
             ${space.rateList.length
     ? html`<table class="rate-table">
-                <caption class="hint">Rates are quoted in ETB and exclude any agreed extras.</caption>
+                <caption class="hint">Rates are quoted in LKR and exclude any agreed extras.</caption>
                 <thead>
                   <tr><th scope="col">Billing unit</th><th scope="col">Rate</th></tr>
                 </thead>
@@ -1327,7 +1327,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
             <p class="section-eyebrow">Operational Rules</p>
             <h2 class="section-title">Booking conditions</h2>
             <dl class="detail-list detail-list--inline">
-              <dt>Opening hours</dt><dd>${space.openTime}–${space.closeTime} (East Africa Time)</dd>
+              <dt>Opening hours</dt><dd>${space.openTime}–${space.closeTime} (Sri Lanka Standard Time)</dd>
               <dt>Minimum booking</dt><dd>${humanMinutes(space.minDurationMinutes)}</dd>
               <dt>Maximum booking</dt>
               <dd>${space.maxDurationMinutes ? humanMinutes(space.maxDurationMinutes) : 'No maximum'}</dd>

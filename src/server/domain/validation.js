@@ -244,7 +244,7 @@ export function parseSpacePayload(input, { partial = false, existing = null } = 
     if (provided('capacity') || !partial) {
       value.capacity = asInteger(get('capacity'), { field: 'capacity', min: 1, max: 100000, required: true });
     }
-    if (provided('currency')) value.currency = oneOf(input.currency, ['ETB', 'USD', 'EUR'], { field: 'currency', required: false, fallback: 'ETB' });
+    if (provided('currency')) value.currency = oneOf(input.currency, ['LKR', 'USD', 'EUR'], { field: 'currency', required: false, fallback: 'LKR' });
     if (provided('pricing_unit')) {
       value.pricing_unit = oneOf(input.pricing_unit, Object.values(PRICING_UNIT), { field: 'pricing_unit' });
     }

@@ -129,7 +129,7 @@ let spaceId, spaceCode = 'E2E-MEET';
     description: 'An exclusive meeting room used for end-to-end verification of the booking system.',
     location: 'Floor 2, Trace Expert City',
     floor: '2',
-    currency: 'ETB',
+    currency: 'LKR',
     pricing_unit: 'HOUR',
     min_duration_minutes: '30',
     max_duration_minutes: '480',
@@ -218,7 +218,7 @@ let customerId;
   const r = await req('GET', '/admin/customers/new');
   const c = csrfOf(await r.text()); if (c) csrf = c;
   const r2 = await req('POST', '/admin/customers', { form: {
-    _csrf: csrf, full_name: 'E2E Customer', email: 'cust@e2e.test', phone: '+251900000000', organization: 'Trace Labs', notes: 'e2e',
+    _csrf: csrf, full_name: 'E2E Customer', email: 'cust@e2e.test', phone: '+94900000000', organization: 'Trace Labs', notes: 'e2e',
   } });
   check('POST create customer -> 303', r2.status === 303, `got ${r2.status}`);
   const r4 = await req('GET', '/api/admin/customers/search?q=E2E+Customer');
@@ -356,7 +356,7 @@ let inquiryRef, withdrawToken;
     desks: '1',
     customer_name: 'Inquiry Person',
     email: 'inq@e2e.test',
-    phone: '+251911111111',
+    phone: '+94911111111',
     organization: 'Trace Labs',
     attendees: '3',
     message: 'please confirm',

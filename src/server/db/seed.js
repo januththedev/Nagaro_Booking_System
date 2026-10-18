@@ -1302,24 +1302,24 @@ function renderSpaceScenePng(width, height, spaceCode, variantIndex = 0) {
 
 const SCENE_ALT_DESCRIPTIONS = {
   'TRC-MR-01': [
-    'Baobab Meeting Room — interior view 1: 12-seat walnut boardroom table, mullioned garden window and presentation display',
-    'Baobab Meeting Room — interior view 2: warm afternoon daylight across the conference table and glass whiteboard wall',
+    'Illustrative rendering of the Baobab Meeting Room (interior view 1): 12-seat boardroom table, mullioned garden window and presentation display',
+    'Illustrative rendering of the Baobab Meeting Room (interior view 2): warm afternoon daylight across the conference table and glass whiteboard wall',
   ],
   'TRC-MR-02': [
-    'Acacia Training Room — interior view 1: tiered oak classroom desks, presenter station and wide workshop display',
-    'Acacia Training Room — interior view 2: sunlit workshop layout with floor-to-ceiling windows and glass whiteboard',
+    'Illustrative rendering of the Acacia Training Room (interior view 1): tiered classroom desks, presenter station and wide workshop display',
+    'Illustrative rendering of the Acacia Training Room (interior view 2): sunlit workshop layout with floor-to-ceiling windows and glass whiteboard',
   ],
   'TRC-AUD-01': [
-    'Grand Auditorium — interior view 1: raked auditorium seating, acoustic timber slat walls and illuminated 14-metre stage',
-    'Grand Auditorium — interior view 2: angled perspective of the presenter lectern, stage spotlights and timber ribs',
+    'Illustrative rendering of the Grand Auditorium (interior view 1): raked auditorium seating, acoustic timber slat walls and illuminated stage',
+    'Illustrative rendering of the Grand Auditorium (interior view 2): angled perspective of the presenter lectern, stage spotlights and timber ribs',
   ],
   'TRC-CW-01': [
-    'Co-working Floor — Desks — interior view 1: shared oak workbench desks with dual monitors, dome lamps and indoor planters',
-    'Co-working Floor — Desks — interior view 2: sunlit studio workspace with industrial glass partitions and birch bookshelves',
+    'Illustrative rendering of the Co-working Floor (interior view 1): shared workbench desks with dual monitors, dome lamps and indoor planters',
+    'Illustrative rendering of the Co-working Floor (interior view 2): sunlit studio workspace with industrial glass partitions and birch bookshelves',
   ],
   'TRC-CW-02': [
-    'Quiet Pods — Focus Desks — interior view 1: acoustic timber-lined focus booths with glass doors and warm desk lamp glow',
-    'Quiet Pods — Focus Desks — interior view 2: calm library-studio focus pods with standing desks and indoor greenery',
+    'Illustrative rendering of the Quiet Pods (interior view 1): acoustic timber-lined focus booths with glass doors and warm desk lamp glow',
+    'Illustrative rendering of the Quiet Pods (interior view 2): calm library-studio focus pods with standing desks and indoor greenery',
   ],
 };
 
@@ -1431,11 +1431,11 @@ export function seedDemoContent(db, { actor } = {}) {
   }
 
   const customers = [
-    { full_name: 'Hanna Bekele', email: 'hanna.bekele@example.com', phone: '+251 911 204 118', organization: 'Addis Digital Labs' },
-    { full_name: 'Samuel Girma', email: 'samuel.girma@example.com', phone: '+251 911 887 340', organization: 'Ethio Cloud Services' },
-    { full_name: 'Marta Tesfaye', email: 'marta.tesfaye@example.com', phone: '+251 922 556 703', organization: 'Trace Skills Institute' },
-    { full_name: 'Yonas Alemu', email: 'yonas.alemu@example.com', phone: '+251 913 992 641', organization: 'Independent' },
-    { full_name: 'Liya Haile', email: 'liya.haile@example.com', phone: '+251 944 118 205', organization: 'Nile Consult' },
+    { full_name: 'Hasini Perera', email: 'hasini.perera@example.com', phone: '+94 77 204 1180', organization: 'Colombo Digital Labs' },
+    { full_name: 'Dinesh Fernando', email: 'dinesh.fernando@example.com', phone: '+94 71 887 3400', organization: 'Ceylon Cloud Services' },
+    { full_name: 'Malsha Silva', email: 'malsha.silva@example.com', phone: '+94 76 556 7030', organization: 'Trace Skills Institute' },
+    { full_name: 'Yasas Jayasinghe', email: 'yasas.jayasinghe@example.com', phone: '+94 75 992 6410', organization: 'Independent' },
+    { full_name: 'Nadeesha Rajapaksa', email: 'nadeesha.rajapaksa@example.com', phone: '+94 77 118 2050', organization: 'Kelani Consult' },
   ].map((payload) => createCustomer(db, { actor, payload }));
 
   const todayKey = businessDateKey(Date.now());
@@ -1453,7 +1453,7 @@ export function seedDemoContent(db, { actor } = {}) {
     { space: room, customer: customers[0], date: todayKey, from: '09:00', to: '11:00', purpose: 'Sprint review', attendees: 9 },
     { space: room, customer: customers[1], date: todayKey, from: '14:00', to: '16:00', purpose: 'Client discovery session', attendees: 6 },
     { space: training, customer: customers[2], date: plusDays(1), from: '09:00', to: '16:00', purpose: 'Data fundamentals training', attendees: 26, billingUnit: 'DAY' },
-    { space: auditorium, customer: customers[4], date: plusDays(3), from: '09:00', to: '18:00', purpose: 'Nile Consult annual conference', attendees: 380, billingUnit: 'DAY' },
+    { space: auditorium, customer: customers[4], date: plusDays(3), from: '09:00', to: '18:00', purpose: 'Kelani Consult annual conference', attendees: 380, billingUnit: 'DAY' },
     { space: room, customer: customers[3], date: plusDays(2), from: '10:00', to: '12:00', purpose: 'Vendor negotiation', attendees: 4 },
     { space: desks, customer: customers[1], date: plusDays(1), from: '07:00', to: '20:00', purpose: 'Team hot-desking — 4 desks', unitCount: 4, billingUnit: 'DAY' },
   ];
@@ -1498,15 +1498,15 @@ export function seedDemoContent(db, { actor } = {}) {
   // An open inquiry, and one whose notification could not be delivered.
   const inquiryRows = [
     {
-      space: auditorium, name: 'Dawit Mekonnen', email: 'dawit.mekonnen@example.com',
-      phone: '+251 911 665 220', organization: 'Rift Valley Media',
+      space: auditorium, name: 'Dilan Weerasinghe', email: 'dilan.weerasinghe@example.com',
+      phone: '+94 77 665 2200', organization: 'Lotus Media',
       start: businessLocalToEpoch(plusDays(10), '09:00'), end: businessLocalToEpoch(plusDays(10), '17:00'),
       attendees: 300, message: 'We would like to host a product launch for around 300 guests. Please advise on staging and AV support.',
       status: 'NEW', emailStatus: 'NOT_CONFIGURED',
     },
     {
-      space: room, name: 'Selam Abebe', email: 'selam.abebe@example.com',
-      phone: '+251 922 401 887', organization: 'Bright Path Consulting',
+      space: room, name: 'Sachini Abeywardena', email: 'sachini.abeywardena@example.com',
+      phone: '+94 76 401 8870', organization: 'Bright Path Consulting',
       start: businessLocalToEpoch(plusDays(4), '13:00'), end: businessLocalToEpoch(plusDays(4), '15:00'),
       attendees: 10, message: 'Half-day strategy session. We need a whiteboard and video conferencing.',
       status: 'CONTACTED', emailStatus: 'NOT_CONFIGURED',

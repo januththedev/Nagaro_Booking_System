@@ -68,7 +68,7 @@ console.log('desk space units:', deskSpace.unitCount);
 
 const customer = createCustomer(db, {
   actor,
-  payload: { full_name: 'Hanna Bekele', email: 'hanna@example.com', phone: '+251911000000', organization: 'Acme' },
+  payload: { full_name: 'Hanna Perera', email: 'hanna@example.com', phone: '+94911000000', organization: 'Acme' },
 });
 console.log('customer:', customer.id, customer.fullName);
 

@@ -7,8 +7,8 @@
  * with an independent hand-written count).
  *
  * Business time: all day boundaries are the *business-local* boundaries from
- * domain/time.js (Africa/Addis_Ababa). The server process time zone is never
- * consulted, so a booking at 23:00 EAT on day N belongs to day N.
+ * domain/time.js (Asia/Colombo). The server process time zone is never
+ * consulted, so a booking at 23:00 SLST on day N belongs to day N.
  *
  * Interval semantics: half-open [start, end); two intervals overlap exactly
  * when `a.start < b.end AND a.end > b.start`.

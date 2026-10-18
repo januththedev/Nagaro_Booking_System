@@ -4,7 +4,7 @@
 --
 -- TIME CONVENTIONS
 --   All *_at columns are INTEGER Unix epoch milliseconds in UTC.
---   Local business time zone is Africa/Addis_Ababa (EAT, UTC+03:00, no DST).
+--   Local business time zone is Asia/Colombo (SLST, UTC+05:30, no DST).
 --
 -- INTERVAL CONVENTIONS
 --   Intervals are half-open [start_at, end_at).
@@ -70,7 +70,7 @@ CREATE TABLE space (
   floor                 TEXT,
   capacity              INTEGER NOT NULL CHECK (capacity >= 1),
   status                TEXT    NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED')),
-  currency              TEXT    NOT NULL DEFAULT 'ETB',
+  currency              TEXT    NOT NULL DEFAULT 'LKR',
   pricing_unit          TEXT    NOT NULL DEFAULT 'HOUR'
                         CHECK (pricing_unit IN ('HOUR','HALF_DAY','DAY','WEEK','MONTH')),
   min_duration_minutes  INTEGER NOT NULL DEFAULT 60 CHECK (min_duration_minutes > 0),
@@ -167,7 +167,7 @@ CREATE TABLE reservation (
   billing_quantity  INTEGER NOT NULL CHECK (billing_quantity >= 1),
   rate_cents        INTEGER NOT NULL CHECK (rate_cents >= 0),
   total_cents       INTEGER NOT NULL CHECK (total_cents >= 0),
-  currency          TEXT    NOT NULL DEFAULT 'ETB',
+  currency          TEXT    NOT NULL DEFAULT 'LKR',
   idempotency_key   TEXT    UNIQUE,
   created_by        INTEGER NOT NULL REFERENCES admin_user(id) ON DELETE RESTRICT,
   created_at        INTEGER NOT NULL,

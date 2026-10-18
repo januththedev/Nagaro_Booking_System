@@ -137,10 +137,10 @@ ${body}
           ${brandMark()}
           <span class="brand__text">
             <span class="brand__name">Nagaro</span>
-            <span class="brand__sub">Trace Expert City, Addis Ababa</span>
+            <span class="brand__sub">Trace Expert City, Colombo</span>
           </span>
         </div>
-        <p>Nagaro space booking · Trace Expert City, Addis Ababa</p>
+        <p>Nagaro space booking · Trace Expert City, Colombo</p>
         <p class="site-footer__note">Availability shown on this site is provisional. A booking is only confirmed once Nagaro staff confirm it.</p>
       </div>
       <div class="site-footer__col">
@@ -156,7 +156,7 @@ ${body}
       </div>
       <div class="site-footer__col">
         <h2 class="admin-nav__heading">Operations Desk</h2>
-        <p class="site-footer__note">All booking times are shown in East Africa Time (UTC+03:00).</p>
+        <p class="site-footer__note">All booking times are shown in Sri Lanka Standard Time (UTC+05:30).</p>
         <p><a href="/admin">Staff operations portal →</a></p>
         ${version ? html`<p class="site-footer__version">Build ${version}</p>` : ''}
       </div>
@@ -229,7 +229,7 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
         </ol></nav>`
     : html`<span class="breadcrumbs breadcrumbs--empty"></span>`}
       <div class="admin-topbar__actions">
-        <span class="tag" title="Business timezone: Africa/Addis_Ababa">EAT · UTC+03:00</span>
+        <span class="tag" title="Business timezone: Asia/Colombo">SLST · UTC+05:30</span>
         <a class="button button--ghost button--small" href="/" target="_blank" rel="noopener">View public site</a>
         ${pageActions ?? ''}
       </div>
@@ -276,7 +276,7 @@ export function card({ title = null, description = null, actions = null, body, m
     ${(title || actions)
     ? html`<header class="card__head">
         <div>
-          ${title ? html`<h3 class="card__title">${title}</h3>` : ''}
+          ${title ? html`<h2 class="card__title">${title}</h2>` : ''}
           ${description ? html`<p class="card__description">${description}</p>` : ''}
         </div>
         ${actions ? html`<div class="card__actions">${actions}</div>` : ''}
@@ -286,16 +286,16 @@ export function card({ title = null, description = null, actions = null, body, m
   </article>`;
 }
 
-export function table({ columns, rows, emptyMessage = 'Nothing to show.', modifiers = '' }) {
+export function table({ columns, rows, emptyMessage = 'Nothing to show.', modifiers = '', label = 'Data table' }) {
   if (!rows || rows.length === 0) {
-    return html`<div class="table-wrap ${modifiers}">
+    return html`<div class="table-wrap ${modifiers}" tabindex="0" role="region" aria-label="${label}">
       <table class="data-table">
         <thead><tr>${columns.map((c) => html`<th scope="col" class="${c.align === 'right' ? 'is-right' : ''}">${c.label}</th>`)}</tr></thead>
       </table>
       <p class="table-empty">${emptyMessage}</p>
     </div>`;
   }
-  return html`<div class="table-wrap ${modifiers}">
+  return html`<div class="table-wrap ${modifiers}" tabindex="0" role="region" aria-label="${label}">
     <table class="data-table">
       <thead>
         <tr>${columns.map((c) => html`<th scope="col" class="${c.align === 'right' ? 'is-right' : ''} ${c.className ?? ''}">${c.label}</th>`)}</tr>

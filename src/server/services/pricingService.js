@@ -65,13 +65,13 @@ export function loadRates(db, spaceId) {
   return new Map(rows.map((r) => [r.unit, r.amount_cents]));
 }
 
-export function formatMoney(cents, currency = 'ETB') {
+export function formatMoney(cents, currency = 'LKR') {
   const amount = (Number(cents) || 0) / 100;
   const formatted = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${currency} ${formatted}`;
 }
 
-export function formatMoneyCompact(cents, currency = 'ETB') {
+export function formatMoneyCompact(cents, currency = 'LKR') {
   const amount = (Number(cents) || 0) / 100;
   if (Number.isInteger(amount)) return `${currency} ${amount.toLocaleString('en-US')}`;
   return `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

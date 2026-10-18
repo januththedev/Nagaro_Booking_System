@@ -474,7 +474,7 @@ export function checkBookingRules(space, { startAt, endAt, attendees = null }) {
 }
 
 function outsideOpeningHours(space, epochMs, dateKey) {
-  return `This space is available ${space.open_time}-${space.close_time} (East Africa Time). Requested time ${clockOf(epochMs)} falls outside opening hours on ${dateKey}.`;
+  return `This space is available ${space.open_time}-${space.close_time} (Sri Lanka Standard Time). Requested time ${clockOf(epochMs)} falls outside opening hours on ${dateKey}.`;
 }
 
 function clockOf(epochMs) {

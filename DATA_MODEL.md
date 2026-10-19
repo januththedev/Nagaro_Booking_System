@@ -20,7 +20,7 @@ than smoothed over.
 
 | Table | Purpose | Natural key | Who reads / writes |
 |---|---|---|---|
-| `admin_user` | One row per member of Nagaro staff who may sign in. Holds the scrypt password hash, the database-resolved role, the failed-login counter and the lockout deadline. | `email` (`UNIQUE COLLATE NOCASE` — `HQ@Nagaro.et` and `hq@nagaro.et` cannot coexist) | **Service only.** Written by the admin-user service and the bootstrap path through `hashPassword()`. Read by `sessions.authenticate()` on every sign-in. Never exposed by any route; the `password_hash` column must never leave the server. |
+| `admin_user` | One row per member of Nagaro staff who may sign in, plus an inactive system principal for public checkout attribution. Holds the scrypt password hash, the database-resolved role, the failed-login counter and the lockout deadline. | `email` (`UNIQUE COLLATE NOCASE` — `HQ@Nagaro.et` and `hq@nagaro.et` cannot coexist) | **Service only.** Written by the admin-user service, bootstrap path, and lazy public-booking system-principal initializer. Read by `sessions.authenticate()` on every sign-in. System principals are excluded from staff lists and cannot authenticate. Never exposed by any route; the `password_hash` column must never leave the server. |
 | `admin_session` | One row per signed-in browser session. Stores **only the SHA-256 hash** of the cookie token plus the per-session CSRF secret, so a database copy cannot be replayed as a live session. | `token_hash` (`UNIQUE`) | **Service only.** Written by `createSession()`, updated by `resolveSession()` (last-seen), revoked by `revokeSession()` / `revokeAllSessionsForUser()`. No route reads the table directly. |
 | `audit_log` | Append-only history of every state change. One row per action, written **inside the same transaction** as the change it describes. | none (surrogate `id`); the meaningful key is `(entity_type, entity_id, at)` | **Admin read, service write.** Read via the admin activity log (`/admin/audit`) and `listAudit()`. Written only by `recordAudit()`. There is no update or delete path. |
 
@@ -37,8 +37,8 @@ than smoothed over.
 
 | Table | Purpose | Natural key | Who reads / writes |
 |---|---|---|---|
-| `customer` | One authoritative profile per customer. `email_normalized` supports duplicate detection; duplicates are **allowed** so that staff can see two records and merge them by hand. | none enforced — `email_normalized` is indexed but **not** unique, deliberately | **Admin read/write only.** Never joined by any public availability query. |
-| `reservation` | The authoritative booking record: window, unit count, attendees, purpose, billing fields, and the full cancellation actor/time/reason trail. | `reference` (`UNIQUE`, format `NG-<year>-<5 digits>`); `idempotency_key` (`UNIQUE`, nullable) for retry safety | **Admin read/write only.** `getPublicAvailability()` never joins this table. |
+| `customer` | One authoritative profile per customer. `email_normalized` supports duplicate detection; duplicates are **allowed** so that staff can see two records and merge them by hand. | none enforced — `email_normalized` is indexed but **not** unique, deliberately | **Admin read/write. Public checkout may resolve or create only its own profile inside the booking transaction.** Never joined by a public availability query. |
+| `reservation` | The authoritative booking record: window, unit count, attendees, purpose, billing fields, booking channel, private management-token hash, and the full cancellation trail. | `reference` (`UNIQUE`, format `NG-<year>-<5 digits>`); `idempotency_key` (`UNIQUE`, nullable); `manage_token_hash` (`UNIQUE`, nullable) | **Admin read/write. Public checkout creates through the canonical booking service and may read/cancel only with reference + capability token.** `getPublicAvailability()` never joins this table. |
 | `occupancy` | **The join between a reservation and the physical units it consumes.** One row per `(resource unit, interval)`. This is the table with the anti-overlap triggers, and the only table that decides whether a space is free. | none enforced by a key — the invariant is the trigger predicate over `(resource_unit_id, start_at, end_at)` among `ACTIVE` rows | **Admin read** (conflict detail, calendar). **Public read of counts only**, never rows. Written only by the booking service. |
 | `maintenance_block` | The human-facing record of planned unavailability: who blocked it, why, over what window. | none (surrogate `id`); looked up by `(space_id, start_at)` | **Admin read/write.** Never exposed publicly except as an anonymous blocked period. |
 
@@ -112,6 +112,12 @@ rows existing rather than of any counter that could drift.
 
 Nullable columns are marked. "Unit / time zone" states what the value means physically.
 
+### 3.0 `admin_user` additions
+
+| Column | Type | Null? | Unit / TZ | Meaning and enumerated values |
+|---|---|---|---|---|
+| `is_system` | INTEGER | no | 0/1 | Default 0. `1` marks the inactive, non-login principal used to attribute public checkout writes without impersonating a human staff user. System rows are excluded from staff lists and first-admin counting. |
+
 ### 3.1 `space`
 
 | Column | Type | Null? | Unit / TZ | Meaning and enumerated values |
@@ -161,6 +167,8 @@ Nullable columns are marked. "Unit / time zone" states what the value means phys
 | `total_cents` | INTEGER | no | cents | `CHECK (>= 0)`. `rate_cents × billing_quantity × unit_count`. |
 | `currency` | TEXT | no | ISO code | Default `LKR`. |
 | `idempotency_key` | TEXT | **yes** | — | `UNIQUE`. Nulls do not collide, so ordinary bookings may omit it. Retry safety for one-shot callers. |
+| `booking_channel` | TEXT | no | — | `STAFF` (default) · `PUBLIC`. Records whether the reservation came from the operations console or public self-service checkout. |
+| `manage_token_hash` | TEXT | **yes** | — | `UNIQUE` when present. SHA-256 hash of the one-time-issued public management capability; the raw token is never stored. Null for staff-created reservations. |
 | `created_by` | INTEGER | no | FK → `admin_user.id` | `ON DELETE RESTRICT`. |
 | `created_at` | INTEGER | no | epoch ms UTC | — |
 | `updated_by` | INTEGER | **yes** | FK → `admin_user.id` | `ON DELETE SET NULL`. |
@@ -262,6 +270,8 @@ Nullable columns are marked. "Unit / time zone" states what the value means phys
 |---|---|---|
 | `admin_user` | `role IN ('ADMIN','STAFF')` | No third role can appear without a migration. Roles are never taken from the client. |
 | `admin_user` | `is_active IN (0,1)` | Boolean discipline; a disabled account cannot be represented ambiguously. |
+| `admin_user` | `is_system IN (0,1)` | Public-checkout attribution principals are explicit and cannot masquerade as ordinary staff rows. |
+| `reservation` | `booking_channel IN ('STAFF','PUBLIC')` | Every reservation has an auditable source. |
 | `space` | `category IN ('MEETING_ROOM','AUDITORIUM','COWORKING')` | Exactly three catalogue shapes; inventory and pricing rules key off this. |
 | `space` | `capacity >= 1` | A space with zero capacity is meaningless. |
 | `space` | `status IN ('DRAFT','PUBLISHED','ARCHIVED')` | Public visibility is a closed set; nothing else can leak. |

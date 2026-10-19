@@ -1,6 +1,6 @@
 # Progress / Resumption Log — Nagaro Space Booking
 
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Completed milestones
 
@@ -43,8 +43,21 @@ Last updated: 2026-10-18
    - Presentation pack added: `PRESENTATION.md` and `presentation/slides.html`.
    - Local demo database reseeded so demo data is Colombo-localised (Sri Lankan names, `+94`
      numbers, `LKR`); previous file backed up inside the gitignored `data/`.
+10. **TRACE Spaces experience + public checkout** — rebuilt the public journey around official
+    TRACE imagery with a responsive editorial landing page, progressive native WebGL ambience,
+    catalogue/detail/checkout/confirmation/management surfaces and a coordinated admin/auth visual
+    system. Public checkout now creates confirmed reservations through the canonical transactional
+    booking engine, hashes private management capabilities, supports safe cancellation, records an
+    auditable `PUBLIC` channel and keeps customer/internal data out of public projections. Official
+    media sources and usage notes are recorded in `src/web/public/trace-media/research/PROVENANCE.md`.
 
 ## Test evidence (final)
+
+- 2026-10-19 full suite (`unit + integration + concurrency`) → **244/244 pass**. This includes
+  real multi-process races, public-checkout capability/privacy tests and transaction rollback tests.
+- Browser verification at 390, 768 and 1280 CSS px → no horizontal overflow or console errors on
+  landing, catalogue, checkout or authentication; WebGL initialized; labels, alt text, language and
+  single-H1 structure verified.
 
 - `npm test` → **192/192 pass** (unit + integration; 190 pre-existing + 2 new regression tests)
 - `npm run test:concurrency` → **37/37 pass**
@@ -82,8 +95,10 @@ New coverage added in the readiness pass: `tests/unit/detailListLayout.test.js` 
    to async is the remaining engineering work). SQLite remains the dev/test default.
 2. **Vercel Blob** — no `BLOB_READ_WRITE_TOKEN` and no Vercel CLI. Blob code is implemented but
    untested against a live store.
-3. **Vercel deployment** — no CLI/credentials. App is deployable via `vercel deploy` once env vars are
-   set; `vercel.json` not yet added.
+3. **Production deployment** — the current synchronous Node/SQLite runtime is not compatible with
+   Sites' Worker/D1 target or durable serverless hosting. No `.openai/hosting.json` is present. A
+   PostgreSQL/D1 adapter, production secrets and provider credentials are required before deployment;
+   `vercel.json` is not yet added.
 4. **Live SMTP** — no `SMTP_HOST`; email status reports `NOT_CONFIGURED` honestly.
 5. **PostgreSQL concurrency tests** — require a live PG instance; the SQLite concurrency suite
    (37 tests) remains the regression reference.

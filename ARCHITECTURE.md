@@ -50,8 +50,14 @@ src/web/
   lib/html.js           escaped templating primitives
   views/                server-rendered pages
   public/               static CSS + progressive-enhancement JS
+apps/public-web/        Next.js public frontend (App Router, React 19, Tailwind 4)
+  app/                  routes: /, /spaces, /book, /book/confirmed, /book/manage,
+                        /booking-request, /booking-request/received, /booking-request/withdraw
+  components/           hero (WebGL + GSAP), catalogue, checkout, management, shell
+  lib/                  server API client, formatting, media, engine-accurate quote mirror
+  tests/                Node test-runner suite for the app (config, quote parity, guards)
 tests/{unit,integration,concurrency}
-scripts/                admin creation, demo, smoke checks
+scripts/                admin creation, demo, smoke checks, e2e harnesses, stack runner
 storage/uploads/        uploaded space photographs (outside the web root)
 data/nagaro.db          SQLite database file
 ```
@@ -63,6 +69,10 @@ Boundaries:
 - **domain** is dependency-free (pure functions + constants).
 - **views** receive plain objects and never query the database.
 - **web/public** is inert: no secrets, no customer data.
+- **apps/public-web** is a presentation layer only: it reads the public JSON API and posts guest
+  forms back to the Node runtime. It owns no database handle, no capability token and no booking
+  rule; the availability, pricing and overlap logic it mirrors for display is asserted against the
+  real server modules by `apps/public-web/tests/quote.test.mjs`.
 
 ## 4. Data model summary
 
@@ -153,6 +163,41 @@ All timestamps are stored as epoch milliseconds in UTC. Every local calculation 
 | `NAGARO_ADMIN_NOTIFICATION_EMAIL` | No | Where inquiry notifications are sent |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `SMTP_FROM` | No | Email delivery |
 | `NAGARO_UPLOAD_DIR` | No (`storage/uploads`) | Photograph storage |
+| `PUBLIC_FRONTEND` | No (`legacy`) | `next` streams public pages to the Next.js process; `legacy` renders them in this process |
+| `PUBLIC_FRONTEND_ORIGIN` | Only when `PUBLIC_FRONTEND=next` | Internal origin of the Next.js process (must not be the public port) |
+| `PUBLIC_FRONTEND_HOST` / `PUBLIC_FRONTEND_PORT` | No (`127.0.0.1:4174`) | Convenience inputs used by `scripts/run-public-stack.js` to build the origin |
+| `API_ORIGIN` (or `API_PROXY_TARGET`) | Only for the Next.js process | Node origin the Next app calls for `/api`, `/assets` and `/media` |
+
+## 12. Public frontend (Next.js) and the same-origin gateway
+
+The public experience can be rendered by a Next.js app in `apps/public-web` while the Node runtime
+stays the only public listener. The split is deliberately in the HTTP layer, not in page code:
+
+```
+browser ──► Node (public port)
+              ├─ /api/*, /admin/*, /assets/*, /media/*      → handled here (booking engine, console, files)
+              ├─ POST /book, /book/cancel, /booking-request,
+              │  /booking-request/withdraw                    → handled here (no-JavaScript form fallback)
+              └─ every other GET                              → streamed to the Next.js process
+```
+
+- `src/server/http/publicFrontendProxy.js` owns the decision. `isBackendOwnedPath(pathname, method)`
+  answers "does the booking runtime own this request", and `BACKEND_FORM_POSTS` lists the page paths
+  whose POSTs must stay local even though their GET is rendered by Next — the same origin is what
+  makes the session cookie, CSRF secret, capability token, rate limiter and audit log work for both
+  stacks at once.
+- The Next app never becomes a second origin: `apps/public-web/next.config.mjs` rewrites
+  `/api`, `/admin`, `/assets` and `/media` straight back to the Node runtime, so a direct visit to
+  the Next port still talks to the same engine (used only for local development).
+- Capability pages (`/book/confirmed`, `/book/manage`) carry `Cache-Control: no-store, private`,
+  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex` from `apps/public-web/middleware.ts`;
+  the booking JSON endpoints set the same headers server-side.
+- Rolling back is configuration only: unset `PUBLIC_FRONTEND` (or set `legacy`) and the Node
+  renderer serves every page again, with the Next process stopped. Both renderers read the same
+  services and the same database, so a rollback never strands data.
+- Evidence: `npm run test:cutover` boots Node + `next start` and drives the public origin, asserting
+  which process answered, that the no-JavaScript form posts reach the booking engine, that the
+  capability pages stay unshareable, and that the legacy flag still works.
 
 ## 13. Target production architecture (Supabase + Vercel)
 

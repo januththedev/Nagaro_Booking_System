@@ -34,7 +34,7 @@ import { closeTestDb, createTestActor, createTestDb } from '../helpers/testDb.js
 /** The frozen public surface, copied from the contract (not from the module). */
 const EXPECTED_PUBLIC_KEYS = [
   'id', 'code', 'name', 'category', 'categoryLabel', 'shortDescription', 'description',
-  'location', 'floor', 'capacity', 'unitCount', 'openTime', 'closeTime',
+  'location', 'floor', 'capacity', 'unitCount', 'pricingUnit', 'openTime', 'closeTime',
   'minDurationMinutes', 'maxDurationMinutes', 'bufferMinutes',
   'rates', 'rateList', 'rateSummary', 'amenities', 'attributes', 'images', 'isPublished',
 ];

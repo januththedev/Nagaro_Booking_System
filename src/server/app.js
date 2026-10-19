@@ -11,7 +11,7 @@
 import { createRouter } from './http/router.js';
 import { getDb } from './db/connection.js';
 import { loadConfig } from './config.js';
-import { join, sep } from 'node:path';
+import { join, relative as relativePath, resolve, sep } from 'node:path';
 import {
   appendCookie, mimeForExtension, redirect, sendFileStream, sendHtml, serializeCookie,
 } from './http/response.js';
@@ -109,20 +109,24 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   /* 1. static assets */
   router.use(async (ctx) => {
     if (!ctx.url.pathname.startsWith(STATIC_PREFIX)) return true;
-    const relative = ctx.url.pathname.slice(STATIC_PREFIX.length);
-    // No traversal, no hidden files, no nested paths beyond one directory.
-    if (!/^[A-Za-z0-9._-]+\.(css|js|mjs|svg|png|jpg|jpeg|webp|ico|woff2|txt)$/.test(relative)) {
+    const assetPath = ctx.url.pathname.slice(STATIC_PREFIX.length);
+    // Nested folders are allowed for curated static collections such as the
+    // official TRACE venue photographs. Each path segment is deliberately
+    // narrow and the resolved-path check below remains the final boundary.
+    if (!/^(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9._-]+\.(css|js|mjs|svg|png|jpg|jpeg|webp|ico|woff2|txt)$/.test(assetPath)) {
       ctx.text('Not found', 404);
       return false;
     }
-    const absolute = join(config.publicDir, relative);
-    if (!absolute.startsWith(config.publicDir + sep)) {
+    const publicRoot = resolve(config.publicDir);
+    const absolute = resolve(join(publicRoot, assetPath));
+    const fromRoot = relativePath(publicRoot, absolute);
+    if (!fromRoot || fromRoot.startsWith(`..${sep}`) || fromRoot === '..' || fromRoot.includes(`..${sep}`)) {
       ctx.text('Not found', 404);
       return false;
     }
-    const dot = relative.lastIndexOf('.');
+    const dot = assetPath.lastIndexOf('.');
     sendFileStream(ctx.res, 200, absolute, {
-      contentType: mimeForExtension(relative.slice(dot)),
+      contentType: mimeForExtension(assetPath.slice(dot)),
       cacheSeconds: config.isProduction ? 3600 : 0,
     });
     ctx.responded = true;

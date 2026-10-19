@@ -19,9 +19,9 @@ function navIcon(paths) {
 }
 
 const PUBLIC_NAV = [
-  { href: '/', label: 'Home' },
+  { href: '/', label: 'Discover' },
   { href: '/spaces', label: 'Spaces' },
-  { href: '/booking-request', label: 'Request a booking' },
+  { href: '/book', label: 'Book' },
 ];
 
 const ADMIN_NAV = [
@@ -102,16 +102,16 @@ export function publicShell({
   return html`<!doctype html>
 <html lang="en">
 <head>
-${documentHead({ title: `${title} · Nagaro Space Booking`, description })}
+${documentHead({ title: `${title} · TRACE Spaces`, description })}
 </head>
 <body class="page page--public ${pageClass}">
 <a class="skip-link" href="#main">Skip to main content</a>
-<header class="site-header">
+<header class="site-header trace-header">
   <div class="site-header__inner">
-    <a class="brand" href="/">
-      ${brandMark()}
-      <span class="brand__word"><span class="brand__name">Nagaro</span>
-        <span class="brand__sub">Trace Expert City</span></span>
+    <a class="brand trace-brand" href="/" aria-label="TRACE Spaces home">
+      <span class="trace-brand__mark" aria-hidden="true">T</span>
+      <span class="brand__word"><span class="brand__name">TRACE</span>
+        <span class="brand__sub">Spaces / Colombo</span></span>
     </a>
     <nav class="site-nav" id="public-nav" aria-label="Main">
       ${PUBLIC_NAV.map((item) => html`<a href="${item.href}"
@@ -119,7 +119,8 @@ ${documentHead({ title: `${title} · Nagaro Space Booking`, description })}
         ${activePath === item.href ? raw('aria-current="page"') : ''}>${item.label}</a>`)}
     </nav>
     <div class="site-header__actions">
-      <a class="button button--ghost button--small" href="/admin">Staff sign in</a>
+      <a class="trace-header__staff" href="/admin">Staff</a>
+      <a class="trace-header__book" href="/book">Book a space <span aria-hidden="true">↗</span></a>
     </div>
   </div>
   <button class="site-nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="public-nav">Menu</button>
@@ -132,18 +133,19 @@ ${body}
     <div class="site-footer__brand footer__brand">
       <div class="brand">
         ${brandMark()}
-        <span class="brand__word"><span class="brand__name">Nagaro</span>
-          <span class="brand__sub">Trace Expert City, Colombo</span></span>
+        <span class="brand__word"><span class="brand__name">TRACE Spaces</span>
+          <span class="brand__sub">Colombo</span></span>
       </div>
-      <p>Nagaro space booking · Trace Expert City, Colombo</p>
-      <p class="site-footer__note">Availability shown on this site is provisional. A booking is only confirmed once Nagaro staff confirm it.</p>
+      <p>Spaces with history, built for what comes next.</p>
+      <p class="site-footer__note">Direct checkout confirms live inventory immediately. Concierge inquiries remain provisional until the operations team confirms them.</p>
     </div>
     <nav class="footer__nav" aria-label="Spaces and booking">
       <h2 class="site-footer__heading">Spaces &amp; Booking</h2>
       <ul class="site-footer__links">
         <li><a href="/">Home</a></li>
         <li><a href="/spaces">All spaces</a></li>
-        <li><a href="/booking-request">Request a booking</a></li>
+        <li><a href="/book">Book a space</a></li>
+        <li><a href="/booking-request">Ask the concierge</a></li>
         <li><a href="/spaces?category=MEETING_ROOM">Meeting rooms</a></li>
         <li><a href="/spaces?category=AUDITORIUM">Auditoriums &amp; event halls</a></li>
         <li><a href="/spaces?category=COWORKING">Co-working desks</a></li>
@@ -157,11 +159,12 @@ ${body}
     </div>
   </div>
   <div class="site-footer__inner footer__base">
-    <span>Nagaro — Trace Expert City, Colombo</span>
-    <span>Provisional schedules · staff-confirmed bookings</span>
+    <span>TRACE Spaces — Trace Expert City, Colombo</span>
+    <span>Live schedules · protected checkout · SLST</span>
   </div>
 </footer>
 <script type="module" src="/assets/public.js"></script>
+<script type="module" src="/assets/public-experience.js"></script>
 </body>
 </html>`;
 }

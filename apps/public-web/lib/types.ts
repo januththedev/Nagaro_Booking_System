@@ -1,0 +1,85 @@
+export type PublicImage = {
+  id: string | number;
+  url: string | null;
+  altText: string | null;
+  isCover: boolean;
+};
+
+export type PublicRate = {
+  unit: string;
+  unitLabel: string;
+  amountCents: number;
+  amountLabel: string;
+  isDefault: boolean;
+};
+
+export type PublicSpace = {
+  id: string | number;
+  code: string;
+  name: string;
+  category: string;
+  categoryLabel: string;
+  shortDescription: string | null;
+  description: string | null;
+  location: string | null;
+  floor: string | null;
+  capacity: number | null;
+  unitCount: number;
+  pricingUnit: string | null;
+  openTime: string;
+  closeTime: string;
+  minDurationMinutes: number;
+  maxDurationMinutes: number | null;
+  bufferMinutes: number;
+  rates: Record<string, number>;
+  rateList: PublicRate[];
+  rateSummary: string;
+  amenities: string[];
+  attributes: Record<string, string | number | boolean>;
+  images: PublicImage[];
+  isPublished: boolean;
+};
+
+export type SpaceListResponse = {
+  items: PublicSpace[];
+  total: number;
+  publishedTotal: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+};
+
+export type Availability = {
+  spaceCode: string;
+  spaceName: string;
+  startAt: number;
+  endAt: number;
+  isPooled: boolean;
+  totalUnits: number;
+  freeUnits: number;
+  requestedUnits: number;
+  isAvailable: boolean;
+  label: string;
+  checkedAt: number;
+};
+
+export type Reservation = {
+  reference: string;
+  status: string;
+  spaceCode: string;
+  spaceName: string;
+  startAt: number;
+  endAt: number;
+  unitCount: number;
+  attendees: number | null;
+  billingUnit: string;
+  billingQuantity: number;
+  rateCents: number;
+  totalCents: number;
+  currency: string;
+};
+
+export type ApiError = {
+  ok?: false;
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
+};

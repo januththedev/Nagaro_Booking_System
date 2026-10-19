@@ -33,6 +33,7 @@ import {
 import { assertBookingRules, allocateUnits, findConflicts, activeUnits } from './availabilityService.js';
 import { quote, loadRates } from './pricingService.js';
 import { recordAudit } from './auditService.js';
+import { resolveOrCreateCustomerInTransaction } from './customerService.js';
 
 /* --------------------------------------------------------------- utilities */
 
@@ -137,6 +138,7 @@ export function hydrateReservation(db, row) {
     cancelledAt: row.cancelled_at,
     cancellationReason: row.cancellation_reason,
     idempotencyKey: row.idempotency_key,
+    bookingChannel: row.booking_channel ?? 'STAFF',
   };
 }
 
@@ -187,14 +189,15 @@ function requiredUnitsFor(space, requested) {
  */
 export function createReservation(db, input) {
   const {
-    actor, spaceId, customerId, startAt, endAt, unitCount = 1, attendees = null,
+    actor, spaceId, customerId, customerPayload = null, startAt, endAt, unitCount = 1, attendees = null,
     purpose = null, internalNotes = null, billingUnit = null,
     billingQuantity = null, idempotencyKey = null, source = 'admin',
+    bookingChannel = 'STAFF', manageTokenHash = null,
   } = input ?? {};
 
   if (!actor || !actor.id) throw validationError('An authenticated staff actor is required.');
   if (!spaceId) throw validationError('A space must be selected.', { field: 'space_id' });
-  if (!customerId) throw validationError('A customer must be selected.', { field: 'customer_id' });
+  if (!customerId && !customerPayload) throw validationError('A customer must be selected.', { field: 'customer_id' });
 
   const window = normaliseWindow({ startAt, endAt });
 
@@ -208,7 +211,10 @@ export function createReservation(db, input) {
       }
 
       const space = loadSpaceOrThrow(db, Number(spaceId));
-      const customer = db.prepare('SELECT id FROM customer WHERE id = ?').get(Number(customerId));
+      const resolvedCustomer = customerId
+        ? db.prepare('SELECT id FROM customer WHERE id = ?').get(Number(customerId))
+        : resolveOrCreateCustomerInTransaction(db, { actor, payload: customerPayload });
+      const customer = resolvedCustomer ? { id: Number(resolvedCustomer.id) } : null;
       if (!customer) throw notFound('Customer not found.');
 
       assertBookingRules(space, window, attendees);
@@ -232,13 +238,14 @@ export function createReservation(db, input) {
       const reference = nextReference(db, 'reservation');
       const now = Date.now();
 
+      const channel = bookingChannel === 'PUBLIC' ? 'PUBLIC' : 'STAFF';
       const info = db.prepare(`
         INSERT INTO reservation
           (reference, space_id, customer_id, status, start_at, end_at, unit_count,
            attendees, purpose, internal_notes, billing_unit, billing_quantity,
            rate_cents, total_cents, currency, idempotency_key, created_by, created_at,
-           updated_by, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           updated_by, updated_at, booking_channel, manage_token_hash)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `).run(
         reference, space.id, customer.id, RESERVATION_STATUS.CONFIRMED,
         window.startAt, window.endAt, required,
@@ -246,7 +253,7 @@ export function createReservation(db, input) {
         purpose || null, internalNotes || null,
         priced.billingUnit, priced.billingQuantity, priced.rateCents, priced.totalCents,
         priced.currency, idempotencyKey ? String(idempotencyKey) : null,
-        actor.id, now, actor.id, now,
+        actor.id, now, actor.id, now, channel, manageTokenHash || null,
       );
 
       const reservationId = Number(info.lastInsertRowid);

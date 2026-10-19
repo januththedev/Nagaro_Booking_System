@@ -398,7 +398,7 @@ export function parseReservationFilters(query = {}) {
 const RESERVATION_LIST_SELECT = `
   SELECT r.id, r.reference, r.status, r.start_at, r.end_at, r.unit_count, r.attendees,
          r.purpose, r.cancellation_reason, r.cancelled_at, r.created_at, r.updated_at,
-         r.total_cents, r.currency, r.billing_unit, r.billing_quantity,
+         r.total_cents, r.currency, r.billing_unit, r.billing_quantity, r.booking_channel,
          s.id AS space_id, s.code AS space_code, s.name AS space_name, s.category AS space_category,
          c.id AS customer_id, c.full_name AS customer_name, c.organization AS customer_organization,
          u.display_name AS created_by_name
@@ -433,6 +433,7 @@ function mapReservationListRow(row) {
     currency: row.currency,
     billingUnit: row.billing_unit,
     billingQuantity: row.billing_quantity,
+    bookingChannel: row.booking_channel ?? 'STAFF',
     createdByName: row.created_by_name,
   };
 }

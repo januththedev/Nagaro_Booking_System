@@ -10,6 +10,7 @@ import { getDb, databasePath, closeDb } from './db/connection.js';
 import { applyMigrations } from './db/migrate.js';
 import { loadConfig, describeConfig } from './config.js';
 import { createApp } from './app.js';
+import { createPublicFrontendProxy } from './http/publicFrontendProxy.js';
 import { ensureUploadDir } from './security/uploads.js';
 import { purgeExpiredSessions } from './security/sessions.js';
 import { ensureFirstAdmin } from './services/adminUserService.js';
@@ -66,9 +67,15 @@ if (config.demoSeed) {
 }
 
 const app = createApp({ db, config });
+const publicFrontend = createPublicFrontendProxy({
+  listener: { host: config.host, port: config.port },
+});
 const server = createServer((req, res) => {
   // A single failing request must never take the process down.
-  Promise.resolve(app.handle(req, res)).catch((error) => {
+  const request = publicFrontend.shouldProxy(req)
+    ? publicFrontend.handle(req, res)
+    : app.handle(req, res);
+  Promise.resolve(request).catch((error) => {
     console.error('[fatal-request]', error);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -76,6 +83,14 @@ const server = createServer((req, res) => {
     }
   });
 });
+
+// Next's development runtime uses a WebSocket for refresh updates. Keeping the
+// upgrade on this listener preserves the same-origin contract during local QA.
+if (publicFrontend.config.mode === 'next') {
+  server.on('upgrade', (req, socket, head) => {
+    publicFrontend.handleUpgrade(req, socket, head);
+  });
+}
 
 server.keepAliveTimeout = 15_000;
 server.headersTimeout = 20_000;
@@ -87,6 +102,9 @@ server.listen(config.port, config.host, () => {
   console.log(`             ${describeConfig(config)}`);
   console.log(`             email status: ${mail.configured ? 'SMTP configured' : 'NOT configured'}`);
   console.log(`             booking integrity: ${triggers.length} anti-overlap trigger(s) active`);
+  console.log(`             public frontend: ${publicFrontend.config.mode}${
+    publicFrontend.config.mode === 'next' ? ` (${publicFrontend.config.origin.origin})` : ''
+  }`);
   console.log(`\n  Ready at ${config.baseUrl}\n`);
 });
 

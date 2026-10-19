@@ -362,8 +362,10 @@ function initAvailabilityChecker() {
   if (!form) return;
   var region = resultRegion(form);
   if (!region) return;
+  var advisoryOnly = form.getAttribute('data-availability-mode') === 'advisory';
 
   form.addEventListener('submit', function (event) {
+    if (advisoryOnly) return;
     if (!form.dataset || form.dataset.enhanced !== 'true') return;
     event.preventDefault();
     requestAvailability(form, region, {});
@@ -371,6 +373,20 @@ function initAvailabilityChecker() {
 
   form.dataset.enhanced = 'true';
   if (!region.getAttribute('aria-live')) region.setAttribute('aria-live', 'polite');
+
+  if (advisoryOnly) {
+    var timer = 0;
+    ['space_code', 'date', 'start_time', 'end_time', 'desks'].forEach(function (name) {
+      var field = one(form, '[name="' + name + '"]');
+      if (!field) return;
+      field.addEventListener('change', function () {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+          if (readAvailabilityQuery(form)) requestAvailability(form, region, { silent: true });
+        }, 180);
+      });
+    });
+  }
 
   /* Prefill from ?date=&start=&end=&desks= supplied by the space detail page. */
   var params = new URLSearchParams(window.location.search || '');
@@ -485,12 +501,17 @@ function initReveal() {
         observer.unobserve(entry.target);
       }
     });
-  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.01 });
   nodes.forEach(function (node, index) {
     if (!node.style.getPropertyValue('--reveal-delay') && index < 12) {
       node.style.setProperty('--reveal-delay', String(Math.min(index, 6) * 50) + 'ms');
     }
-    observer.observe(node);
+    var rect = node.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.94 && rect.bottom > 0) {
+      node.classList.add('is-visible');
+    } else {
+      observer.observe(node);
+    }
   });
 }
 

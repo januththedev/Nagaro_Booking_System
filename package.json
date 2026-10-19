@@ -10,6 +10,13 @@
   "scripts": {
     "start": "node src/server/index.js",
     "dev": "node --watch src/server/index.js",
+    "dev:public": "npm run dev --prefix apps/public-web",
+    "dev:full": "node scripts/run-public-stack.js",
+    "build:public": "npm run build --prefix apps/public-web",
+    "start:full": "node scripts/run-public-stack.js --production",
+    "test:public": "npm run test --prefix apps/public-web",
+    "test:cutover": "node scripts/e2e-public-frontend.js",
+    "test:full": "npm run test:all && npm run test:public && npm run test:cutover",
     "migrate": "node src/server/db/migrate.js",
     "seed": "node src/server/db/seed.js",
     "admin:create": "node scripts/create-admin.js",

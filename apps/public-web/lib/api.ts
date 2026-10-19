@@ -1,0 +1,56 @@
+import type { Availability, PublicSpace, Reservation, SpaceListResponse } from "./types";
+
+const serverBase = () => {
+  const raw = process.env.API_ORIGIN || process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:4173";
+  return /^https?:\/\//.test(raw) ? raw.replace(/\/$/, "") : "http://127.0.0.1:4173";
+};
+
+export const clientApiPath = (path: string) => {
+  const base = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") || "";
+  return `${base}${path}`;
+};
+
+async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${serverBase()}${path}`, {
+    ...init,
+    cache: "no-store",
+    headers: { Accept: "application/json", ...(init.headers || {}) },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.error?.message || `Request failed with status ${response.status}.`);
+  }
+  return body as T;
+}
+
+export async function getSpaces(): Promise<{ spaces: PublicSpace[]; available: boolean }> {
+  try {
+    const body = await apiFetch<SpaceListResponse>("/api/public/spaces?page=1&pageSize=100&sort=name");
+    return { spaces: Array.isArray(body.items) ? body.items : [], available: true };
+  } catch {
+    return { spaces: [], available: false };
+  }
+}
+
+export async function getSpace(code: string): Promise<PublicSpace | null> {
+  try {
+    return await apiFetch<PublicSpace>(`/api/public/spaces/${encodeURIComponent(code)}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function getBooking(reference: string, token: string): Promise<Reservation | null> {
+  if (!reference || !token) return null;
+  try {
+    const body = await apiFetch<{ ok: true; data: { reservation: Reservation } }>(
+      `/api/public/bookings/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return body.data.reservation;
+  } catch {
+    return null;
+  }
+}
+
+export type { Availability, PublicSpace, Reservation };

@@ -188,6 +188,45 @@ export function parseCustomerPayload(input, { partial = false } = {}) {
   return value;
 }
 
+/**
+ * Resolve the canonical customer for a public checkout while the caller owns
+ * the write transaction. Existing profiles are never mutated; the oldest
+ * matching email is reused. This keeps customer creation and inventory
+ * allocation in one rollback boundary.
+ */
+export function resolveOrCreateCustomerInTransaction(db, { actor, payload } = {}) {
+  if (!actor || !actor.id) throw validationError('An authenticated actor is required.');
+  const value = parseCustomerPayload(payload);
+  const normalized = normalizeEmail(value.email);
+  const existing = db.prepare(`
+    SELECT id FROM customer
+     WHERE email_normalized = ?
+     ORDER BY created_at ASC, id ASC
+     LIMIT 1
+  `).get(normalized);
+  if (existing) return getCustomer(db, Number(existing.id));
+
+  const now = Date.now();
+  const info = db.prepare(`
+    INSERT INTO customer (full_name, email, email_normalized, phone, organization, notes, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).run(
+    value.fullName, value.email, normalized, value.phone ?? null,
+    value.organization ?? null, null, now, now,
+  );
+  const id = Number(info.lastInsertRowid);
+  recordAudit(db, {
+    actorAdminUserId: actor.id,
+    actorLabel: actor.label,
+    action: 'customer.created',
+    entityType: 'customer',
+    entityId: id,
+    summary: `Created customer ${value.fullName} through public checkout`,
+    details: { email: normalized, organization: value.organization ?? null, source: 'public_checkout' },
+  });
+  return getCustomer(db, id);
+}
+
 function requiredEmailField(value) {
   const email = optionalEmail(value);
   if (!email) throw validationError('Email address is required.', { field: 'email' });

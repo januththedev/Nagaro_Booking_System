@@ -895,8 +895,19 @@ function initReveal() {
         observer.unobserve(entry.target);
       }
     });
-  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
-  nodes.forEach(function (node) { observer.observe(node); });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.01 });
+  nodes.forEach(function (node) {
+    /* Very tall dashboard wrappers can occupy the viewport while their
+       intersection ratio stays below the observer threshold. Reveal anything
+       already inside the initial viewport so mobile users never see a blank
+       operations screen. */
+    var rect = node.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.92 && rect.bottom > 0) {
+      node.classList.add('is-visible');
+    } else {
+      observer.observe(node);
+    }
+  });
 }
 
 function initSubmitOnce() {

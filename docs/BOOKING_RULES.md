@@ -411,7 +411,30 @@ the double-booking check.
 
 ---
 
-## 10. Audit and retention
+## 10. Public self-service bookings
+
+`GET|POST /book` is a separate channel from an inquiry. A successful public checkout creates a real
+`CONFIRMED` reservation and `ACTIVE` occupancy rows immediately. It uses the same `createReservation()`
+transaction as staff bookings, so opening hours, duration, capacity, buffers, deterministic desk allocation,
+price snapshots and the database overlap triggers are identical for both channels.
+
+- Public bookings may use only `PUBLISHED` spaces and must start in the future.
+- The form token becomes a unique idempotency key; replaying one submission never creates a second booking.
+- Customer resolution and creation occur inside the same `BEGIN IMMEDIATE` transaction as the reservation,
+  so a losing concurrent checkout leaves no orphan customer, reservation, occupancy or audit row.
+- `booking_channel = 'PUBLIC'` distinguishes checkout reservations from staff-created records.
+- A random management capability is issued once. Only its SHA-256 hash is stored in
+  `reservation.manage_token_hash`; wrong reference/token pairs return the same not-found response.
+- A guest may cancel a confirmed booking before its start time. Cancellation uses the canonical cancellation
+  service, releases inventory once, and retains the reservation and released occupancy as history.
+- No payment is taken online. The rate and computed LKR total are still frozen on the reservation for offline
+  settlement or invoicing.
+- The inactive system principal exists only to preserve the non-null creator/audit foreign-key contract. It
+  cannot sign in and is excluded from staff account lists and first-admin bootstrap decisions.
+
+---
+
+## 11. Audit and retention
 
 - Every state change writes an `audit_log` row **inside the same transaction** as the change it
   describes. A rolled-back change leaves no audit entry; a committed change always has one.

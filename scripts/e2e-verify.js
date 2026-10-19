@@ -446,6 +446,124 @@ console.log('\n[16] media serving is inert');
   }
 }
 
+// 17. public JSON booking contract (the Next.js frontend boundary)
+console.log('\n[17] public JSON booking contract');
+{
+  const window = slstWindow(31, 14, 2);
+  const token = `e2e-public-${Date.now()}`;
+  const body = {
+    form_token: token,
+    space_code: spaceCode,
+    date: new Date(window.start + 5.5 * 3600000).toISOString().slice(0, 10),
+    start_time: '14:00',
+    end_time: '16:00',
+    desks: '1',
+    attendees: '6',
+    message: 'JSON checkout E2E',
+    customer_name: 'Public Guest',
+    email: `public-guest-${Date.now()}@e2e.test`,
+    phone: '+94 77 000 0000',
+    organization: 'Guest Labs',
+  };
+
+  const post = () => fetch(base + '/api/public/bookings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const r = await post();
+  const j = await r.json().catch(() => null);
+  check('POST /api/public/bookings -> 201', r.status === 201, `got ${r.status}`);
+  check('response is no-store', (r.headers.get('cache-control') || '').includes('no-store'));
+  check('response is no-referrer', r.headers.get('referrer-policy') === 'no-referrer');
+  const ref = j?.data?.reservation?.reference;
+  const manageToken = j?.data?.manageToken;
+  check('JSON checkout returns a reference', /^NG-\d{4}-\d{5}$/.test(ref || ''), JSON.stringify(j).slice(0, 200));
+  check('JSON checkout returns a capability token', typeof manageToken === 'string' && manageToken.length >= 40);
+  check('JSON checkout projects no customer PII', !Object.hasOwn(j?.data?.reservation ?? {}, 'customer'));
+
+  if (ref && manageToken) {
+    const r2 = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}`, {
+      headers: { Authorization: `Bearer ${manageToken}`, Accept: 'application/json' },
+    });
+    const j2 = await r2.json().catch(() => null);
+    check('GET capability booking -> 200', r2.status === 200, `got ${r2.status}`);
+    check('capability booking returns the reference', j2?.data?.reservation?.reference === ref);
+    check('capability lookup is no-store', (r2.headers.get('cache-control') || '').includes('no-store'));
+
+    const r3 = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}`, {
+      headers: { Authorization: 'Bearer wrong-token-value-that-is-long-enough', Accept: 'application/json' },
+    });
+    check('wrong capability -> 404', r3.status === 404, `got ${r3.status}`);
+
+    const r4 = await post();
+    const j4 = await r4.json().catch(() => null);
+    check('idempotent retry -> 200', r4.status === 200, `got ${r4.status}`);
+    check('idempotent retry keeps the same reference', j4?.data?.reservation?.reference === ref);
+    check('idempotent retry is flagged', j4?.data?.idempotent === true);
+
+    const competitor = await fetch(base + '/api/public/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        ...body,
+        form_token: `e2e-competitor-${Date.now()}`,
+        email: `competitor-${Date.now()}@e2e.test`,
+      }),
+    });
+    const competitorBody = await competitor.json().catch(() => null);
+    check('competing JSON checkout -> 409', competitor.status === 409, `got ${competitor.status}`);
+    check(
+      'competing JSON checkout reports a conflict',
+      competitorBody?.error?.code === 'DOUBLE_BOOKING_CONFLICT',
+      JSON.stringify(competitorBody).slice(0, 200),
+    );
+
+    const cancel = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${manageToken}`,
+      },
+      body: JSON.stringify({ reference: ref, token: manageToken }),
+    });
+    const cancelBody = await cancel.json().catch(() => null);
+    check('JSON cancel -> 200', cancel.status === 200, `got ${cancel.status}`);
+    check('JSON cancel marks the reservation CANCELLED', cancelBody?.data?.reservation?.status === 'CANCELLED');
+
+    const cancelAgain = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${manageToken}`,
+      },
+      body: JSON.stringify({ reference: ref, token: manageToken }),
+    });
+    check('second JSON cancel -> 409', cancelAgain.status === 409, `got ${cancelAgain.status}`);
+  }
+
+  const inquiry = await fetch(base + '/api/public/inquiries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      space_code: spaceCode,
+      date: '2026-12-12',
+      start_time: '10:00',
+      end_time: '12:00',
+      customer_name: 'Concierge Guest',
+      email: `concierge-${Date.now()}@e2e.test`,
+      message: 'JSON inquiry E2E',
+    }),
+  });
+  const inquiryBody = await inquiry.json().catch(() => null);
+  check('POST /api/public/inquiries -> 201', inquiry.status === 201, `got ${inquiry.status}`);
+  check('JSON inquiry returns INQ reference', /^INQ-\d{4}-\d+/.test(inquiryBody?.data?.reference || ''));
+  check('JSON inquiry exposes a withdrawal path', typeof inquiryBody?.data?.withdrawPath === 'string');
+}
+
 child.kill();
 await new Promise((r) => setTimeout(r, 500));
 try { rmSync(dir, { recursive: true, force: true, maxRetries: 3 }); } catch { /* ignore */ }

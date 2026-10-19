@@ -54,9 +54,10 @@ called inside a write transaction), `randomToken(bytes)`.
 ### bookingService.js
 
 ```js
-createReservation(db, { actor, spaceId, customerId, startAt, endAt, unitCount,
+createReservation(db, { actor, spaceId, customerId?, customerPayload?, startAt, endAt, unitCount,
                         attendees, purpose, internalNotes, billingUnit,
-                        billingQuantity, idempotencyKey, source })
+                        billingQuantity, idempotencyKey, source,
+                        bookingChannel?, manageTokenHash? })
   -> { reservation, idempotent: boolean }        // throws DoubleBookingError
 
 updateReservation(db, { actor, reservationId, patch: { spaceId?, customerId?,
@@ -77,6 +78,20 @@ loadReservation(db, id) | findReservationByReference(db, reference)
 ```
 
 `actor` is always `{ id, label, role }`. `label` is used verbatim in the audit log.
+
+### publicBookingService.js
+
+```js
+createPublicBooking(db, { spaceId, startAt, endAt, unitCount, attendees,
+                          purpose, idempotencyKey, customer, now? })
+  -> { reservation: publicSafeShape, idempotent, manageToken }
+getPublicBooking(db, { reference, token }) -> publicSafeShape
+cancelPublicBooking(db, { reference, token, now? }) -> publicSafeShape
+```
+
+Only the one-time raw management token can authorize guest reads/cancellation; the database stores its
+SHA-256 hash. The public-safe shape contains booking reference, space, schedule, quantity, price and status,
+never customer data, audit actors, internal notes, other reservation references or unit identities.
 
 **Reservation object shape** (what views and API responses consume):
 
@@ -236,7 +251,7 @@ Patterns use `:param` segments. Method mismatch yields 405; unmatched paths fall
 Middleware registered with `router.use(fn)` runs in order. Returning `false` or having
 already responded stops the chain. Errors thrown anywhere are routed to `router.onError`.
 
-**Route ownership rule:** visitor-facing routes live under `/`, `/spaces`, `/booking-request`,
+**Route ownership rule:** visitor-facing routes live under `/`, `/spaces`, `/book`, `/booking-request`,
 `/media`, `/assets`; JSON APIs under `/api/public/*`; staff routes under `/admin/*` and
 `/api/admin/*`. Public routes must never import `customerService`.
 
@@ -275,6 +290,11 @@ Every route below must exist. Handlers are thin; all rules live in services.
 | GET | `/` | Landing page: hero, category entry points, featured published spaces |
 | GET | `/spaces` | Published space directory with category, capacity, price, amenity and text filters |
 | GET | `/spaces/:code` | Space detail: gallery, amenities, category attributes, rates, availability checker, request CTA |
+| GET | `/book` | Direct guest checkout, optionally pre-filled (`?space=<code>&date=&start=&end=`) |
+| POST | `/book` | Atomically confirm a public reservation; JSON when requested, otherwise redirect |
+| GET | `/book/confirmed` | Capability-protected confirmation page (`?ref=&token=`) |
+| GET | `/book/manage` | Capability-protected booking summary and cancellation action |
+| POST | `/book/cancel` | Cancel a not-yet-started public reservation and release inventory once |
 | GET | `/booking-request` | Request-to-book form, optionally pre-filled (`?space=<code>&date=&start=&end=`) |
 | POST | `/booking-request` | Persist inquiry, attempt notification, redirect to confirmation |
 | GET | `/booking-request/received` | Truthful acknowledgement (reference, provisional wording, delivery status) |
@@ -290,6 +310,10 @@ Every route below must exist. Handlers are thin; all rules live in services.
 | GET | `/api/public/spaces/:code` | One published space |
 | GET | `/api/public/availability` | `?space=<code>&start=&end=&desks=` → provisional availability, counts only |
 | GET | `/api/public/availability/day` | `?space=<code>&date=` → hourly slots for one day |
+| POST | `/api/public/bookings` | Atomically confirm a public reservation; returns `{ ok: true, data: { reservation, manageToken, managePath, idempotent } }` (`no-store, private`, `no-referrer`) |
+| GET | `/api/public/bookings/:reference` | Load a public reservation with capability token (`Authorization: Bearer <token>`, `x-booking-capability`, or `?token=`) |
+| POST | `/api/public/bookings/:reference/cancel` | Cancel a future public reservation with capability token and release inventory once |
+| POST | `/api/public/inquiries` | Persist a provisional concierge inquiry and return `{ ok: true, data: { requestRef, reference, ... } }` |
 
 ### Admin pages (HTML)
 

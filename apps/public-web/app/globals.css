@@ -1,0 +1,239 @@
+@import "tailwindcss";
+@import "@fontsource/libre-caslon-display/400.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+:root {
+  color-scheme: light;
+  --bone: #f4f1ea;
+  --concrete: #e7e1d5;
+  --mortar: #dbd3c3;
+  --paper-card: #faf8f3;
+  --ink: #121513;
+  --graphite: #4a514c;
+  --muted-stone: #68706a;
+  --brick: #8c3b2b;
+  --oxidized: #173830;
+  --obsidian: #0d110f;
+  --obsidian-elevated: #151b18;
+  --chartreuse: #d4f248;
+  --rule: rgba(18, 21, 19, 0.15);
+  --rule-strong: rgba(18, 21, 19, 0.34);
+  --rule-dark: rgba(244, 241, 234, 0.16);
+  --font-display: "Libre Caslon Display", Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background-color: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--oxidized);
+  outline-offset: 2px;
+}
+
+.surface-dark :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: var(--chartreuse);
+}
+
+::selection {
+  background-color: var(--chartreuse);
+  color: var(--ink);
+}
+
+/* Subtle architectural grain overlay using inline SVG data URI */
+.campus-grain {
+  background-image: radial-gradient(rgba(18, 21, 19, 0.045) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+.hairline-t {
+  border-top: 1px solid var(--rule);
+}
+
+.hairline-b {
+  border-bottom: 1px solid var(--rule);
+}
+
+.hairline-box {
+  border: 1px solid var(--rule);
+}
+
+.surface-dark {
+  background-color: var(--obsidian);
+  color: var(--bone);
+}
+
+.surface-concrete {
+  background-color: var(--concrete);
+  color: var(--ink);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.85rem 1.4rem;
+  background-color: var(--ink);
+  color: var(--bone);
+  border: 1px solid var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--oxidized);
+  border-color: var(--oxidized);
+  color: var(--bone);
+}
+
+.btn-chartreuse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.85rem 1.4rem;
+  background-color: var(--chartreuse);
+  color: var(--ink);
+  border: 1px solid var(--chartreuse);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.btn-chartreuse:hover {
+  background-color: #dfga5c;
+  background-color: #e2fa64;
+  color: var(--ink);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.85rem 1.4rem;
+  background-color: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.btn-outline:hover {
+  background-color: rgba(18, 21, 19, 0.07);
+}
+
+.surface-dark .btn-outline:hover {
+  background-color: rgba(244, 241, 234, 0.1);
+}
+
+/* At 320 px the two arrival actions must stay on one line and above the fold. */
+@media (max-width: 359px) {
+  .hero-actions .btn-chartreuse,
+  .hero-actions .btn-outline {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+}
+
+.field-input {
+  width: 100%;
+  min-height: 2.85rem;
+  padding: 0.65rem 0.85rem;
+  background-color: var(--paper-card);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.field-input:focus {
+  border-color: var(--oxidized);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

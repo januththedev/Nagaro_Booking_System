@@ -4,7 +4,7 @@ A centralized space-booking and rental-management system for Nagaro at **Trace E
 
 Two experiences:
 
-- **Public** — visitors browse published spaces, check provisional availability for a period, and submit a request-to-book inquiry. No accounts, no payments, no self-service confirmed reservations.
+- **Public** — visitors browse published spaces, check live availability, and either confirm a guest reservation immediately or send a concierge inquiry for a complex event. No account or online payment is required; confirmed checkouts receive a private management link.
 - **Administrative** — staff manage spaces, photographs, customers, reservations, cancellations, maintenance and inquiries from one place.
 
 Three space categories are supported: **meeting/training rooms**, the **auditorium**, and **co-working desks** (individually bookable).
@@ -35,6 +35,30 @@ npm run seed -- --demo      # optional: demonstration catalogue, customers and b
 npm start                   # http://127.0.0.1:4173
 ```
 
+### Running the Next.js public frontend
+
+The public pages can be rendered by the Next.js app in `apps/public-web` while the Node runtime
+keeps the public port. One origin, two owners — see `ARCHITECTURE.md` §12.
+
+```bash
+npm install --prefix apps/public-web   # frontend dependencies (separate lockfile)
+npm run build:public                   # production build of the public app
+npm run dev:full                       # Node on :4173 + `next dev` on :4174, one public origin
+# or, against the production build:
+npm run start:full                     # Node on :4173 + `next start` on :4174
+```
+
+Open `http://127.0.0.1:4173`. Pages come from Next; `/api/*`, `/admin/*`, `/assets/*`, `/media/*`
+and the no-JavaScript form posts stay in the booking runtime. Rolling back is configuration only:
+
+```bash
+# legacy renderer, no Next process needed
+PUBLIC_FRONTEND=legacy npm start
+```
+
+`npm run test:cutover` verifies the split end to end (which process answered, form fallbacks,
+capability headers, legacy rollback).
+
 ### Creating the first administrator
 
 Either set both `NAGARO_BOOTSTRAP_ADMIN_EMAIL` and `NAGARO_BOOTSTRAP_ADMIN_PASSWORD`
@@ -59,7 +83,11 @@ The password is read from the prompt, `--password`, or `NAGARO_NEW_ADMIN_PASSWOR
 | `npm test` | Unit + integration tests |
 | `npm run test:concurrency` | Multi-process booking-integrity tests (slower) |
 | `npm run test:e2e` | End-to-end acceptance harness (real forms, CSRF, upload) |
+| `npm run test:public` | Next.js public app suite (config, quote parity with the engine, surface guards) |
+| `npm run test:cutover` | Boots Node + `next start` and verifies the same-origin split and the legacy rollback |
 | `npm run test:all` | Everything |
+| `npm run test:full` | Every suite incl. the frontend and the cut-over harness |
+| `npm run dev:full` / `npm run start:full` | Run the whole stack (Node + Next) on one public origin |
 | `npm run demo:double-booking` | Live demonstration that conflicting bookings are refused |
 
 ## Demonstrating the double-booking rejection
@@ -77,9 +105,10 @@ reservation exists for that period and exits non-zero if the guarantee is violat
 
 ```
 src/server/    HTTP layer, domain rules, business services, security, routes, migrations
-src/web/       server-rendered views, HTML primitives, static CSS/JS
+src/web/       server-rendered views (legacy renderer and admin console), static CSS/JS
+apps/public-web/ Next.js public frontend (landing, catalogue, checkout, management, concierge)
 tests/         unit, integration and concurrency suites
-scripts/       database provisioning, inspection and the demo
+scripts/       database provisioning, inspection, the demo and the acceptance harnesses
 storage/       uploaded space photographs (created at runtime, not committed)
 data/          the SQLite database (created at runtime, not committed)
 ```
@@ -104,6 +133,7 @@ data/          the SQLite database (created at runtime, not committed)
 | `FINAL_READINESS_REPORT.md` | Release-readiness verdict and the local demo boundary |
 | `PRESENTATION.md` | 10-slide presentation outline, speaker script and demo run-sheet |
 | `presentation/slides.html` | Self-contained 10-slide deck (screenshots in `presentation/assets/`) |
+| `PUBLIC_FRONTEND_REPORT.md` | The Next.js public frontend: what changed, how it was verified, rollback, limitations |
 
 ## Project status
 

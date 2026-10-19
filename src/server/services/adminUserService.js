@@ -48,13 +48,15 @@ export function hydrateAdminUser(row) {
 }
 
 export function getAdminUser(db, id) {
-  const row = db.prepare(`SELECT ${ADMIN_USER_COLUMNS} FROM admin_user WHERE id = ?`).get(Number(id));
+  const row = db.prepare(`SELECT ${ADMIN_USER_COLUMNS} FROM admin_user WHERE id = ? AND COALESCE(is_system, 0) = 0`).get(Number(id));
   return hydrateAdminUser(row);
 }
 
 /** Active accounts by default; administrators first, then name. */
 export function listAdminUsers(db, { includeInactive = false } = {}) {
-  const where = includeInactive ? '' : 'WHERE is_active = 1';
+  const where = includeInactive
+    ? 'WHERE COALESCE(is_system, 0) = 0'
+    : 'WHERE is_active = 1 AND COALESCE(is_system, 0) = 0';
   return db.prepare(`
     SELECT ${ADMIN_USER_COLUMNS}
       FROM admin_user
@@ -341,7 +343,7 @@ export function setPassword(db, { actor, adminUserId, newPassword } = {}) {
  */
 export function ensureFirstAdmin(db, { email, password, displayName = null } = {}) {
   return withWriteTransaction(db, () => {
-    const existing = Number(db.prepare('SELECT COUNT(*) AS c FROM admin_user').get().c);
+    const existing = Number(db.prepare('SELECT COUNT(*) AS c FROM admin_user WHERE COALESCE(is_system, 0) = 0').get().c);
     if (existing > 0) return { created: false, reason: 'administrators already exist' };
 
     const normalisedEmail = normalizeEmail(requiredEmail(email, { field: 'email' }));

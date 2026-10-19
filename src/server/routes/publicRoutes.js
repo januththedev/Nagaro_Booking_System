@@ -12,13 +12,15 @@
  *     `getSpaceDayGrid(..., { includeDetails: false })` only. There is no code
  *     path here that can reach a customer name, a reservation reference or an
  *     internal note.
- *   - **No inventory, no customers, no reservations.** This module never
- *     imports `customerService` or `bookingService`; an inquiry is a durable
- *     record of a request and nothing more.
+ *   - **Two explicit booking channels.** `/booking-request` remains a durable
+ *     inquiry that consumes no inventory. `/book` delegates to the public
+ *     booking service, which uses the canonical atomic booking core and a
+ *     private capability token for guest management.
  *   - **Honest email wording.** A saved inquiry is never described as a
  *     delivered email; see `EMAIL_STATUS_NOTICE` in `publicViews.js`.
  *   - Every rendered value passes through the `html` tagged template.
  */
+import { randomBytes } from 'node:crypto';
 import { clientIp } from '../http/request.js';
 import { redirect } from '../http/response.js';
 import { AppError, notFound, validationError } from '../domain/errors.js';
@@ -37,8 +39,12 @@ import {
   getInquiryByReference, submitInquiry, withdrawInquiry,
 } from '../services/inquiryService.js';
 import {
+  cancelPublicBooking, createPublicBooking, getPublicBooking,
+} from '../services/publicBookingService.js';
+import {
   publicErrorPage, publicSpaceProjection, renderBookingReceivedPage, renderBookingRequestPage,
-  renderHomePage, renderSpaceDetailPage, renderSpaceDirectoryPage, renderWithdrawFormPage,
+  renderHomePage, renderPublicBookingConfirmedPage, renderPublicBookingManagePage,
+  renderSelfBookingPage, renderSpaceDetailPage, renderSpaceDirectoryPage, renderWithdrawFormPage,
   renderWithdrawalConfirmedPage,
 } from '../../web/views/publicViews.js';
 
@@ -313,7 +319,7 @@ function requestHrefFor(space, values) {
       params.set('desks', String(values.desks));
     }
   }
-  return `/booking-request?${params.toString()}`;
+  return `/book?${params.toString()}`;
 }
 
 /* ------------------------------------------------------------ inquiry helpers */
@@ -321,17 +327,19 @@ function requestHrefFor(space, values) {
 function formValues(body) {
   const source = body ?? {};
   return {
-    customer_name: textValue(source.customer_name, 160),
+    customer_name: textValue(source.customer_name ?? source.customerName ?? source.name, 160),
     email: textValue(source.email, 254),
     phone: textValue(source.phone, 40),
     organization: textValue(source.organization, 160),
-    space_code: textValue(source.space_code, 60).toUpperCase(),
+    space_code: textValue(source.space_code ?? source.spaceCode, 60).toUpperCase(),
     date: dateValue(source.date),
-    start_time: clockValue(source.start_time ?? source.start),
-    end_time: clockValue(source.end_time ?? source.end),
-    desks: textValue(source.desks ?? source.desk_quantity, 6),
+    start_time: clockValue(source.start_time ?? source.startTime ?? source.start),
+    end_time: clockValue(source.end_time ?? source.endTime ?? source.end),
+    start_at: textValue(source.requested_start_at ?? source.start_at ?? source.requestedStartAt ?? source.startAt, 40),
+    end_at: textValue(source.requested_end_at ?? source.end_at ?? source.requestedEndAt ?? source.endAt, 40),
+    desks: textValue(source.desks ?? source.desk_quantity ?? source.deskQuantity, 6),
     attendees: textValue(source.attendees, 8),
-    message: textValue(source.message, 2000),
+    message: textValue(source.message ?? source.purpose, 2000),
   };
 }
 
@@ -364,12 +372,103 @@ function payloadFromValues(values) {
     phone: values.phone,
     organization: values.organization,
     space_code: values.space_code,
+    requested_start_at: values.start_at || null,
+    requested_end_at: values.end_at || null,
     date: values.date,
     start_time: values.start_time,
     end_time: values.end_time,
     desk_quantity: values.desks,
     attendees: values.attendees,
     message: values.message,
+  };
+}
+
+function newPublicBookingToken() {
+  return randomBytes(24).toString('base64url');
+}
+
+function publicBookingInput(db, values, formToken, now = Date.now()) {
+  const space = findPublishedSpace(db, values.space_code);
+  if (!space) throw validationError('Choose a published space.', { space_code: 'Choose a published space.' });
+  const window = parseBookingWindow({
+    start_at: values.start_at || null,
+    end_at: values.end_at || null,
+    date: values.date,
+    start_time: values.start_time,
+    end_time: values.end_time,
+  });
+  const token = textValue(formToken, 120);
+  if (!/^[A-Za-z0-9_-]{20,120}$/.test(token)) {
+    throw validationError('This booking form has expired. Reload the page and try again.', {
+      form_token: 'Reload the booking form before submitting.',
+    });
+  }
+  const units = space.category === SPACE_CATEGORY.COWORKING
+    ? intValue(values.desks, { min: 1, max: 500, fallback: 1 })
+    : 1;
+  const attendees = values.attendees === ''
+    ? null
+    : intValue(values.attendees, { min: 0, max: 100000, fallback: null });
+  return {
+    spaceId: space.id,
+    startAt: window.startAt,
+    endAt: window.endAt,
+    unitCount: units,
+    attendees,
+    purpose: values.message || null,
+    idempotencyKey: `public:${token}`,
+    now,
+    customer: {
+      fullName: values.customer_name,
+      email: values.email,
+      phone: values.phone,
+      organization: values.organization,
+    },
+  };
+}
+
+/**
+ * Read the private booking capability without forcing it into a URL. The
+ * bearer header is the preferred API transport; the explicit header and token
+ * query/body aliases keep the browser management links backwards compatible.
+ */
+function bookingCapability(ctx, body = null) {
+  const authorization = String(ctx.req.headers.authorization ?? '');
+  const bearer = /^Bearer\s+(.+)$/i.exec(authorization)?.[1] ?? '';
+  return textValue(
+    body?.token
+      ?? body?.manage_token
+      ?? body?.manageToken
+      ?? ctx.req.headers['x-booking-capability']
+      ?? ctx.query.token
+      ?? bearer,
+    200,
+  );
+}
+
+function publicBookingFormToken(ctx, body) {
+  return body?.form_token
+    ?? body?.formToken
+    ?? body?.idempotency_key
+    ?? body?.idempotencyKey
+    ?? ctx.req.headers['idempotency-key'];
+}
+
+function protectCapabilityResponse(ctx) {
+  ctx.setHeader('Referrer-Policy', 'no-referrer');
+  ctx.setHeader('Cache-Control', 'no-store, private');
+}
+
+function publicBookingResponse(result) {
+  const managePath = result.manageToken
+    ? `/book/manage?ref=${encodeURIComponent(result.reservation.reference)}`
+      + `&token=${encodeURIComponent(result.manageToken)}`
+    : null;
+  return {
+    reservation: result.reservation,
+    manageToken: result.manageToken,
+    managePath,
+    idempotent: result.idempotent,
   };
 }
 
@@ -545,6 +644,122 @@ export function registerPublicRoutes(router, deps = {}) {
       check,
       requestHref: requestHrefFor(space, check.values),
     }));
+  });
+
+  /* --------------------------------------------------- direct guest booking */
+
+  router.get('/book', async (ctx) => {
+    ctx.html(renderSelfBookingPage({
+      spaces: selectPublicSpaces(db, {}).published.map(projectSpace),
+      values: { ...prefillValues(ctx.query), today: businessDateKey(clock()) },
+      formToken: newPublicBookingToken(),
+    }));
+  });
+
+  router.post('/book', async (ctx) => {
+    const body = await ctx.readBody();
+    const values = formValues(body);
+    const spaces = selectPublicSpaces(db, {}).published.map(projectSpace);
+    const renderProblems = (error) => {
+      const problems = problemStrings(error?.details);
+      ctx.html(renderSelfBookingPage({
+        spaces,
+        values: { ...values, today: businessDateKey(clock()) },
+        errors: error?.details ?? null,
+        problems: problems.length ? problems : [error?.message ?? 'Please check the booking details.'],
+        formToken: textValue(body.form_token, 120) || newPublicBookingToken(),
+        status: error?.status ?? 422,
+      }), error?.status ?? 422);
+    };
+
+    try {
+      protectCapabilityResponse(ctx);
+      enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
+      const result = createPublicBooking(db, publicBookingInput(db, values, publicBookingFormToken(ctx, body), clock()));
+      const reservation = result.reservation;
+
+      if (ctx.wantsJson) {
+        ctx.json({ ok: true, data: publicBookingResponse(result) }, result.idempotent ? 200 : 201);
+        return;
+      }
+      if (!result.manageToken) {
+        ctx.html(renderPublicBookingConfirmedPage({ reservation, managePath: null }), 200);
+        return;
+      }
+      redirect(ctx.res, `/book/confirmed?ref=${encodeURIComponent(reservation.reference)}&token=${encodeURIComponent(result.manageToken)}`, 303);
+      ctx.responded = true;
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      if (ctx.wantsJson) throw error;
+      renderProblems(error);
+    }
+  });
+
+  router.get('/book/confirmed', async (ctx) => {
+    ctx.setHeader('Referrer-Policy', 'no-referrer');
+    ctx.setHeader('Cache-Control', 'no-store, private');
+    const reference = textValue(ctx.query.ref ?? ctx.query.reference, 40);
+    const token = textValue(ctx.query.token, 200);
+    try {
+      const reservation = getPublicBooking(db, { reference, token });
+      const managePath = `/book/manage?ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token)}`;
+      ctx.html(renderPublicBookingConfirmedPage({ reservation, managePath }));
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      ctx.html(publicErrorPage({
+        status: 404,
+        title: 'That private booking link was not recognised',
+        message: 'We could not open a confirmed booking with this link.',
+        hint: 'Use the complete private link from the booking confirmation, or contact the operations desk.',
+      }), 404);
+    }
+  });
+
+  router.get('/book/manage', async (ctx) => {
+    ctx.setHeader('Referrer-Policy', 'no-referrer');
+    ctx.setHeader('Cache-Control', 'no-store, private');
+    const reference = textValue(ctx.query.ref ?? ctx.query.reference, 40);
+    const token = textValue(ctx.query.token, 200);
+    try {
+      const reservation = getPublicBooking(db, { reference, token });
+      ctx.html(renderPublicBookingManagePage({
+        reservation,
+        reference,
+        token,
+        cancelled: textValue(ctx.query.cancelled, 5) === '1',
+      }));
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      ctx.html(publicErrorPage({
+        status: 404,
+        title: 'That private booking link was not recognised',
+        message: 'We could not open a booking with this link.',
+        hint: 'Use the complete private link from your confirmation screen.',
+      }), 404);
+    }
+  });
+
+  router.post('/book/cancel', async (ctx) => {
+    ctx.setHeader('Referrer-Policy', 'no-referrer');
+    ctx.setHeader('Cache-Control', 'no-store, private');
+    const body = await ctx.readBody();
+    const reference = textValue(body.reference ?? body.ref, 40);
+    const token = textValue(body.token, 200);
+    try {
+      const reservation = cancelPublicBooking(db, { reference, token, now: clock() });
+      if (ctx.wantsJson) { ctx.json({ ok: true, data: { reservation } }); return; }
+      redirect(ctx.res, `/book/manage?ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token)}&cancelled=1`, 303);
+      ctx.responded = true;
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      if (ctx.wantsJson) throw error;
+      ctx.html(publicErrorPage({
+        status: error.status,
+        title: error.status === 409 ? 'This booking cannot be cancelled online' : 'That private booking link was not recognised',
+        message: error.message,
+        hint: 'Contact the operations desk and quote the booking reference if you need help.',
+      }), error.status);
+    }
   });
 
   /* -------------------------------------------------------- request form */
@@ -768,5 +983,67 @@ export function registerPublicRoutes(router, deps = {}) {
     }
     const grid = getSpaceDayGrid(db, { spaceId: space.id, dateKey, includeDetails: false });
     ctx.json(publicDayProjection(space.code, grid));
+  });
+
+  router.post('/api/public/bookings', async (ctx) => {
+    protectCapabilityResponse(ctx);
+    const body = await ctx.readBody();
+    const values = formValues(body);
+    const formToken = publicBookingFormToken(ctx, body);
+    enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
+    const result = createPublicBooking(db, publicBookingInput(db, values, formToken, clock()));
+    ctx.json({ ok: true, data: publicBookingResponse(result) }, result.idempotent ? 200 : 201);
+  });
+
+  router.get('/api/public/bookings/:reference', async (ctx) => {
+    protectCapabilityResponse(ctx);
+    const reference = textValue(ctx.params.reference, 40);
+    const token = bookingCapability(ctx);
+    const reservation = getPublicBooking(db, { reference, token });
+    ctx.json({ ok: true, data: { reservation } });
+  });
+
+  router.post('/api/public/bookings/:reference/cancel', async (ctx) => {
+    protectCapabilityResponse(ctx);
+    const body = await ctx.readBody();
+    const reference = textValue(ctx.params.reference ?? body.reference ?? body.ref, 40);
+    const token = bookingCapability(ctx, body);
+    const reservation = cancelPublicBooking(db, { reference, token, now: clock() });
+    ctx.json({ ok: true, data: { reservation } });
+  });
+
+  router.post('/api/public/inquiries', async (ctx) => {
+    const body = await ctx.readBody();
+    const values = formValues(body);
+    const ip = clientIp(ctx.req);
+    enforcePublicInquiryLimits(db, { ip, email: values.email, now: clock() });
+    const result = await submitInquiry(db, {
+      payload: payloadFromValues(values),
+      ip,
+      mailer,
+      now: clock(),
+      baseUrl,
+      enforceRateLimit: false,
+    });
+    const reference = result.inquiry.reference;
+    const token = result.inquiry.withdrawToken ?? '';
+    const withdrawPath = `/booking-request/withdraw?ref=${encodeURIComponent(reference)}`
+      + (token ? `&token=${encodeURIComponent(token)}` : '');
+    ctx.json({
+      ok: true,
+      data: {
+        requestRef: reference,
+        reference,
+        spaceCode: result.inquiry.spaceCode,
+        spaceName: result.inquiry.spaceName,
+        startAt: result.inquiry.startAt,
+        endAt: result.inquiry.endAt,
+        deskQuantity: result.inquiry.deskQuantity,
+        status: result.inquiry.status,
+        emailStatus: result.inquiry.emailStatus,
+        withdrawToken: token || null,
+        withdrawPath,
+      },
+    }, 201);
   });
 }

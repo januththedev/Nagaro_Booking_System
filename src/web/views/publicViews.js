@@ -35,7 +35,7 @@ import { rateSummary as spaceRateSummary } from '../../server/services/spaceServ
 /** The complete, frozen public surface of a space. */
 export const PUBLIC_SPACE_KEYS = Object.freeze([
   'id', 'code', 'name', 'category', 'categoryLabel', 'shortDescription', 'description',
-  'location', 'floor', 'capacity', 'unitCount', 'openTime', 'closeTime',
+  'location', 'floor', 'capacity', 'unitCount', 'pricingUnit', 'openTime', 'closeTime',
   'minDurationMinutes', 'maxDurationMinutes', 'bufferMinutes',
   'rates', 'rateList', 'rateSummary', 'amenities', 'attributes', 'images', 'isPublished',
 ]);
@@ -51,8 +51,8 @@ const FORBIDDEN_KEY_NAMES = Object.freeze([
   'idempotencyKey', 'createdBy', 'notes', 'purpose', 'attendees', 'totalCents',
 ].map(normalizeKeyName));
 
-const CAVEAT = 'Provisional only — this check does not hold the space. '
-  + 'A booking is confirmed only once Nagaro staff confirm it.';
+const CAVEAT = 'Availability is advisory and never holds inventory. '
+  + 'Direct checkout confirms immediately inside the booking transaction; a concierge inquiry awaits staff confirmation.';
 
 /** Architectural line icons for the three space categories (inline SVG, no external assets). */
 const CATEGORY_ICON = Object.freeze({
@@ -223,6 +223,7 @@ export function publicSpaceProjection(space, { images = [], availability = null,
     floor: space.floor ?? null,
     capacity: space.capacity,
     unitCount: space.unitCount ?? (Array.isArray(space.units) ? space.units.length : 0),
+    pricingUnit: space.pricingUnit ?? null,
     openTime: space.openTime,
     closeTime: space.closeTime,
     minDurationMinutes: space.minDurationMinutes,
@@ -282,7 +283,7 @@ function venueCard(space) {
       ${space.shortDescription ? html`<p class="venue-card__blurb">${space.shortDescription}</p>` : ''}
       <div class="venue-card__foot">
         <a href="/spaces/${space.code}">View space →</a>
-        <a href="/booking-request?space=${space.code}">Inquire →</a>
+        <a href="/book?space=${space.code}">Book now →</a>
       </div>
     </div>
   </article>`;
@@ -381,41 +382,6 @@ function paginationNav({ page, pageSize, total, basePath, pairs = [] }) {
 
 /* ==================================================================== pages */
 
-const CATEGORY_TAGLINE = Object.freeze({
-  [SPACE_CATEGORY.MEETING_ROOM]: 'Architecturally quiet boardrooms, executive suites and modular training studios equipped with high-lumen projection, acoustic treatment and enterprise Wi-Fi.',
-  [SPACE_CATEGORY.AUDITORIUM]: 'A landmark tiered hall at Trace Expert City engineered for product keynotes, screenings, symposiums and full-company town halls with stage lighting and PA.',
-  [SPACE_CATEGORY.COWORKING]: 'Ergonomic individual workstations and dedicated team benches in a daylight-filled studio floor, ready for focused daily, weekly or monthly residencies.',
-});
-
-const CATEGORY_UNITS = Object.freeze({
-  [SPACE_CATEGORY.MEETING_ROOM]: 'Hourly · Half-day · Full-day',
-  [SPACE_CATEGORY.AUDITORIUM]: 'Hourly · Half-day · Full-day',
-  [SPACE_CATEGORY.COWORKING]: 'Daily · Weekly · Monthly',
-});
-
-/** First two real photograph URLs across featured spaces, padded with the placeholder. */
-function heroPhotos(featured) {
-  const urls = [];
-  for (const space of featured ?? []) {
-    for (const image of space.images ?? []) {
-      if (image?.url && !urls.some((entry) => entry.url === image.url)) {
-        urls.push({ url: image.url, alt: altFor(image, space), name: space.name, code: space.code });
-      }
-      if (urls.length >= 2) break;
-    }
-    if (urls.length >= 2) break;
-  }
-  while (urls.length < 2) {
-    urls.push({
-      url: PLACEHOLDER_IMAGE,
-      alt: 'Illustration placeholder for Nagaro venues at Trace Expert City',
-      name: null,
-      code: null,
-    });
-  }
-  return urls;
-}
-
 /** Earliest open to latest close across featured spaces, or null when unknown. */
 function heroWindow(featured) {
   const opens = (featured ?? []).map((space) => space.openTime).filter(Boolean).sort();
@@ -424,174 +390,123 @@ function heroWindow(featured) {
   return `${opens[0]}–${closes[closes.length - 1]} SLST`;
 }
 
-/** Highest published capacity per category, from the featured (published) list. */
-function maxCapacityByCategory(featured) {
-  const out = {};
-  for (const space of featured ?? []) {
-    if (Number.isFinite(Number(space.capacity)) && Number(space.capacity) > 0) {
-      out[space.category] = Math.max(out[space.category] ?? 0, Number(space.capacity));
-    }
-  }
-  return out;
-}
+const TRACE_CHAPTERS = Object.freeze([
+  { verb: 'Meet', name: 'Idea Studio', note: 'Workshops, board reviews and focused sessions', image: '/assets/trace-media/research/idea-studio.webp' },
+  { verb: 'Make', name: 'Coworking Hall', note: 'Open-span workbenches for engineering and design residencies', image: '/assets/trace-media/research/expert-city-coworking.webp' },
+  { verb: 'Gather', name: 'Creator Space', note: 'Daylit training halls and seminar configurations', image: '/assets/trace-media/research/creator-space.jpg' },
+  { verb: 'Launch', name: 'Bay 07 & Auditorium', note: 'Full-production conference and keynote spans', image: '/assets/trace-media/research/bay-07.jpg' },
+]);
 
-/** `GET /` — hero-premium, category rows, featured venue grid, steps, CTA band. */
+/** `GET /` - cinematic editorial landing, authentic TRACE spaces and live booking inventory. */
 export function renderHomePage({ featured = [], totalPublished = 0, categoryCounts = {} } = {}) {
-  const categories = SPACE_CATEGORY_ORDER.map((category) => ({
-    category,
-    label: SPACE_CATEGORY_LABEL[category] ?? category,
-    tagline: CATEGORY_TAGLINE[category] ?? '',
-    units: CATEGORY_UNITS[category] ?? 'Flexible billing',
-    count: categoryCounts[category] ?? 0,
-  }));
-
-  const photos = heroPhotos(featured);
+  void totalPublished;
+  void categoryCounts;
   const window = heroWindow(featured);
-  const capacityByCategory = maxCapacityByCategory(featured);
-  const caption = photos[0].name
-    ? { name: photos[0].name, code: photos[0].code }
-    : (featured[0] ? { name: featured[0].name, code: featured[0].code } : null);
 
-  const body = html`<section class="hero-premium" data-reveal>
-    <div class="hero__grid">
-      <div class="hero__copy">
-        <p class="hero__eyebrow">Trace Expert City · Nagaro Venue Collection</p>
-        <h1 class="hero__title">Rooms for <em>focused work</em>, halls for landmark events.</h1>
-        <p class="hero__lede">Meeting rooms, executive training suites, the grand auditorium and co-working
-          studios at Trace Expert City, Colombo — live provisional schedules, honest LKR rates and a
-          staff-confirmed booking desk.</p>
-        <form class="hero__search" method="get" action="/spaces" role="search" aria-label="Search spaces">
-          <label class="hero__search-field">
-            <span>Keyword</span>
-            <input type="search" name="q" placeholder="Name, code or building" maxlength="80">
-          </label>
-          <label class="hero__search-field">
-            <span>Date</span>
-            <input type="date" name="date">
-          </label>
-          <label class="hero__search-field">
-            <span>From</span>
-            <input type="time" name="start_time" step="900">
-          </label>
-          <label class="hero__search-field">
-            <span>To</span>
-            <input type="time" name="end_time" step="900">
-          </label>
-          <button class="button button--primary" type="submit">Search spaces</button>
-        </form>
-        <dl class="hero__stats">
-          <div><dt>Published venues</dt><dd>${totalPublished}</dd></div>
-          <div><dt>Spatial typologies</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
-          ${window ? html`<div><dt>Opening window</dt><dd>${window}</dd></div>` : ''}
-        </dl>
-        <p class="hint">Online availability checks reflect the live calendar but never lock inventory —
-          every reservation is verified and confirmed by the Nagaro operations desk.</p>
+  const body = html`<div class="trace-home" data-experience-root>
+  <section class="trace-intro hero-premium" aria-labelledby="trace-home-title">
+    <div class="trace-intro__mast" data-reveal>
+      <p class="trace-intro__issue">TRACE Expert City · Maradana, Colombo</p>
+      <h1 class="trace-intro__title" id="trace-home-title"><span>TRACE</span><em>spaces</em></h1>
+      <p class="trace-intro__dek">Restored brick bays, timber spans and working halls for teams that build, gather and launch.</p>
+    </div>
+
+    <div class="trace-stage" data-tilt-stage>
+      <picture class="trace-stage__picture">
+        <img src="/assets/trace-media/research/trace-spaces-hero.webp"
+             alt="The restored brick warehouse bays and landscaped grounds of TRACE Expert City"
+             width="1600" height="900" loading="eager" fetchpriority="high" data-webgl-source>
+      </picture>
+      <canvas class="trace-stage__canvas" data-webgl-ambient aria-hidden="true"></canvas>
+      <div class="trace-stage__veil" aria-hidden="true"></div>
+      <div class="trace-stage__topline">
+        <span>Maradana · Colombo 10</span>
+        <span class="trace-stage__live"><i></i> Live booking ledger</span>
       </div>
-      <div class="hero__media">
-        <img class="hero__photo--a" src="${photos[0].url}" alt="${photos[0].alt}" loading="eager">
-        <img class="hero__photo--b" src="${photos[1].url}" alt="${photos[1].alt}" loading="lazy">
-        <span class="hero__stamp" aria-hidden="true">
-          <svg viewBox="0 0 120 120" focusable="false">
-            <defs><path id="hero-stamp-ring" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"/></defs>
-            <text><textPath href="#hero-stamp-ring">TRACE EXPERT CITY · NAGARO VENUES ·&#160;</textPath></text>
-          </svg>
-        </span>
-        ${caption
-    ? html`<p class="hero__caption">Pictured: <a href="/spaces/${caption.code}">${caption.name}</a> at Trace Expert City</p>`
-    : html`<p class="hero__caption">New venues are being prepared at Trace Expert City</p>`}
+      <div class="trace-stage__content">
+        <p class="trace-stage__eyebrow">Meet · Make · Gather · Launch</p>
+        <h2>Space to make<br><em>something matter.</em></h2>
+      </div>
+      <div class="trace-stage__bottom">
+        <p class="trace-stage__summary">Explore restored brick bays, verify Sri Lanka Standard Time availability, and confirm your booking directly online.</p>
+        <div class="cluster">
+          <a class="trace-pill trace-pill--light" href="/spaces">Explore spaces <span aria-hidden="true">↗</span></a>
+          <a class="trace-pill trace-pill--dark" href="/book">Book now <span aria-hidden="true">↗</span></a>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="section" data-reveal>
-    <div class="section__head">
-      <span class="section__index">01</span>
-      <h2 class="section__title">What you can book</h2>
-      <p class="section__lede">Three distinct spatial typologies across Trace Expert City, with
-        ${totalPublished === 1 ? '1 venue published' : `${totalPublished} venues published`} right now.</p>
+  <section class="trace-manifesto" data-reveal>
+    <p class="trace-kicker">Architectural heritage</p>
+    <h2>A former railway warehouse.<br>A contemporary campus for serious work.</h2>
+    <div class="trace-manifesto__copy">
+      <p>TRACE Expert City is a living innovation campus in Maradana, Colombo. Load-bearing brick, long industrial spans and mature tropical courtyards give every meeting, cohort and keynote architectural weight.</p>
+      <p>Direct online bookings confirm immediately against live inventory, while complex multi-day or custom production briefs can be routed to our concierge desk.</p>
     </div>
-    ${categories.map((item, index) => {
-    const representative = featured.find((space) => space.category === item.category) ?? null;
-    const repCover = representative ? coverImage(representative) : null;
-    const src = repCover?.url ?? PLACEHOLDER_IMAGE;
-    const alt = repCover && representative ? altFor(repCover, representative)
-      : `${item.label} at Nagaro, Trace Expert City (illustration placeholder)`;
-    const maxCap = capacityByCategory[item.category] ?? null;
-    return html`<article class="cat-row ${index % 2 === 1 ? 'cat-row--flip' : ''}" data-reveal>
-      <a class="cat-row__media" href="/spaces?category=${item.category}" tabindex="-1" aria-hidden="true">
-        <img src="${src}" alt="${alt}" loading="lazy">
-      </a>
-      <div class="cat-row__body">
-        <p class="cat-row__kicker">Typology · ${item.count === 1 ? '1 venue published' : `${item.count} venues published`}</p>
-        <h3 class="cat-row__title">${item.label}</h3>
-        <p class="cat-row__text">${item.tagline}</p>
-        <ul class="cat-row__facts">
-          <li>${item.count === 1 ? '1 published venue' : `${item.count} published venues`}</li>
-          <li>${item.units}</li>
-          ${maxCap ? html`<li>Up to ${maxCap} people</li>` : ''}
-        </ul>
-        <a href="/spaces?category=${item.category}">Explore ${item.label} →</a>
-      </div>
-    </article>`;
-  })}
   </section>
 
-  <section class="section" data-reveal>
-    <div class="section__head">
-      <span class="section__index">02</span>
-      <h2 class="section__title">Featured spaces</h2>
-      <p class="section__lede">Published architectural rooms, halls and desk studios at Trace Expert City,
-        with capacities and transparent LKR rates.</p>
+  <section class="trace-spaces" aria-labelledby="trace-spaces-title">
+    <header class="trace-section-head" data-reveal>
+      <div><p class="trace-kicker">Spatial programme</p></div>
+      <h2 id="trace-spaces-title">Meet, Make, Gather and Launch.</h2>
+      <a href="/spaces">View live catalogue <span aria-hidden="true">↗</span></a>
+    </header>
+    <div class="venue-grid">
+      ${TRACE_CHAPTERS.map((chapter) => html`<article class="venue-card" data-reveal>
+        <a class="venue-card__media" href="/spaces" aria-label="Explore ${chapter.verb} spaces: ${chapter.name}">
+          <img src="${chapter.image}" alt="${chapter.name} at TRACE Expert City" width="960" height="600" loading="lazy">
+          <span class="venue-card__tag">${chapter.verb}</span>
+        </a>
+        <div class="venue-card__body">
+          <h3 class="venue-card__name">${chapter.name}</h3>
+          <p class="venue-card__blurb">${chapter.note}</p>
+        </div>
+      </article>`)}
     </div>
-    ${featured.length
-    ? html`${spaceGrid(featured)}
-      <p><a href="/spaces">View full directory →</a></p>`
-    : emptyState(
-      'No spaces are published yet.',
-      'Nagaro staff are still preparing the catalogue. Please check back shortly.',
+  </section>
+
+  <section class="trace-booking" data-reveal>
+    <div class="trace-booking__visual">
+      <img src="/assets/trace-media/research/expert-city-industry-visits.webp"
+           alt="The restored industrial architecture of TRACE Expert City" width="1400" height="1050" loading="lazy">
+    </div>
+    <div class="trace-booking__body">
+      <p class="trace-kicker">Direct online confirmation</p>
+      <h2>From live availability<br>to confirmed receipt.</h2>
+      <p>Select a published venue and Sri Lanka Standard Time window, review the LKR tariff, and lock your allocation immediately.</p>
+      <a class="trace-pill trace-pill--dark" href="/book">Book now <span aria-hidden="true">↗</span></a>
+      ${window ? html`<p class="trace-booking__hours">Campus operating window · ${window}</p>` : ''}
+    </div>
+  </section>
+
+  <section class="trace-live" aria-labelledby="trace-live-title">
+    <header class="trace-section-head" data-reveal>
+      <div><p class="trace-kicker">Published venues</p></div>
+      <h2 id="trace-live-title">Open for reservation at TRACE Expert City.</h2>
+      <a href="/spaces">Compare all <span aria-hidden="true">↗</span></a>
+    </header>
+    ${featured.length ? spaceGrid(featured) : emptyState(
+      'The live catalogue is being prepared.',
+      'The TRACE venue atmosphere is ready to explore while operations publish booking inventory.',
     )}
   </section>
 
-  <section class="section" data-reveal>
-    <div class="section__head">
-      <span class="section__index">03</span>
-      <h2 class="section__title">How a request to book works</h2>
-      <p class="section__lede">Live calendar transparency paired with human operational review, so every room
-        setup, turnaround buffer and desk allocation is guaranteed.</p>
+  <section class="trace-final" data-reveal>
+    <p class="trace-kicker">Reserve at TRACE Expert City</p>
+    <h2>Claim your room, desk or hall<br><em>in central Colombo.</em></h2>
+    <div class="cluster">
+      <a class="trace-pill trace-pill--light" href="/book">Book now <span aria-hidden="true">↗</span></a>
+      <a class="trace-pill trace-pill--dark" href="/spaces">Explore spaces <span aria-hidden="true">↗</span></a>
     </div>
-    <div class="steps">
-      <article class="step" data-reveal>
-        <span class="step__num">01</span>
-        <h3 class="step__title">Inspect space &amp; provisional schedule</h3>
-        <p class="step__text">Explore room capacities, technical amenities, turnaround buffers and LKR rate
-          schedules. Run a live provisional check for your preferred date and time window.</p>
-      </article>
-      <article class="step" data-reveal>
-        <span class="step__num">02</span>
-        <h3 class="step__title">Submit a booking inquiry</h3>
-        <p class="step__text">Send your preferred schedule, attendee count and setup notes. You receive an
-          immediate reference code (<code>INQ-YYYY-NNNNN</code>) and a private self-service withdrawal link.</p>
-      </article>
-      <article class="step" data-reveal>
-        <span class="step__num">03</span>
-        <h3 class="step__title">Operations desk confirmation</h3>
-        <p class="step__text">Nagaro staff review the calendar, verify layout and catering or AV requirements
-          with you, and issue a formal confirmed reservation that locks the inventory.</p>
-      </article>
-    </div>
-    <div class="cta-band" data-reveal>
-      <p class="cta-band__title">Requests carry no payment and no automatic hold — confirmation is always human.</p>
-      <p><a class="button button--primary" href="/booking-request">Request a booking</a>
-        <a class="button button--ghost" href="/spaces">Browse spaces</a></p>
-    </div>
-  </section>`;
+  </section>
+</div>`;
 
   return publicShell({
-    title: 'Nagaro spaces at Trace Expert City',
-    description: 'Book meeting rooms, the auditorium and co-working desks at Nagaro, Trace Expert City, Colombo. '
-      + 'Check availability and send a request to book.',
+    title: 'TRACE spaces in Colombo',
+    description: 'Explore and book distinctive meeting, event and creative spaces at TRACE Expert City in Colombo.',
     activePath: '/',
-    pageClass: 'page--home',
+    pageClass: 'page--home page--experience',
     body,
   });
 }
@@ -791,8 +706,10 @@ function renderSelectedVenuePreview(chosen) {
 /** `GET /booking-request` — the request-to-book form (pre-fillable, re-renderable). */
 export function renderBookingRequestPage({
   spaces = [], values = {}, errors = null, problems = [], status = 200,
+  mode = 'inquiry', formToken = '',
 } = {}) {
   void status;
+  const instant = mode === 'instant';
   const alertProblems = problems.length > 0 && problems.length <= 8 ? problems : [];
   const chosenCode = text(values.space_code).toUpperCase();
   const chosen = spaces.find((space) => space.code.toUpperCase() === chosenCode) ?? null;
@@ -803,14 +720,16 @@ export function renderBookingRequestPage({
   const body = html`<section class="container booking-flow" data-reveal>
     <header class="venue-hero">
       <div>
-        <p class="section-eyebrow">Nagaro Concierge Desk · Trace Expert City</p>
-        <h1 class="page-title">Request a booking</h1>
-        <p class="section-subtitle">Tell us which venue and schedule you need. Nagaro staff verify every calendar request by hand and confirm the reservation with you — submitting this inquiry does not lock inventory and carries no payment.</p>
+        <p class="section-eyebrow">${instant ? 'Direct Checkout' : 'Nagaro Concierge Desk'} · Trace Expert City</p>
+        <h1 class="page-title">${instant ? 'Book your space' : 'Request a booking'}</h1>
+        <p class="section-subtitle">${instant
+    ? 'Choose a published venue and schedule, enter your details, and secure the live slot immediately. No online payment is taken; the confirmed LKR price is recorded for offline settlement.'
+    : 'Tell us which venue and schedule you need. Nagaro staff verify every calendar request by hand and confirm the reservation with you — submitting this inquiry does not lock inventory and carries no payment.'}</p>
       </div>
-      <ol class="flow-progress" aria-label="Request progress">
-        <li class="is-current"><span class="flow-progress__num">1</span> Space &amp; schedule</li>
-        <li><span class="flow-progress__num">2</span> Contact details</li>
-        <li><span class="flow-progress__num">3</span> Review &amp; send</li>
+      <ol class="flow-progress" aria-label="Checkout stages">
+        <li class="is-current">Space &amp; schedule</li>
+        <li>Contact details</li>
+        <li>Review &amp; send</li>
       </ol>
     </header>
 
@@ -826,9 +745,11 @@ export function renderBookingRequestPage({
       <div class="inquiry-main">
         <div class="card form-card">
           <div class="card__body">
-            <form method="post" action="/booking-request" class="stack" autocomplete="on" data-submit-once>
+            <form method="post" action="${instant ? '/book' : '/booking-request'}" class="stack" autocomplete="on" data-submit-once
+              ${instant ? raw('data-availability-form data-availability-mode="advisory"') : ''}>
+              ${instant ? html`<input type="hidden" name="form_token" value="${formToken}">` : ''}
               <fieldset class="form-section">
-                <legend class="form-section__title">01 · Space &amp; Preferred Schedule</legend>
+                <legend class="form-section__title">Space &amp; Preferred Schedule</legend>
                 <p class="form-section__desc hint">All times are in Sri Lanka Standard Time (UTC+5:30). Single requests must start and finish on the same calendar day.</p>
                 <div class="form-grid">
                   ${field({
@@ -893,8 +814,10 @@ export function renderBookingRequestPage({
                 </div>
               </fieldset>
 
+              ${instant ? availabilityResult({ kind: 'idle' }) : ''}
+
               <fieldset class="form-section">
-                <legend class="form-section__title">02 · Your Contact Details</legend>
+                <legend class="form-section__title">Your Contact Details</legend>
                 <p class="form-section__desc hint">Used exclusively by Nagaro staff to verify and confirm this booking request.</p>
                 <div class="form-grid">
                   ${field({
@@ -908,7 +831,7 @@ export function renderBookingRequestPage({
   })}
                   ${field({
     id: 'email', label: 'Email address', required: true,
-    hint: 'We send the confirmation here.',
+    hint: instant ? 'Attached to the confirmed booking.' : 'We send the acknowledgement here.',
     error: errorFor(errors, 'email'),
     control: (described) => input({
       id: 'email', name: 'email', type: 'email', value: values.email ?? '',
@@ -938,7 +861,7 @@ export function renderBookingRequestPage({
               </fieldset>
 
               <fieldset class="form-section">
-                <legend class="form-section__title">03 · Event Notes &amp; Requirements</legend>
+                <legend class="form-section__title">Event Notes &amp; Requirements</legend>
                 <div class="form-grid">
                   ${field({
     id: 'message', label: 'Anything else? (optional)', required: false, className: 'form-field--full',
@@ -950,30 +873,36 @@ export function renderBookingRequestPage({
   })}
                 </div>
                 <div class="form-actions">
-                  <button class="button button--primary button--large" type="submit">Send booking request</button>
+                  <button class="button button--primary button--large" type="submit">${instant ? 'Confirm this booking' : 'Send booking request'}</button>
                   <a class="button button--ghost button--large" href="/spaces">Browse spaces</a>
                 </div>
-                <p class="hint">Sending this form saves a request for Nagaro staff. It is not a
-                  confirmed booking, does not reserve inventory, and nothing is charged.</p>
+                <p class="hint">${instant
+    ? 'Submitting runs one final availability check inside the booking transaction. If the slot is still free, inventory is reserved immediately. Nothing is charged online.'
+    : 'Sending this form saves a request for Nagaro staff. It is not a confirmed booking, does not reserve inventory, and nothing is charged.'}</p>
               </fieldset>
             </form>
           </div>
         </div>
       </div>
 
-      <aside class="inquiry-aside stack">
+      <aside class="booking-side inquiry-aside stack">
         ${renderSelectedVenuePreview(chosen)}
 
         <div class="card">
           <div class="card__body stack">
-            <p class="section-eyebrow">Verification Protocol</p>
+            <p class="section-eyebrow">${instant ? 'Booking Protocol' : 'Verification Protocol'}</p>
             <h2 class="section-title">What happens next</h2>
-            <ol class="inquiry-steps">
+            ${instant ? html`<ol class="inquiry-steps">
+              <li><strong>Rules checked:</strong> Opening hours, duration, capacity and turnaround buffers are validated.</li>
+              <li><strong>Inventory locked:</strong> The server re-checks the live calendar inside a protected write transaction.</li>
+              <li><strong>Reference issued:</strong> A successful checkout receives one confirmed <code>NG-YYYY-NNNNN</code> reservation and a private management link.</li>
+            </ol>
+            <p class="hint">Prefer help with setup or a complex production? <a href="/booking-request">Ask the concierge team instead.</a></p>` : html`<ol class="inquiry-steps">
               <li><strong>Instant reference issued:</strong> Your request is recorded in the Nagaro operations queue with a unique <code>INQ-YYYY-NNNNN</code> reference.</li>
               <li><strong>Calendar &amp; buffer review:</strong> Our team checks turnaround buffers, room configuration and desk pool capacity for your requested window.</li>
               <li><strong>Direct confirmation:</strong> Staff contact you to finalise billing and issue a confirmed reservation. Only then is the space held.</li>
             </ol>
-            <p class="hint">Need to cancel an inquiry before staff respond? Use the private withdrawal link provided on your acknowledgement screen.</p>
+            <p class="hint">Need to cancel an inquiry before staff respond? Use the private withdrawal link provided on your acknowledgement screen.</p>`}
           </div>
         </div>
       </aside>
@@ -981,13 +910,68 @@ export function renderBookingRequestPage({
   </section>`;
 
   return publicShell({
-    title: 'Request a booking',
-    description: 'Send Nagaro a request to book a meeting room, the auditorium or co-working desks at '
-      + 'Trace Expert City. Staff confirm every booking by hand.',
-    activePath: '/booking-request',
-    pageClass: 'page--request',
+    title: instant ? 'Book a space' : 'Request a booking',
+    description: instant
+      ? 'Check live availability and confirm a guest booking at TRACE Expert City.'
+      : 'Send Nagaro a request to book a meeting room, the auditorium or co-working desks at Trace Expert City. Staff confirm every booking by hand.',
+    activePath: instant ? '/book' : '/booking-request',
+    pageClass: instant ? 'page--request page--checkout' : 'page--request',
     body,
   });
+}
+
+export function renderSelfBookingPage(options = {}) {
+  return renderBookingRequestPage({ ...options, mode: 'instant' });
+}
+
+export function renderPublicBookingConfirmedPage({ reservation, managePath = null } = {}) {
+  const body = html`<section class="container stack">
+    <div class="card card--acknowledgement booking-confirmed">
+      <div class="card__body stack">
+        <p class="tag tag--success">Inventory secured</p>
+        <h1 class="page-title">Your space is booked.</h1>
+        <p class="section-subtitle">The live calendar has been updated. Keep the private link below with your reference.</p>
+        <dl class="detail-list">
+          <dt>Reference</dt><dd><code>${reservation?.reference ?? ''}</code></dd>
+          <dt>Space</dt><dd>${reservation?.spaceName ?? '—'} <span class="hint">${reservation?.spaceCode ?? ''}</span></dd>
+          <dt>Period</dt><dd>${reservation?.startAt && reservation?.endAt ? periodLabel(reservation.startAt, reservation.endAt) : '—'} <span class="hint">SLST</span></dd>
+          <dt>Confirmed value</dt><dd>${money(reservation?.totalCents ?? 0, reservation?.currency ?? 'LKR')}</dd>
+          <dt>Status</dt><dd>${statusBadge(reservation?.status ?? 'CONFIRMED')}</dd>
+        </dl>
+        <div class="alert alert--success" role="status"><p><strong>This is a confirmed reservation.</strong> The selected inventory is no longer available to competing bookings.</p></div>
+        <div class="cluster">
+          ${managePath ? html`<a class="button button--primary" href="${managePath}">Open private booking link</a>` : ''}
+          <a class="button button--ghost" href="/spaces">Browse more spaces</a>
+        </div>
+        ${managePath ? html`<p class="hint">Save the private link. Anyone who has it can view or cancel this booking before it starts.</p>` : html`<p class="hint">This submission was already processed. Quote the reference above if you need help.</p>`}
+      </div>
+    </div>
+  </section>`;
+  return publicShell({ title: 'Booking confirmed', activePath: '/booking-request', pageClass: 'page--received', body });
+}
+
+export function renderPublicBookingManagePage({ reservation, reference, token, cancelled = false } = {}) {
+  const body = html`<section class="container stack">
+    <div class="card card--acknowledgement">
+      <div class="card__body stack">
+        <p class="tag ${cancelled ? '' : 'tag--info'}">Private booking link</p>
+        <h1 class="page-title">${cancelled ? 'Booking cancelled' : 'Manage your booking'}</h1>
+        <dl class="detail-list">
+          <dt>Reference</dt><dd><code>${reservation?.reference ?? reference}</code></dd>
+          <dt>Space</dt><dd>${reservation?.spaceName ?? '—'}</dd>
+          <dt>Period</dt><dd>${reservation?.startAt && reservation?.endAt ? periodLabel(reservation.startAt, reservation.endAt) : '—'} <span class="hint">SLST</span></dd>
+          <dt>Status</dt><dd>${statusBadge(reservation?.status ?? (cancelled ? 'CANCELLED' : 'CONFIRMED'))}</dd>
+        </dl>
+        ${!cancelled && reservation?.status === 'CONFIRMED' ? html`<form method="post" action="/book/cancel" data-confirm="Cancel this confirmed booking and release its inventory?">
+          <input type="hidden" name="reference" value="${reference}">
+          <input type="hidden" name="token" value="${token}">
+          <button class="button button--danger" type="submit">Cancel booking</button>
+        </form>` : ''}
+        <p class="hint">For complex changes or a booking that has already started, contact the operations desk and quote the reference.</p>
+      </div>
+    </div>
+  </section>`;
+  return publicShell({ title: cancelled ? 'Booking cancelled' : 'Manage booking', activePath: '/booking-request', pageClass: 'page--received', body });
 }
 
 /** `GET /booking-request/received` — truthful acknowledgement of a submitted request. */
@@ -1118,7 +1102,7 @@ export function renderWithdrawalConfirmedPage({ reference = '', status = 'WITHDR
  * `space` is a `publicSpaceProjection()` result; `check` is the server-rendered
  * answer for the no-JavaScript checker.
  */
-export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booking-request' } = {}) {
+export function renderSpaceDetailPage({ space, check = {}, requestHref = '/book' } = {}) {
   const values = check.values ?? {};
   const images = space.images ?? [];
   const main = coverImage(space);
@@ -1153,7 +1137,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
           </ul>
         </div>
         <div class="venue-header__actions cluster">
-          <a class="button button--primary" href="${requestHref}">Request this space</a>
+          <a class="button button--primary" href="${requestHref}">Book this space</a>
           <a class="button button--ghost" href="/spaces">All spaces</a>
         </div>
       </div>
@@ -1312,9 +1296,10 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
               ${availabilityResult(check.result)}
             </form>
             <div class="cluster request-cta">
-              <a class="button button--primary button--block" href="${requestHref}">Request this space</a>
+              <a class="button button--primary button--block" href="${requestHref}">Book this space</a>
+              <a class="button button--ghost button--block" href="/booking-request?space=${space.code}">Ask the team</a>
             </div>
-            <p class="book-panel__note hint">Checking a window or submitting an inquiry does not lock the room. Nagaro operations staff confirm all bookings.</p>
+            <p class="book-panel__note hint">Checking a window never holds the room. Direct checkout confirms immediately when the slot is free; a concierge inquiry stays provisional until staff confirm it.</p>
           </div>
         </div>
 
@@ -1335,8 +1320,8 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
     ? `${space.unitCount} ${space.unitCount === 1 ? 'desk' : 'desks'}`
     : 'One exclusive room'}</dd>
             </dl>
-            <p class="hint">Availability answers are provisional and one inquiry is not a reservation.
-              Nagaro staff confirm every booking by hand.</p>
+            <p class="hint">Availability answers are provisional and never reserve inventory.
+              Direct checkout confirms immediately; concierge inquiries are confirmed by staff.</p>
           </div>
         </div>
       </aside>

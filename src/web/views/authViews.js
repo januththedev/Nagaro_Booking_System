@@ -13,7 +13,7 @@ export function renderLoginPage({
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Staff sign in · Nagaro Space Booking</title>
+  <title>Operations sign in · TRACE Spaces</title>
   <link rel="stylesheet" href="/assets/styles.css">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
@@ -27,8 +27,8 @@ export function renderLoginPage({
           <path d="M4 20V9M10 20V4M16 20v-7M21 20H3" />
         </svg>
       </span>
-      <span class="brand__word"><span class="brand__name">Nagaro</span>
-        <span class="brand__sub">Trace Expert City</span></span>
+      <span class="brand__word"><span class="brand__name">TRACE Spaces</span>
+        <span class="brand__sub">Colombo</span></span>
     </a>
     <div class="site-header__actions">
       <a class="button button--ghost button--small" href="/">← Back to public site</a>
@@ -45,10 +45,10 @@ export function renderLoginPage({
               <path d="M4 20V9M10 20V4M16 20v-7M21 20H3" />
             </svg>
           </span>
-          <span class="auth-showcase__eyebrow">Nagaro Operations · Colombo</span>
+          <span class="auth-showcase__eyebrow">TRACE Operations · Colombo</span>
         </div>
-        <h1 class="auth-showcase__title">Operations &amp; Inventory Console — Trace Expert City</h1>
-        <p class="auth-showcase__lead">Manage published venue schedules, convert visitor inquiries into confirmed reservations, and coordinate room turnarounds across Trace Expert City.</p>
+        <h1 class="auth-showcase__title">One calm view of every space, guest and booking.</h1>
+        <p class="auth-showcase__lead">Run the TRACE Spaces catalogue, supervise direct guest checkouts and coordinate room turnarounds from one operational cockpit.</p>
         <dl class="auth-highlights">
           <div class="auth-highlights__item">
             <dt>Database-enforced conflict prevention</dt>
@@ -59,8 +59,8 @@ export function renderLoginPage({
             <dd>Real-time desk pool allocation and maintenance blocking across Sri Lanka Standard Time (UTC+5:30) operating windows.</dd>
           </div>
           <div class="auth-highlights__item">
-            <dt>Manual inquiry verification</dt>
-            <dd>Review visitor booking requests, verify customer records and issue confirmed reservations with full audit traceability.</dd>
+            <dt>Public checkout, visible instantly</dt>
+            <dd>Self-service bookings arrive confirmed with their source clearly marked; concierge inquiries remain available for tailored events.</dd>
           </div>
         </dl>
       </aside>
@@ -71,7 +71,7 @@ export function renderLoginPage({
             <div>
               <p class="section-eyebrow">Authorized Personnel</p>
               <h2 class="card__title">Staff sign in</h2>
-              <p class="card__description">Enter your Nagaro staff credentials to access the administration console.</p>
+              <p class="card__description">Enter your staff credentials to open the TRACE operations console.</p>
             </div>
           </div>
           <div class="card__body stack">
@@ -85,7 +85,7 @@ export function renderLoginPage({
               <div class="form-field form-field--full">
                 <label for="email">Email address</label>
                 <input id="email" name="email" type="email" required autocomplete="username"
-                       value="${email}" autofocus aria-describedby="email-hint" placeholder="staff@nagaro.lk">
+                       value="${email}" autofocus aria-describedby="email-hint" placeholder="operations@trace.lk">
                 <p class="hint" id="email-hint">Use the address your administrator registered.</p>
               </div>
               <div class="form-field form-field--full">
@@ -96,10 +96,10 @@ export function renderLoginPage({
                 <button class="button button--primary button--block" type="submit">Sign in to console</button>
               </div>
             </form>
-            ${emailConfigured ? '' : html`<p class="hint">Email delivery is not configured in this environment. Booking inquiries are still saved and visible to staff in the inquiry queue.</p>`}
+            ${emailConfigured ? '' : html`<p class="hint">Email delivery is not configured in this environment. Direct bookings still confirm on screen, and concierge inquiries remain visible in the operations queue.</p>`}
           </div>
         </div>
-        <p class="hint auth-panel__footnote">Visitors do not need an account. <a href="/spaces">Browse spaces</a> or <a href="/booking-request">request a booking</a>.</p>
+        <p class="hint auth-panel__footnote">Visitors do not need an account. <a href="/spaces">Browse spaces</a>, <a href="/book">book instantly</a> or <a href="/booking-request">ask the concierge</a>.</p>
       </div>
     </div>
   </section>
@@ -107,15 +107,16 @@ export function renderLoginPage({
 <footer class="site-footer">
   <div class="site-footer__inner footer__grid">
     <div class="footer__brand">
-      <p><strong>Nagaro</strong> · Trace Expert City, Colombo</p>
-      <p class="site-footer__note">Staff sign-in. Availability shown on the public site is provisional; bookings are confirmed by staff.</p>
+      <p><strong>TRACE Spaces</strong> · Trace Expert City, Colombo</p>
+      <p class="site-footer__note">Direct checkout confirms immediately against live inventory. Concierge inquiries remain provisional until staff review.</p>
     </div>
     <nav class="footer__nav" aria-label="Public site">
       <h2 class="site-footer__heading">Public site</h2>
       <ul class="site-footer__links">
         <li><a href="/">Home</a></li>
         <li><a href="/spaces">All spaces</a></li>
-        <li><a href="/booking-request">Request a booking</a></li>
+        <li><a href="/book">Book a space</a></li>
+        <li><a href="/booking-request">Ask the concierge</a></li>
       </ul>
     </nav>
     <div class="footer__ops">
@@ -124,7 +125,7 @@ export function renderLoginPage({
     </div>
   </div>
   <div class="site-footer__inner footer__base">
-    <span>Nagaro — Trace Expert City, Colombo</span>
+    <span>TRACE Spaces — Colombo</span>
   </div>
 </footer>
 </body>

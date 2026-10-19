@@ -139,7 +139,7 @@ export function renderReservationListPage({
     return {
       cells: [
         html`<a class="rowlink" href="/admin/reservations/${reservation.id}"><code>${reservation.reference}</code></a>
-          <div class="meta-line">${relativeDayLabel(reservation.createdAt)} ${timeLabel(reservation.createdAt)}</div>`,
+          <div class="meta-line">${reservation.bookingChannel === 'PUBLIC' ? tag('Public checkout') : tag('Staff')} · ${relativeDayLabel(reservation.createdAt)} ${timeLabel(reservation.createdAt)}</div>`,
         html`<strong>${reservation.spaceName}</strong>
           <div class="meta-line"><code class="nowrap">${reservation.spaceCode}</code> · ${categoryLabelText(reservation.category)}</div>`,
         html`<span><strong>${reservation.customerName}</strong></span>
@@ -613,6 +613,8 @@ export function renderReservationDetailPage({
     <dl class="detail-list">
       <dt>Reference</dt><dd><code>${reservation.reference}</code></dd>
       <dt>Status</dt><dd>${statusBadge(reservation.status)}</dd>
+      <dt>Booking source</dt><dd>${reservation.bookingChannel === 'PUBLIC' ? tag('Public checkout') : tag('Staff-created')}
+        <span class="hint"> · ${reservation.bookingChannel === 'PUBLIC' ? 'confirmed through the self-service checkout' : 'created inside the operations console'}</span></dd>
       <dt>Space</dt><dd>${space
     ? html`<a href="/admin/spaces/${space.id}">${reservation.spaceCode} \u2014 ${reservation.spaceName}</a>`
     : html`${reservation.spaceCode} \u2014 ${reservation.spaceName}`}

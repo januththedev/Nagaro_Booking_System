@@ -110,10 +110,8 @@ ${documentHead({ title: `${title} · Nagaro Space Booking`, description })}
   <div class="site-header__inner">
     <a class="brand" href="/">
       ${brandMark()}
-      <span class="brand__text">
-        <span class="brand__name">Nagaro</span>
-        <span class="brand__sub">Trace Expert City</span>
-      </span>
+      <span class="brand__word"><span class="brand__name">Nagaro</span>
+        <span class="brand__sub">Trace Expert City</span></span>
     </a>
     <nav class="site-nav" id="public-nav" aria-label="Main">
       ${PUBLIC_NAV.map((item) => html`<a href="${item.href}"
@@ -130,37 +128,37 @@ ${documentHead({ title: `${title} · Nagaro Space Booking`, description })}
 ${body}
 </main>
 <footer class="site-footer">
-  <div class="site-footer__inner">
-    <div class="site-footer__grid">
-      <div class="site-footer__col">
-        <div class="brand">
-          ${brandMark()}
-          <span class="brand__text">
-            <span class="brand__name">Nagaro</span>
-            <span class="brand__sub">Trace Expert City, Colombo</span>
-          </span>
-        </div>
-        <p>Nagaro space booking · Trace Expert City, Colombo</p>
-        <p class="site-footer__note">Availability shown on this site is provisional. A booking is only confirmed once Nagaro staff confirm it.</p>
+  <div class="site-footer__inner footer__grid">
+    <div class="site-footer__brand footer__brand">
+      <div class="brand">
+        ${brandMark()}
+        <span class="brand__word"><span class="brand__name">Nagaro</span>
+          <span class="brand__sub">Trace Expert City, Colombo</span></span>
       </div>
-      <div class="site-footer__col">
-        <h2 class="admin-nav__heading">Spaces &amp; Booking</h2>
-        <ul class="admin-nav__list">
-          <li><a href="/">Home</a></li>
-          <li><a href="/spaces">All spaces</a></li>
-          <li><a href="/booking-request">Request a booking</a></li>
-          <li><a href="/spaces?category=MEETING_ROOM">Meeting rooms</a></li>
-          <li><a href="/spaces?category=AUDITORIUM">Auditoriums &amp; event halls</a></li>
-          <li><a href="/spaces?category=COWORKING">Co-working desks</a></li>
-        </ul>
-      </div>
-      <div class="site-footer__col">
-        <h2 class="admin-nav__heading">Operations Desk</h2>
-        <p class="site-footer__note">All booking times are shown in Sri Lanka Standard Time (UTC+05:30).</p>
-        <p><a href="/admin">Staff operations portal →</a></p>
-        ${version ? html`<p class="site-footer__version">Build ${version}</p>` : ''}
-      </div>
+      <p>Nagaro space booking · Trace Expert City, Colombo</p>
+      <p class="site-footer__note">Availability shown on this site is provisional. A booking is only confirmed once Nagaro staff confirm it.</p>
     </div>
+    <nav class="footer__nav" aria-label="Spaces and booking">
+      <h2 class="site-footer__heading">Spaces &amp; Booking</h2>
+      <ul class="site-footer__links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/spaces">All spaces</a></li>
+        <li><a href="/booking-request">Request a booking</a></li>
+        <li><a href="/spaces?category=MEETING_ROOM">Meeting rooms</a></li>
+        <li><a href="/spaces?category=AUDITORIUM">Auditoriums &amp; event halls</a></li>
+        <li><a href="/spaces?category=COWORKING">Co-working desks</a></li>
+      </ul>
+    </nav>
+    <div class="footer__ops">
+      <h2 class="site-footer__heading">Operations Desk</h2>
+      <p class="site-footer__note">All booking times are shown in Sri Lanka Standard Time (UTC+05:30).</p>
+      <p><a href="/admin">Staff operations portal →</a></p>
+      ${version ? html`<p class="site-footer__version">Build ${version}</p>` : ''}
+    </div>
+  </div>
+  <div class="site-footer__inner footer__base">
+    <span>Nagaro — Trace Expert City, Colombo</span>
+    <span>Provisional schedules · staff-confirmed bookings</span>
   </div>
 </footer>
 <script type="module" src="/assets/public.js"></script>
@@ -179,22 +177,22 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
 </head>
 <body class="page page--admin">
 <a class="skip-link" href="#main">Skip to main content</a>
-<div class="admin-shell">
-  <aside class="admin-sidebar" id="admin-sidebar">
-    <div class="admin-sidebar__brand">
-      ${brandMark()}
-      <span class="brand__text">
-        <span class="brand__name">Nagaro</span>
-        <span class="brand__sub">Operations Console</span>
-      </span>
+<div class="app-shell admin-shell">
+  <aside class="sidebar admin-sidebar" id="admin-sidebar">
+    <div class="sidebar__brand admin-sidebar__brand">
+      <a class="brand" href="/admin" aria-label="Nagaro admin home">
+        ${brandMark()}
+        <span class="brand__word"><span class="brand__name">Nagaro</span>
+          <span class="brand__sub">Operations Console</span></span>
+      </a>
     </div>
-    <nav class="admin-nav" aria-label="Administration">
-      ${ADMIN_NAV.map((section) => html`<div class="admin-nav__section">
+    <nav class="sidebar__nav admin-nav" aria-label="Administration">
+      ${ADMIN_NAV.map((section) => html`<div class="nav-group admin-nav__section">
         <h2 class="admin-nav__heading">${section.group}</h2>
         <ul class="admin-nav__list">
           ${section.items.map((item) => html`<li>
             <a href="${item.href}"
-               class="admin-nav__link ${isActiveNav(activePath, item.href) ? 'is-active' : ''}"
+               class="nav-link admin-nav__link ${isActiveNav(activePath, item.href) ? 'is-active' : ''}"
                ${isActiveNav(activePath, item.href) ? raw('aria-current="page"') : ''}>
               <span class="admin-nav__icon" aria-hidden="true">${item.icon}</span>
               <span>${item.label}</span>
@@ -203,7 +201,7 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
         </ul>
       </div>`)}
     </nav>
-    <div class="admin-sidebar__footer">
+    <div class="sidebar__user admin-sidebar__footer">
       <p class="admin-user">
         <span class="admin-user__name">${actor?.displayName ?? 'Staff'}</span>
         <span class="admin-user__role">${actor?.role ?? ''}</span>
@@ -214,13 +212,13 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
       </form>
     </div>
   </aside>
-  <div class="admin-main">
-    <header class="admin-topbar">
+  <div class="maincol admin-main">
+    <header class="topbar admin-topbar">
       <button class="admin-topbar__menu" type="button" data-sidebar-toggle aria-expanded="false" aria-controls="admin-sidebar" aria-label="Toggle navigation">
         ${navIcon('<path d="M4 6h16M4 12h16M4 18h16"/>')}
       </button>
       ${breadcrumbs.length
-    ? html`<nav class="breadcrumbs" aria-label="Breadcrumb"><ol>
+    ? html`<nav class="page-crumb breadcrumbs" aria-label="Breadcrumb"><ol>
           ${breadcrumbs.map((crumb, index) => html`<li>
             ${crumb.href && index < breadcrumbs.length - 1
     ? html`<a href="${crumb.href}">${crumb.label}</a>`
@@ -228,21 +226,21 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
           </li>`)}
         </ol></nav>`
     : html`<span class="breadcrumbs breadcrumbs--empty"></span>`}
-      <div class="admin-topbar__actions">
+      <div class="topbar__actions admin-topbar__actions">
         <span class="tag" title="Business timezone: Asia/Colombo">SLST · UTC+05:30</span>
         <a class="button button--ghost button--small" href="/" target="_blank" rel="noopener">View public site</a>
         ${pageActions ?? ''}
       </div>
     </header>
     <main id="main" class="admin-content">
-      <div class="admin-page-head">
+      <div class="page-head admin-page-head">
         <div>
           <h1 class="page-title">${title}</h1>
-          ${subtitle ? html`<p class="page-subtitle">${subtitle}</p>` : ''}
+          ${subtitle ? html`<p class="page-sub page-subtitle">${subtitle}</p>` : ''}
         </div>
       </div>
-      ${flashRegion(flash)}
-      <div data-page-body>${body}</div>
+      <div class="flash-stack" aria-live="polite">${flashRegion(flash)}</div>
+      <div class="page-body" data-page-body>${body}</div>
     </main>
   </div>
 </div>

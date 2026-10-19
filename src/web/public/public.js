@@ -463,6 +463,76 @@ function initGallery() {
   if (current) select(current);
 }
 
+/* ------------------------------------------------- scroll reveal + header */
+
+function initReveal() {
+  var nodes = all(document, '[data-reveal]');
+  if (!nodes.length) return;
+  document.documentElement.classList.add('js-reveal');
+  if (!('IntersectionObserver' in window)) {
+    nodes.forEach(function (node) { node.classList.add('is-visible'); });
+    return;
+  }
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) {
+    nodes.forEach(function (node) { node.classList.add('is-visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+  nodes.forEach(function (node, index) {
+    if (!node.style.getPropertyValue('--reveal-delay') && index < 12) {
+      node.style.setProperty('--reveal-delay', String(Math.min(index, 6) * 50) + 'ms');
+    }
+    observer.observe(node);
+  });
+}
+
+function initScrolledHeader() {
+  var header = one(document, '.site-header');
+  if (!header || !('requestAnimationFrame' in window)) return;
+  var ticking = false;
+  function update() {
+    ticking = false;
+    header.classList.toggle('is-scrolled', (window.scrollY || 0) > 8);
+  }
+  update();
+  window.addEventListener('scroll', function () {
+    if (!ticking) {
+      ticking = true;
+      window.requestAnimationFrame(update);
+    }
+  }, { passive: true });
+}
+
+/* ------------------------------------------------- submit-once guard */
+
+function initSubmitOnce() {
+  all(document, 'form[data-submit-once]').forEach(function (form) {
+    /* data-confirm forms ask first; disabling there would freeze the form
+       when the visitor answers "cancel", so the confirm guard owns them. */
+    if (form.hasAttribute('data-confirm')) return;
+    form.addEventListener('submit', function () {
+      window.setTimeout(function () {
+        if (form.dataset.submitted === 'true') return;
+        form.dataset.submitted = 'true';
+        all(form, 'button[type="submit"]').forEach(function (button) {
+          button.setAttribute('aria-busy', 'true');
+          button.disabled = true;
+          if (!button.dataset.label) button.dataset.label = button.textContent;
+          setText(button, 'Sending…');
+        });
+      }, 0);
+    });
+  });
+}
+
 /* -------------------------------------------------------------------- boot */
 
 function boot() {
@@ -473,6 +543,9 @@ function boot() {
   initConfirmGuards();
   initAvailabilityChecker();
   initGallery();
+  initReveal();
+  initScrolledHeader();
+  initSubmitOnce();
 }
 
 if (document.readyState === 'loading') {

@@ -123,7 +123,7 @@ function calendarToolbar({ filters, spaces, nav, heading }) {
   return card({
     title: heading,
     description: 'Navigate dates, switch between Day and Week views, or filter by space, category and booking status.',
-    actions: html`<div class="cluster">
+    actions: html`<div class="cal-toolbar cluster">
       <div class="cluster" role="group" aria-label="View mode">
         <a class="button ${isDay ? 'button--primary' : 'button--ghost'} button--small"
            href="${viewToggleHref('day', filters)}"

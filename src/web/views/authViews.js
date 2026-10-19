@@ -27,10 +27,8 @@ export function renderLoginPage({
           <path d="M4 20V9M10 20V4M16 20v-7M21 20H3" />
         </svg>
       </span>
-      <span class="brand__text">
-        <span class="brand__name">Nagaro</span>
-        <span class="brand__sub">Trace Expert City</span>
-      </span>
+      <span class="brand__word"><span class="brand__name">Nagaro</span>
+        <span class="brand__sub">Trace Expert City</span></span>
     </a>
     <div class="site-header__actions">
       <a class="button button--ghost button--small" href="/">← Back to public site</a>
@@ -38,7 +36,7 @@ export function renderLoginPage({
   </div>
 </header>
 <main id="main" class="site-main">
-  <section class="container">
+  <section class="container" data-reveal>
     <div class="auth-layout">
       <aside class="auth-showcase">
         <div class="auth-showcase__brand">
@@ -107,8 +105,26 @@ export function renderLoginPage({
   </section>
 </main>
 <footer class="site-footer">
-  <div class="site-footer__inner">
-    <p>Nagaro space booking · Trace Expert City, Colombo</p>
+  <div class="site-footer__inner footer__grid">
+    <div class="footer__brand">
+      <p><strong>Nagaro</strong> · Trace Expert City, Colombo</p>
+      <p class="site-footer__note">Staff sign-in. Availability shown on the public site is provisional; bookings are confirmed by staff.</p>
+    </div>
+    <nav class="footer__nav" aria-label="Public site">
+      <h2 class="site-footer__heading">Public site</h2>
+      <ul class="site-footer__links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/spaces">All spaces</a></li>
+        <li><a href="/booking-request">Request a booking</a></li>
+      </ul>
+    </nav>
+    <div class="footer__ops">
+      <h2 class="site-footer__heading">Operations</h2>
+      <p class="site-footer__note">Sri Lanka Standard Time (UTC+05:30).</p>
+    </div>
+  </div>
+  <div class="site-footer__inner footer__base">
+    <span>Nagaro — Trace Expert City, Colombo</span>
   </div>
 </footer>
 </body>

@@ -873,6 +873,52 @@ function initScrollableTables() {
   window.addEventListener('resize', debounce(refresh, 200));
 }
 
+/* ------------------------------------------------- scroll reveal + submit */
+
+function initReveal() {
+  var nodes = all(document, '[data-reveal]');
+  if (!nodes.length) return;
+  document.documentElement.classList.add('js-reveal');
+  if (!('IntersectionObserver' in window)) {
+    nodes.forEach(function (node) { node.classList.add('is-visible'); });
+    return;
+  }
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) {
+    nodes.forEach(function (node) { node.classList.add('is-visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+  nodes.forEach(function (node) { observer.observe(node); });
+}
+
+function initSubmitOnce() {
+  all(document, 'form[data-submit-once]').forEach(function (form) {
+    /* data-confirm forms ask first; disabling there would freeze the form
+       when the operator answers "cancel", so the confirm guard owns them. */
+    if (form.hasAttribute('data-confirm')) return;
+    form.addEventListener('submit', function () {
+      window.setTimeout(function () {
+        if (form.dataset.submitted === 'true') return;
+        form.dataset.submitted = 'true';
+        all(form, 'button[type="submit"]').forEach(function (button) {
+          button.setAttribute('aria-busy', 'true');
+          button.disabled = true;
+          if (!button.dataset.label) button.dataset.label = button.textContent;
+          setText(button, 'Saving…');
+        });
+      }, 0);
+    });
+  });
+}
+
 /* -------------------------------------------------------------------- boot */
 
 function boot() {
@@ -884,6 +930,8 @@ function boot() {
   initLiveAvailability();
   initFilterAutoSubmit();
   initScrollableTables();
+  initReveal();
+  initSubmitOnce();
 }
 
 if (document.readyState === 'loading') {

@@ -125,10 +125,10 @@ export function renderReservationListPage({
   };
   Object.keys(extraQuery).forEach((key) => { if (!extraQuery[key]) delete extraQuery[key]; });
 
-  const statusTabs = html`<nav class="cluster" aria-label="Filter reservations by status">
+  const statusTabs = html`<nav class="quick-tabs cluster" aria-label="Filter reservations by status">
     ${RESERVATION_STATUS_TABS.map((tab) => {
       const isActive = currentStatus === tab.value;
-      return html`<a class="button ${isActive ? 'button--primary' : 'button--ghost'} button--small"
+      return html`<a class="quick-tab status-tab ${isActive ? 'is-active' : ''}"
         href="${reservationStatusTabHref(tab.value, filters)}"
         ${isActive ? raw('aria-current="page"') : ''}>${tab.label}</a>`;
     })}
@@ -138,7 +138,7 @@ export function renderReservationListPage({
     const isCancelled = reservation.status === RESERVATION_STATUS.CANCELLED;
     return {
       cells: [
-        html`<a href="/admin/reservations/${reservation.id}"><code>${reservation.reference}</code></a>
+        html`<a class="rowlink" href="/admin/reservations/${reservation.id}"><code>${reservation.reference}</code></a>
           <div class="meta-line">${relativeDayLabel(reservation.createdAt)} ${timeLabel(reservation.createdAt)}</div>`,
         html`<strong>${reservation.spaceName}</strong>
           <div class="meta-line"><code class="nowrap">${reservation.spaceCode}</code> · ${categoryLabelText(reservation.category)}</div>`,
@@ -275,7 +275,7 @@ export function renderBookingFormPage({
     ${alertBlock(alert)}
 
     <form method="post" action="${isEdit ? `/admin/reservations/${reservation.id}` : '/admin/reservations'}"
-          class="split-layout" data-reservation-form data-booking-form
+          class="split-layout" data-reservation-form data-booking-form data-submit-once
           data-availability-url="/api/admin/availability" data-tz-offset="+05:30"
           data-space-code="${selectedSpace?.code ?? ''}"
           data-available-desks="${selectedSpace?.unitCount ?? ''}">

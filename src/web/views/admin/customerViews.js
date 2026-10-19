@@ -201,7 +201,7 @@ export function customerFormView({
         description: editing
           ? 'Changes are kept in the activity log. Emails must be unique across the directory.'
           : 'Create one profile per customer. If a reservation already used this person’s email, the profile may already exist — check the possible duplicates before saving.',
-        body: html`<form class="form-grid" method="post" action="${action}">
+        body: html`<form class="form-grid form-card" method="post" action="${action}" data-submit-once>
           ${csrfField(csrfToken)}
           ${textField({
             id: 'full_name', label: 'Full name', value: values.full_name, required: true,

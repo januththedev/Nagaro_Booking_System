@@ -277,10 +277,10 @@ export function renderSpaceListPage({
 }) {
   const currentStatus = filters.status || 'active';
 
-  const statusPills = html`<nav class="cluster" aria-label="Quick status filters">
+  const statusPills = html`<nav class="quick-tabs cluster" aria-label="Quick status filters">
     ${QUICK_STATUS_PILLS.map((pill) => {
       const isActive = currentStatus === pill.value;
-      return html`<a class="button ${isActive ? 'button--primary' : 'button--ghost'} button--small"
+      return html`<a class="quick-tab status-tab ${isActive ? 'is-active' : ''}"
         href="${statusFilterHref(pill.value, filters)}"
         ${isActive ? raw('aria-current="page"') : ''}>${pill.label}</a>`;
     })}
@@ -498,7 +498,7 @@ export function renderSpaceFormPage({
   })}
   </div>`;
 
-  const body = html`<form method="post" action="${action}" class="stack">
+  const body = html`<form method="post" action="${action}" class="stack form-card" data-submit-once>
     ${csrfField(csrfToken)}
     ${problemsSummary(details, {
     renderedIds,
@@ -753,7 +753,7 @@ export function renderSpaceDetailPage({
     description: `${images.length} of 12 uploaded · the photograph marked as the cover is shown first in the public directory.`,
     body: html`<div class="stack">
       ${imageList}
-      <form method="post" action="${base}/images" enctype="multipart/form-data" class="stack">
+      <form method="post" action="${base}/images" enctype="multipart/form-data" class="stack form-card" data-submit-once>
         ${csrfField(csrfToken)}
         <div class="form-grid">
           <div class="form-field">

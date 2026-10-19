@@ -42,16 +42,16 @@ function plural(count, singular, pluralForm = `${singular}s`) {
 }
 
 function statCard({ label, value, caption, tone = null, actionHref = null, actionLabel = null }) {
-  return html`<div class="stat ${tone ? `stat--${tone}` : ''}">
-    <span class="stat__value">${value}</span>
-    <span class="stat__label">${label}</span>
-    ${caption ? html`<span class="hint">${caption}</span>` : ''}
-    ${actionHref && actionLabel ? html`<a class="stat__action" href="${actionHref}">${actionLabel} →</a>` : ''}
+  return html`<div class="kpi stat ${tone ? `kpi--${tone} stat--${tone}` : ''}">
+    <span class="kpi__value stat__value">${value}</span>
+    <span class="kpi__label stat__label">${label}</span>
+    ${caption ? html`<span class="kpi__hint hint">${caption}</span>` : ''}
+    ${actionHref && actionLabel ? html`<a class="kpi__link stat__action" href="${actionHref}">${actionLabel} →</a>` : ''}
   </div>`;
 }
 
 function statGrid(items, modifier = '') {
-  return html`<div class="stat-grid ${modifier}">${items.map((item) => item instanceof RawHtml ? item : statCard(item))}</div>`;
+  return html`<div class="kpi-grid stat-grid ${modifier}">${items.map((item) => item instanceof RawHtml ? item : statCard(item))}</div>`;
 }
 
 /** Visual occupancy progress bar (0–100%). Width comes from a 5%-bucket
@@ -123,7 +123,7 @@ function reservationTable(reservations, emptyMessage) {
     ],
     rows: reservations.map((reservation) => ({
       cells: [
-        html`<a href="/admin/reservations/${reservation.id}">${reservation.reference}</a>`,
+        html`<a class="rowlink" href="/admin/reservations/${reservation.id}">${reservation.reference}</a>`,
         html`<span>${reservation.spaceName}</span>
           <span class="meta-line">${reservation.spaceCode} · ${categoryLabel(reservation.category)}</span>`,
         html`<span>${reservation.customerName}</span>`,
@@ -232,7 +232,7 @@ export function renderDashboardPage({
     pageActions: html`
       <a class="button button--ghost button--small" href="/admin/calendar?date=${businessDate}">Today's calendar</a>
       <a class="button button--primary button--small" href="/admin/reservations/new">New reservation</a>`,
-    body: html`<div class="stack" data-dashboard="admin" data-summary-url="/api/admin/dashboard/summary">
+    body: html`<div class="stack" data-dashboard="admin" data-summary-url="/api/admin/dashboard/summary" data-reveal>
 
       ${statGrid(primaryMetrics, 'stat-grid--primary')}
       ${statGrid(secondaryMetrics, 'stat-grid--secondary')}
@@ -281,7 +281,7 @@ export function renderDashboardPage({
     }),
   })}
 
-      <div data-today-confirmed>
+      <div data-today-confirmed data-reveal>
         ${card({
     title: "Today's confirmed bookings",
     description: `Business day ${businessDate}. Cancelled bookings are listed separately below.`,
@@ -290,7 +290,7 @@ export function renderDashboardPage({
   })}
       </div>
 
-      <div data-today-cancelled>
+      <div data-today-cancelled data-reveal>
         ${cancelledToday.length
     ? card({
       title: 'Cancelled today',
@@ -384,7 +384,7 @@ export function renderDashboardPage({
       ],
       rows: attention.map((inquiry) => ({
         cells: [
-          html`<a href="/admin/inquiries/${inquiry.id}">${inquiry.reference}</a>`,
+          html`<a class="rowlink" href="/admin/inquiries/${inquiry.id}">${inquiry.reference}</a>`,
           inquiry.spaceName
             ? html`<span>${inquiry.spaceName}</span><span class="meta-line">${inquiry.spaceCode}</span>`
             : html`<span>Space removed</span>`,
@@ -460,7 +460,7 @@ function auditEntity(entry) {
   const base = ENTITY_PATHS[entry.entityType];
   if (!entry.entityId) return html`<span class="meta-line">${entry.entityType}</span>`;
   if (!base) return html`<span class="meta-line">${entry.entityType} #${entry.entityId}</span>`;
-  return html`<a href="${base}${encodeURIComponent(entry.entityId)}">${entry.entityType} #${entry.entityId}</a>`;
+  return html`<a class="rowlink" href="${base}${encodeURIComponent(entry.entityId)}">${entry.entityType} #${entry.entityId}</a>`;
 }
 
 /* ---------------------------------------------------------- inquiry queue */
@@ -527,6 +527,14 @@ export function renderInquiryListPage({
       ${statGrid(primaryInquiryStats, 'stat-grid--primary')}
       ${statGrid(secondaryInquiryStats, 'stat-grid--secondary')}
 
+      <nav class="quick-tabs cluster" aria-label="Quick inquiry filters">
+        <a class="button ${!filters.status ? 'button--primary' : 'button--ghost'} button--small" href="/admin/inquiries">All open</a>
+        <a class="button ${filters.status === 'NEW' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/inquiries?status=NEW">New</a>
+        <a class="button ${filters.status === 'CONTACTED' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/inquiries?status=CONTACTED">Contacted</a>
+        <a class="button ${filters.status === 'CONVERTED' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/inquiries?status=CONVERTED">Converted</a>
+        <a class="button ${filters.status === 'CLOSED' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/inquiries?status=CLOSED">Closed</a>
+      </nav>
+
       ${stats.emailNotDelivered > 0
     ? html`<div class="alert alert--error" role="alert" data-notification-undelivered>
         <p><strong>Notification email NOT delivered — ${stats.emailNotDelivered}
@@ -538,7 +546,7 @@ export function renderInquiryListPage({
       ${card({
     title: 'Filter the queue',
     description: 'Search by visitor name, email, or reference, and narrow by lifecycle status, space, or email delivery outcome.',
-    body: html`<form class="filter-bar" method="get" action="/admin/inquiries">
+    body: html`<form class="filters-bar filter-bar" method="get" action="/admin/inquiries">
         <div class="filter-bar__field">
           <label for="filter-q">Name, email or reference</label>
           <input id="filter-q" name="q" type="search" value="${filters.q ?? ''}" maxlength="160">
@@ -607,7 +615,7 @@ export function renderInquiryListPage({
       ],
       rows: inquiries.map((inquiry) => ({
         cells: [
-          html`<a href="/admin/inquiries/${inquiry.id}">${inquiry.reference}</a>`,
+          html`<a class="rowlink" href="/admin/inquiries/${inquiry.id}">${inquiry.reference}</a>`,
           inquiry.spaceName
             ? html`<span>${inquiry.spaceName}</span><span class="meta-line">${inquiry.spaceCode}</span>`
             : html`<span>Space removed</span>`,
@@ -710,7 +718,7 @@ export function renderInquiryDetailPage({
         <dt>Received</dt><dd>${timeTag(inquiry.createdAt)}</dd>
         <dt>Status</dt><dd>${statusBadge(inquiry.status)}</dd>
         <dt>Requested space</dt><dd>${inquiry.spaceName
-    ? html`<a href="/admin/spaces/${inquiry.spaceId}">${inquiry.spaceName}</a>
+    ? html`<a class="rowlink" href="/admin/spaces/${inquiry.spaceId}">${inquiry.spaceName}</a>
         <span class="meta-line">${inquiry.spaceCode} · ${inquiry.categoryLabel ?? ''}</span>`
     : html`<span>The requested space is no longer in the catalogue.</span>`}</dd>
         <dt>Requested window</dt><dd>${periodLabel(inquiry.startAt, inquiry.endAt)}
@@ -721,7 +729,7 @@ export function renderInquiryDetailPage({
         <dt>Visitor message</dt><dd>${inquiry.message ? html`<blockquote>${inquiry.message}</blockquote>` : html`<span class="meta-line">No message sent.</span>`}</dd>
         ${inquiry.convertedReservationId
     ? html`<dt>Converted reservation</dt><dd>
-            <a href="/admin/reservations/${inquiry.convertedReservationId}">${inquiry.convertedReservationReference ?? `#${inquiry.convertedReservationId}`}</a>
+            <a class="rowlink" href="/admin/reservations/${inquiry.convertedReservationId}">${inquiry.convertedReservationReference ?? `#${inquiry.convertedReservationId}`}</a>
             ${inquiry.convertedReservationStatus ? html` ${statusBadge(inquiry.convertedReservationStatus)}` : ''}
           </dd>`
     : ''}
@@ -792,7 +800,7 @@ export function renderInquiryDetailPage({
         “Create reservation from this inquiry” and the booking commits.</p>
       ${inquiry.convertedReservationId
     ? html`<div class="alert alert--success" role="status">
-          <p>Already linked to reservation <a href="/admin/reservations/${inquiry.convertedReservationId}">${inquiry.convertedReservationReference ?? `#${inquiry.convertedReservationId}`}</a>.</p>
+          <p>Already linked to reservation <a class="rowlink" href="/admin/reservations/${inquiry.convertedReservationId}">${inquiry.convertedReservationReference ?? `#${inquiry.convertedReservationId}`}</a>.</p>
         </div>`
     : ''}
       <div class="stack">
@@ -805,7 +813,7 @@ export function renderInquiryDetailPage({
           ${card({
     title: 'Update this inquiry',
     description: 'Record follow-up progress and internal staff notes.',
-    body: html`<form method="post" action="/admin/inquiries/${inquiry.id}/status" class="form-grid">
+    body: html`<form method="post" action="/admin/inquiries/${inquiry.id}/status" class="form-grid form-card" data-submit-once>
       <input type="hidden" name="_csrf" value="${csrfToken}">
       <div class="form-field form-field--full">
         <label for="inquiry-status">Status</label>
@@ -879,7 +887,7 @@ export function renderMaintenancePage({
     ],
     rows: rows.map((block) => ({
       cells: [
-        html`<a href="/admin/spaces/${block.spaceId}">${block.spaceName}</a>
+        html`<a class="rowlink" href="/admin/spaces/${block.spaceId}">${block.spaceName}</a>
           <span class="meta-line">${block.spaceCode}</span>`,
         html`${periodLabel(block.startAt, block.endAt)}`,
         html`${block.reason}`,
@@ -928,7 +936,7 @@ export function renderMaintenancePage({
 
       ${card({
     title: 'Filter',
-    body: html`<form class="filter-bar" method="get" action="/admin/maintenance">
+    body: html`<form class="filters-bar filter-bar" method="get" action="/admin/maintenance">
       <div class="filter-bar__field">
         <label for="maint-space-filter">Space</label>
         <select id="maint-space-filter" name="space">
@@ -969,7 +977,7 @@ export function renderMaintenancePage({
     title: 'Create a maintenance block',
     description: 'Blocks every active bookable unit of the chosen space for the whole period.',
     body: canCreate
-      ? html`<form method="post" action="/admin/maintenance" class="form-grid">
+      ? html`<form method="post" action="/admin/maintenance" class="form-grid form-card" data-submit-once>
         <input type="hidden" name="_csrf" value="${csrfToken}">
         <div class="form-field">
           <label for="maint-space">Space</label>
@@ -1043,12 +1051,19 @@ export function renderAuditPage({
       { label: 'Admin', href: '/admin' },
       { label: 'Activity log' },
     ],
-    body: html`<div class="stack">
+    body: html`<div class="stack" data-reveal>
+
+      <nav class="quick-tabs cluster" aria-label="Quick activity filters">
+        <a class="button ${!filters.entityType ? 'button--primary' : 'button--ghost'} button--small" href="/admin/audit">All entries</a>
+        <a class="button ${filters.entityType === 'reservation' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/audit?entityType=reservation">Reservations</a>
+        <a class="button ${filters.entityType === 'inquiry' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/audit?entityType=inquiry">Inquiries</a>
+        <a class="button ${filters.entityType === 'space' ? 'button--primary' : 'button--ghost'} button--small" href="/admin/audit?entityType=space">Spaces</a>
+      </nav>
 
       ${card({
     title: 'Filter the log',
     description: 'Inspect immutable operational records by entity type, action name, or staff member.',
-    body: html`<form class="filter-bar" method="get" action="/admin/audit">
+    body: html`<form class="filters-bar filter-bar" method="get" action="/admin/audit">
       <div class="filter-bar__field">
         <label for="audit-entity">Entity type</label>
         <select id="audit-entity" name="entityType">

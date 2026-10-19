@@ -241,6 +241,9 @@ export function publicSpaceProjection(space, { images = [], availability = null,
 
 /* ------------------------------------------------------------ shared fragments */
 
+/** Fallback artwork when a space has no photographs yet. */
+const PLACEHOLDER_IMAGE = '/assets/placeholder-space.svg';
+
 /** Cover image for a card, falling back to the first photograph. */
 function coverImage(space) {
   const images = space?.images ?? [];
@@ -252,54 +255,41 @@ function altFor(image, space) {
   return alt || `${space.name} at Nagaro, Trace Expert City`;
 }
 
-function spaceCard(space) {
+/**
+ * Contract card: `.venue-grid > .venue-card`. Only real photograph URLs are
+ * used; spaces without photographs render the bundled SVG placeholder.
+ */
+function venueCard(space) {
   const cover = coverImage(space);
-  const amenities = Array.isArray(space.amenities) ? space.amenities : [];
-  const visibleAmenities = amenities.slice(0, 3);
-  const extraAmenities = Math.max(0, amenities.length - visibleAmenities.length);
-  const kicker = locationLine(space);
-
-  const media = cover
-    ? html`<a class="space-card__media" href="/spaces/${space.code}" tabindex="-1" aria-hidden="true">
-        <img src="${cover.url}" alt="${altFor(cover, space)}" loading="lazy">
-        <span class="space-card__badge">${space.categoryLabel}</span>
-        ${space.capacity ? html`<span class="space-card__capacity">Up to ${space.capacity}</span>` : ''}
-      </a>`
-    : html`<a class="space-card__media space-card__media--empty" href="/spaces/${space.code}" tabindex="-1" aria-hidden="true">
-        <span class="space-card__badge space-card__badge--empty">${space.categoryLabel}</span>
-        ${space.capacity ? html`<span class="space-card__capacity">Up to ${space.capacity}</span>` : ''}
-      </a>`;
-
-  return html`<article class="space-card" data-space-code="${space.code}">
-    ${media}
-    <div class="space-card__body">
-      <p class="space-card__kicker">${kicker} · <code>${space.code}</code></p>
-      <h3 class="space-card__title"><a href="/spaces/${space.code}">${space.name}</a></h3>
-      ${metaLine([
-    space.categoryLabel,
+  const src = cover?.url ?? PLACEHOLDER_IMAGE;
+  const alt = cover ? altFor(cover, space) : `${space.name} at Nagaro, Trace Expert City (illustration placeholder)`;
+  const meta = [
+    space.location || 'Trace Expert City',
+    space.floor ? `Floor ${space.floor}` : null,
     space.capacity ? `Up to ${space.capacity} people` : null,
     space.openTime && space.closeTime ? `${space.openTime}–${space.closeTime} SLST` : null,
-  ])}
-      ${space.shortDescription ? html`<p class="space-card__summary">${space.shortDescription}</p>` : ''}
-      ${visibleAmenities.length
-    ? html`<ul class="space-card__amenities" aria-label="Highlighted amenities">
-        ${visibleAmenities.map((item) => html`<li class="space-card__amenity">${item}</li>`)}
-        ${extraAmenities > 0 ? html`<li class="space-card__amenity space-card__amenity--more">+${extraAmenities} more</li>` : ''}
-      </ul>`
-    : ''}
-      <div class="space-card__footer">
-        <p class="price"><span class="price__label">From</span> ${space.rateSummary}</p>
-        <div class="space-card__actions">
-          <a class="button button--primary button--small" href="/spaces/${space.code}">View space</a>
-          <a class="button button--ghost button--small" href="/booking-request?space=${space.code}">Inquire</a>
-        </div>
+  ].filter(Boolean).join(' · ');
+
+  return html`<article class="venue-card" data-space-code="${space.code}" data-reveal>
+    <a class="venue-card__media" href="/spaces/${space.code}" tabindex="-1" aria-hidden="true">
+      <img src="${src}" alt="${alt}" loading="lazy">
+      <span class="venue-card__tag">${space.categoryLabel}</span>
+      <span class="venue-card__price">${space.rateSummary}</span>
+    </a>
+    <div class="venue-card__body">
+      <h3 class="venue-card__name"><a href="/spaces/${space.code}">${space.name}</a></h3>
+      <p class="venue-card__meta">${meta} · <code>${space.code}</code></p>
+      ${space.shortDescription ? html`<p class="venue-card__blurb">${space.shortDescription}</p>` : ''}
+      <div class="venue-card__foot">
+        <a href="/spaces/${space.code}">View space →</a>
+        <a href="/booking-request?space=${space.code}">Inquire →</a>
       </div>
     </div>
   </article>`;
 }
 
 function spaceGrid(spaces) {
-  return html`<div class="space-grid">${spaces.map((space) => spaceCard(space))}</div>`;
+  return html`<div class="venue-grid">${spaces.map((space) => venueCard(space))}</div>`;
 }
 
 /** Availability region. Mirrors the markup `public.js` writes after a JSON check. */
@@ -403,79 +393,49 @@ const CATEGORY_UNITS = Object.freeze({
   [SPACE_CATEGORY.COWORKING]: 'Daily · Weekly · Monthly',
 });
 
-function renderHeroShowcase(featured, totalPublished) {
-  const primary = featured[0] ?? null;
-  const secondary = featured[1] ?? null;
-
-  if (!primary) {
-    return html`<div class="hero__showcase">
-      <article class="hero-card">
-        <div class="hero-card__body">
-          <span class="tag tag--info">Trace Expert City · Colombo</span>
-          <h2 class="hero-card__title">Curated Workspace &amp; Event Architecture</h2>
-          <p class="hero-card__meta">Boardrooms, executive training suites, grand auditorium &amp; co-working studios.</p>
-          <dl class="hero-spec-list">
-            <div><dt>Published venues</dt><dd>${totalPublished} venues</dd></div>
-            <div><dt>Time zone</dt><dd>Sri Lanka Standard Time (UTC+5:30)</dd></div>
-            <div><dt>Verification</dt><dd>Staff-verified scheduling</dd></div>
-          </dl>
-        </div>
-      </article>
-    </div>`;
+/** First two real photograph URLs across featured spaces, padded with the placeholder. */
+function heroPhotos(featured) {
+  const urls = [];
+  for (const space of featured ?? []) {
+    for (const image of space.images ?? []) {
+      if (image?.url && !urls.some((entry) => entry.url === image.url)) {
+        urls.push({ url: image.url, alt: altFor(image, space), name: space.name, code: space.code });
+      }
+      if (urls.length >= 2) break;
+    }
+    if (urls.length >= 2) break;
   }
-
-  const cover = coverImage(primary);
-  return html`<div class="hero__showcase">
-    <article class="hero-card">
-      ${cover
-    ? html`<a class="hero-card__media" href="/spaces/${primary.code}" tabindex="-1" aria-hidden="true">
-        <img src="${cover.url}" alt="${altFor(cover, primary)}">
-        <span class="hero-card__badge">${primary.categoryLabel}</span>
-      </a>`
-    : html`<div class="hero-card__media hero-card__media--empty">
-        <span class="hero-card__badge">${primary.categoryLabel}</span>
-      </div>`}
-      <div class="hero-card__body">
-        <div class="hero-card__header">
-          <p class="hero-card__kicker">${locationLine(primary)} · <code>${primary.code}</code></p>
-          <h2 class="hero-card__title"><a href="/spaces/${primary.code}">${primary.name}</a></h2>
-        </div>
-        <p class="hero-card__meta">
-          <span>Up to ${primary.capacity} people</span>
-          <span>·</span>
-          <span>${primary.openTime}–${primary.closeTime} SLST</span>
-        </p>
-        <div class="hero-card__footer">
-          <p class="price"><span class="price__label">From</span> ${primary.rateSummary}</p>
-          <a class="button button--ghost button--small" href="/spaces/${primary.code}">Inspect venue →</a>
-        </div>
-      </div>
-    </article>
-
-    <div class="hero-spec-card">
-      <div class="hero-spec-card__item">
-        <span class="hero-spec-card__label">Live Catalogue</span>
-        <strong class="hero-spec-card__value">${totalPublished} published ${totalPublished === 1 ? 'venue' : 'venues'}</strong>
-      </div>
-      <div class="hero-spec-card__item">
-        <span class="hero-spec-card__label">Campus Standard</span>
-        <strong class="hero-spec-card__value">Sri Lanka Standard Time (UTC+5:30)</strong>
-      </div>
-      <div class="hero-spec-card__item">
-        <span class="hero-spec-card__label">Booking Model</span>
-        <strong class="hero-spec-card__value">Staff-verified scheduling</strong>
-      </div>
-      ${secondary
-    ? html`<div class="hero-spec-card__item hero-spec-card__item--link">
-        <span class="hero-spec-card__label">Also featured</span>
-        <a href="/spaces/${secondary.code}" class="hero-spec-card__value">${secondary.name} →</a>
-      </div>`
-    : ''}
-    </div>
-  </div>`;
+  while (urls.length < 2) {
+    urls.push({
+      url: PLACEHOLDER_IMAGE,
+      alt: 'Illustration placeholder for Nagaro venues at Trace Expert City',
+      name: null,
+      code: null,
+    });
+  }
+  return urls;
 }
 
-/** `GET /` — hero, three category entry points and up to six featured spaces. */
+/** Earliest open to latest close across featured spaces, or null when unknown. */
+function heroWindow(featured) {
+  const opens = (featured ?? []).map((space) => space.openTime).filter(Boolean).sort();
+  const closes = (featured ?? []).map((space) => space.closeTime).filter(Boolean).sort();
+  if (!opens.length || !closes.length) return null;
+  return `${opens[0]}–${closes[closes.length - 1]} SLST`;
+}
+
+/** Highest published capacity per category, from the featured (published) list. */
+function maxCapacityByCategory(featured) {
+  const out = {};
+  for (const space of featured ?? []) {
+    if (Number.isFinite(Number(space.capacity)) && Number(space.capacity) > 0) {
+      out[space.category] = Math.max(out[space.category] ?? 0, Number(space.capacity));
+    }
+  }
+  return out;
+}
+
+/** `GET /` — hero-premium, category rows, featured venue grid, steps, CTA band. */
 export function renderHomePage({ featured = [], totalPublished = 0, categoryCounts = {} } = {}) {
   const categories = SPACE_CATEGORY_ORDER.map((category) => ({
     category,
@@ -485,106 +445,145 @@ export function renderHomePage({ featured = [], totalPublished = 0, categoryCoun
     count: categoryCounts[category] ?? 0,
   }));
 
-  const body = html`<section class="hero hero--editorial">
-    <div class="hero__inner">
-      <div class="hero__grid">
-        <div class="hero__copy">
-          <p class="hero__eyebrow">Trace Expert City · Workspace &amp; Venue Collection</p>
-          <h1 class="hero__title">Architectural spaces for focused work, training and landmark events.</h1>
-          <p class="hero__subtitle">Nagaro manages the bookable meeting rooms, executive training suites, grand auditorium and co-working studios at Trace Expert City in Colombo. Inspect real-time schedules, review spatial specifications and submit a booking inquiry directly to our operations desk.</p>
-          <div class="hero__actions">
-            <a class="button button--primary button--large" href="/spaces">Explore the spaces</a>
-            <a class="button button--ghost button--large" href="/booking-request">Submit a booking inquiry</a>
-          </div>
-          <div class="hero__notice">
-            <p><strong>Provisional availability notice:</strong> Online availability checks reflect current calendar state in real time, but submitting an inquiry does not automatically lock inventory. Every reservation is verified and confirmed by the Nagaro operations desk.</p>
-          </div>
-          <dl class="hero__stats">
-            <div class="hero__stat"><dt>Published venues</dt><dd>${totalPublished}</dd></div>
-            <div class="hero__stat"><dt>Spatial typologies</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
-            <div class="hero__stat"><dt>Operations desk</dt><dd>Mon–Sat · SLST</dd></div>
-          </dl>
-        </div>
-        ${renderHeroShowcase(featured, totalPublished)}
+  const photos = heroPhotos(featured);
+  const window = heroWindow(featured);
+  const capacityByCategory = maxCapacityByCategory(featured);
+  const caption = photos[0].name
+    ? { name: photos[0].name, code: photos[0].code }
+    : (featured[0] ? { name: featured[0].name, code: featured[0].code } : null);
+
+  const body = html`<section class="hero-premium" data-reveal>
+    <div class="hero__grid">
+      <div class="hero__copy">
+        <p class="hero__eyebrow">Trace Expert City · Nagaro Venue Collection</p>
+        <h1 class="hero__title">Rooms for <em>focused work</em>, halls for landmark events.</h1>
+        <p class="hero__lede">Meeting rooms, executive training suites, the grand auditorium and co-working
+          studios at Trace Expert City, Colombo — live provisional schedules, honest LKR rates and a
+          staff-confirmed booking desk.</p>
+        <form class="hero__search" method="get" action="/spaces" role="search" aria-label="Search spaces">
+          <label class="hero__search-field">
+            <span>Keyword</span>
+            <input type="search" name="q" placeholder="Name, code or building" maxlength="80">
+          </label>
+          <label class="hero__search-field">
+            <span>Date</span>
+            <input type="date" name="date">
+          </label>
+          <label class="hero__search-field">
+            <span>From</span>
+            <input type="time" name="start_time" step="900">
+          </label>
+          <label class="hero__search-field">
+            <span>To</span>
+            <input type="time" name="end_time" step="900">
+          </label>
+          <button class="button button--primary" type="submit">Search spaces</button>
+        </form>
+        <dl class="hero__stats">
+          <div><dt>Published venues</dt><dd>${totalPublished}</dd></div>
+          <div><dt>Spatial typologies</dt><dd>${SPACE_CATEGORY_ORDER.length}</dd></div>
+          ${window ? html`<div><dt>Opening window</dt><dd>${window}</dd></div>` : ''}
+        </dl>
+        <p class="hint">Online availability checks reflect the live calendar but never lock inventory —
+          every reservation is verified and confirmed by the Nagaro operations desk.</p>
+      </div>
+      <div class="hero__media">
+        <img class="hero__photo--a" src="${photos[0].url}" alt="${photos[0].alt}" loading="eager">
+        <img class="hero__photo--b" src="${photos[1].url}" alt="${photos[1].alt}" loading="lazy">
+        <span class="hero__stamp" aria-hidden="true">
+          <svg viewBox="0 0 120 120" focusable="false">
+            <defs><path id="hero-stamp-ring" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"/></defs>
+            <text><textPath href="#hero-stamp-ring">TRACE EXPERT CITY · NAGARO VENUES ·&#160;</textPath></text>
+          </svg>
+        </span>
+        ${caption
+    ? html`<p class="hero__caption">Pictured: <a href="/spaces/${caption.code}">${caption.name}</a> at Trace Expert City</p>`
+    : html`<p class="hero__caption">New venues are being prepared at Trace Expert City</p>`}
       </div>
     </div>
   </section>
 
-  <section class="container stack">
-    <div class="section-head">
-      <div>
-        <p class="section-eyebrow">Curated Typologies</p>
-        <h2 class="section-title">What you can book</h2>
-        <p class="section-subtitle">Three distinct spatial categories across Trace Expert City, with ${totalPublished === 1 ? '1 venue published' : `${totalPublished} venues published`} right now.</p>
+  <section class="section" data-reveal>
+    <div class="section__head">
+      <span class="section__index">01</span>
+      <h2 class="section__title">What you can book</h2>
+      <p class="section__lede">Three distinct spatial typologies across Trace Expert City, with
+        ${totalPublished === 1 ? '1 venue published' : `${totalPublished} venues published`} right now.</p>
+    </div>
+    ${categories.map((item, index) => {
+    const representative = featured.find((space) => space.category === item.category) ?? null;
+    const repCover = representative ? coverImage(representative) : null;
+    const src = repCover?.url ?? PLACEHOLDER_IMAGE;
+    const alt = repCover && representative ? altFor(repCover, representative)
+      : `${item.label} at Nagaro, Trace Expert City (illustration placeholder)`;
+    const maxCap = capacityByCategory[item.category] ?? null;
+    return html`<article class="cat-row ${index % 2 === 1 ? 'cat-row--flip' : ''}" data-reveal>
+      <a class="cat-row__media" href="/spaces?category=${item.category}" tabindex="-1" aria-hidden="true">
+        <img src="${src}" alt="${alt}" loading="lazy">
+      </a>
+      <div class="cat-row__body">
+        <p class="cat-row__kicker">Typology · ${item.count === 1 ? '1 venue published' : `${item.count} venues published`}</p>
+        <h3 class="cat-row__title">${item.label}</h3>
+        <p class="cat-row__text">${item.tagline}</p>
+        <ul class="cat-row__facts">
+          <li>${item.count === 1 ? '1 published venue' : `${item.count} published venues`}</li>
+          <li>${item.units}</li>
+          ${maxCap ? html`<li>Up to ${maxCap} people</li>` : ''}
+        </ul>
+        <a href="/spaces?category=${item.category}">Explore ${item.label} →</a>
       </div>
-    </div>
-    <div class="category-showcase-grid category-grid">
-      ${categories.map((item) => html`<a class="category-card" href="/spaces?category=${item.category}">
-        <div class="category-card__top">
-          <span class="category-card__icon" aria-hidden="true">${raw(CATEGORY_ICON[item.category] ?? '')}</span>
-          <span class="category-card__count">${item.count} published</span>
-        </div>
-        <h3 class="category-card__title">${item.label}</h3>
-        <p class="category-card__meta">${item.tagline}</p>
-        <div class="category-card__footer">
-          <span class="category-card__units">${item.units}</span>
-          <span class="category-card__cta">Explore category →</span>
-        </div>
-      </a>`)}
-    </div>
+    </article>`;
+  })}
+  </section>
 
-    <div class="section-head">
-      <div>
-        <p class="section-eyebrow">Selected Inventory</p>
-        <h2 class="section-title">Featured spaces</h2>
-        <p class="section-subtitle">Published architectural rooms, halls and desk studios at Trace Expert City, with capacities and transparent LKR rates.</p>
-      </div>
-      <div class="section-actions">
-        <a class="button button--ghost button--small" href="/spaces">View full directory →</a>
-      </div>
+  <section class="section" data-reveal>
+    <div class="section__head">
+      <span class="section__index">02</span>
+      <h2 class="section__title">Featured spaces</h2>
+      <p class="section__lede">Published architectural rooms, halls and desk studios at Trace Expert City,
+        with capacities and transparent LKR rates.</p>
     </div>
     ${featured.length
-    ? spaceGrid(featured)
+    ? html`${spaceGrid(featured)}
+      <p><a href="/spaces">View full directory →</a></p>`
     : emptyState(
       'No spaces are published yet.',
       'Nagaro staff are still preparing the catalogue. Please check back shortly.',
     )}
+  </section>
 
-    <section class="process-section card">
-      <div class="card__body stack">
-        <div class="section-head">
-          <div>
-            <p class="section-eyebrow">Concierge Verification Workflow</p>
-            <h2 class="section-title">How a request to book works</h2>
-            <p class="section-subtitle">We pair live calendar transparency with human operational review so every room setup, turnaround buffer and desk allocation is guaranteed.</p>
-          </div>
-        </div>
-        <div class="process-grid">
-          <article class="process-step">
-            <span class="process-step__num">01</span>
-            <h3 class="process-step__title">01 · Inspect Space &amp; Provisional Schedule</h3>
-            <p class="process-step__body">Explore room capacities, technical amenities, turnaround buffers and LKR rate schedules. Run a live provisional check for your preferred date and time window.</p>
-          </article>
-          <article class="process-step">
-            <span class="process-step__num">02</span>
-            <h3 class="process-step__title">02 · Submit a Booking Inquiry</h3>
-            <p class="process-step__body">Send your preferred schedule, attendee count and setup notes. You receive an immediate reference code (<code>INQ-YYYY-NNNNN</code>) and a private self-service withdrawal link.</p>
-          </article>
-          <article class="process-step">
-            <span class="process-step__num">03</span>
-            <h3 class="process-step__title">03 · Operations Desk Confirmation</h3>
-            <p class="process-step__body">Nagaro staff review the calendar, verify layout and catering or AV requirements with you, and issue a formal confirmed reservation that locks the inventory.</p>
-          </article>
-        </div>
-        <div class="process-footer cluster">
-          <p class="hint">Requests are not confirmed bookings, and submitting the inquiry form carries no automatic hold or online payment.</p>
-          <div class="cluster">
-            <a class="button button--primary" href="/booking-request">Request a booking</a>
-            <a class="button button--ghost" href="/spaces">Browse spaces</a>
-          </div>
-        </div>
-      </div>
-    </section>
+  <section class="section" data-reveal>
+    <div class="section__head">
+      <span class="section__index">03</span>
+      <h2 class="section__title">How a request to book works</h2>
+      <p class="section__lede">Live calendar transparency paired with human operational review, so every room
+        setup, turnaround buffer and desk allocation is guaranteed.</p>
+    </div>
+    <div class="steps">
+      <article class="step" data-reveal>
+        <span class="step__num">01</span>
+        <h3 class="step__title">Inspect space &amp; provisional schedule</h3>
+        <p class="step__text">Explore room capacities, technical amenities, turnaround buffers and LKR rate
+          schedules. Run a live provisional check for your preferred date and time window.</p>
+      </article>
+      <article class="step" data-reveal>
+        <span class="step__num">02</span>
+        <h3 class="step__title">Submit a booking inquiry</h3>
+        <p class="step__text">Send your preferred schedule, attendee count and setup notes. You receive an
+          immediate reference code (<code>INQ-YYYY-NNNNN</code>) and a private self-service withdrawal link.</p>
+      </article>
+      <article class="step" data-reveal>
+        <span class="step__num">03</span>
+        <h3 class="step__title">Operations desk confirmation</h3>
+        <p class="step__text">Nagaro staff review the calendar, verify layout and catering or AV requirements
+          with you, and issue a formal confirmed reservation that locks the inventory.</p>
+      </article>
+    </div>
+    <div class="cta-band" data-reveal>
+      <p class="cta-band__title">Requests carry no payment and no automatic hold — confirmation is always human.</p>
+      <p><a class="button button--primary" href="/booking-request">Request a booking</a>
+        <a class="button button--ghost" href="/spaces">Browse spaces</a></p>
+    </div>
   </section>`;
 
   return publicShell({
@@ -607,45 +606,41 @@ export function renderSpaceDirectoryPage({
   const summary = filterSummary(filters);
   const hasActiveFilters = pairs.length > 0;
 
-  const categoryQuickLinks = [
-    { code: '', label: `All venues (${publishedTotal})`, href: '/spaces' },
-    { code: SPACE_CATEGORY.MEETING_ROOM, label: 'Meeting & training rooms', href: `/spaces?category=${SPACE_CATEGORY.MEETING_ROOM}` },
-    { code: SPACE_CATEGORY.AUDITORIUM, label: 'Auditorium', href: `/spaces?category=${SPACE_CATEGORY.AUDITORIUM}` },
-    { code: SPACE_CATEGORY.COWORKING, label: 'Co-working desks', href: `/spaces?category=${SPACE_CATEGORY.COWORKING}` },
+  const categoryChips = [
+    { code: '', label: `All venues (${publishedTotal})` },
+    { code: SPACE_CATEGORY.MEETING_ROOM, label: 'Meeting & training rooms' },
+    { code: SPACE_CATEGORY.AUDITORIUM, label: 'Auditorium' },
+    { code: SPACE_CATEGORY.COWORKING, label: 'Co-working desks' },
   ];
 
-  const body = html`<section class="container stack">
-    <header class="directory-hero">
-      <div class="directory-hero__copy">
-        <p class="section-eyebrow">Trace Expert City · Venue Directory</p>
-        <h1 class="page-title">Spaces &amp; Architectural Venues</h1>
-        <p class="section-subtitle">Every published room, hall and co-working studio managed by Nagaro at Trace Expert City. Filter by capacity, billing unit or technical amenity. Availability shown on any venue page is provisional.</p>
-      </div>
-      <nav class="category-pills" aria-label="Quick category filter">
-        ${categoryQuickLinks.map((item) => {
-    const active = (filters.category ?? '') === item.code;
-    return html`<a href="${item.href}"
-            class="category-pill ${active ? 'is-active' : ''}"
-            ${active ? raw('aria-current="page"') : ''}>${item.label}</a>`;
-  })}
-      </nav>
+  const body = html`<section class="container">
+    <header data-reveal>
+      <p class="section-eyebrow">Trace Expert City · Venue Directory</p>
+      <h1 class="page-title">Spaces &amp; Architectural Venues</h1>
+      <p class="section-subtitle">Every published room, hall and co-working studio managed by Nagaro at Trace
+        Expert City. Filter by capacity, billing unit or technical amenity. Availability shown on any venue
+        page is provisional.</p>
     </header>
 
-    <div class="directory-layout">
-      <aside class="directory-sidebar">
-        <form class="filter-panel filter-bar" method="get" action="/spaces" role="search" aria-label="Filter spaces">
-          <div class="filter-panel__head">
-            <h2 class="filter-panel__title">Refine venues</h2>
-            ${hasActiveFilters ? html`<a class="filter-panel__reset" href="/spaces">Clear all</a>` : ''}
-          </div>
-
-          <div class="filter-bar__field">
+    <div class="discover">
+      <aside class="discover__filters" data-reveal>
+        <h2>Refine venues</h2>
+        <nav class="chip-group" aria-label="Quick category filter">
+          ${categoryChips.map((item) => {
+    const active = (filters.category ?? '') === item.code;
+    const href = item.code ? `/spaces?category=${item.code}` : '/spaces';
+    return html`<a href="${href}" class="chip ${active ? 'is-active' : ''}"
+              ${active ? raw('aria-current="page"') : ''}>${item.label}</a>`;
+  })}
+        </nav>
+        <form method="get" action="/spaces" role="search" aria-label="Filter spaces">
+          <div class="filter-group">
             <label for="filter-q">Keyword search</label>
             <input id="filter-q" name="q" type="search" value="${filters.q ?? ''}"
                    placeholder="Name, code or building" maxlength="80">
           </div>
 
-          <div class="filter-bar__field">
+          <div class="filter-group">
             <label for="filter-category">Category</label>
             <select id="filter-category" name="category">
               <option value="">All categories</option>
@@ -654,14 +649,14 @@ export function renderSpaceDirectoryPage({
             </select>
           </div>
 
-          <div class="filter-bar__field">
+          <div class="filter-group">
             <label for="filter-capacity">Minimum capacity</label>
             <input id="filter-capacity" name="min_capacity" type="number" min="1" max="100000"
                    placeholder="e.g. 12 people"
                    value="${filters.minCapacity === null || filters.minCapacity === undefined ? '' : filters.minCapacity}">
           </div>
 
-          <div class="filter-bar__field">
+          <div class="filter-group">
             <label for="filter-pricing">Pricing unit</label>
             <select id="filter-pricing" name="pricing_unit">
               <option value="">Any pricing unit</option>
@@ -670,7 +665,7 @@ export function renderSpaceDirectoryPage({
             </select>
           </div>
 
-          <div class="filter-bar__field">
+          <div class="filter-group">
             <label for="filter-sort">Sort order</label>
             <select id="filter-sort" name="sort">
               ${[['name', 'Name (A–Z)'], ['capacity', 'Capacity (high to low)'], ['price', 'Starting rate (low to high)']].map(([value, label]) => html`<option value="${value}"
@@ -679,35 +674,31 @@ export function renderSpaceDirectoryPage({
           </div>
 
           ${amenityOptions.length
-    ? html`<fieldset class="filter-bar__field filter-amenities">
+    ? html`<fieldset class="filter-group">
               <legend>Amenities${selected.size ? ` (${selected.size} selected)` : ''}</legend>
-              <div class="filter-amenities__list">
-                ${amenityOptions.map((amenity) => html`<label class="checkbox-label" for="amenity-${slugId(amenity)}">
-                  <input id="amenity-${slugId(amenity)}" type="checkbox" name="amenity" value="${amenity}"
-                         ${attr('checked', selected.has(amenity))}>
-                  <span>${amenity}</span>
-                </label>`)}
-              </div>
+              ${amenityOptions.map((amenity) => html`<label for="amenity-${slugId(amenity)}">
+                <input id="amenity-${slugId(amenity)}" type="checkbox" name="amenity" value="${amenity}"
+                       ${attr('checked', selected.has(amenity))}>
+                <span>${amenity}</span>
+              </label>`)}
             </fieldset>`
     : ''}
 
-          <div class="filter-bar__actions">
+          <div>
             <button class="button button--primary button--block" type="submit">Apply filters</button>
-            <a class="button button--ghost button--block" href="/spaces">Reset filters</a>
+            <a href="/spaces">Reset filters</a>
           </div>
         </form>
       </aside>
 
-      <div class="directory-main stack">
-        <div class="directory-toolbar">
-          <p class="meta-line">
-            <strong>${total === 1 ? '1 space matches' : `${total} spaces match`}</strong>${summary ? ` ${summary}` : ''}
-            · ${publishedTotal} published in total.
-          </p>
-          ${hasActiveFilters
-    ? html`<a class="button button--ghost button--small" href="/spaces">Clear active filters</a>`
+      <div class="discover__results" data-reveal>
+        <p class="result-count">
+          <strong>${total === 1 ? '1 space matches' : `${total} spaces match`}</strong>${summary ? ` ${summary}` : ''}
+          · ${publishedTotal} published in total.
+        </p>
+        ${hasActiveFilters
+    ? html`<p><a href="/spaces">Clear active filters</a></p>`
     : ''}
-        </div>
 
         ${spaces.length
     ? spaceGrid(spaces)
@@ -809,13 +800,18 @@ export function renderBookingRequestPage({
     ? 'How many desks do you need? Leave blank for one.'
     : 'Only used for co-working desk requests.';
 
-  const body = html`<section class="container stack">
-    <header class="venue-header">
+  const body = html`<section class="container booking-flow" data-reveal>
+    <header class="venue-hero">
       <div>
         <p class="section-eyebrow">Nagaro Concierge Desk · Trace Expert City</p>
         <h1 class="page-title">Request a booking</h1>
         <p class="section-subtitle">Tell us which venue and schedule you need. Nagaro staff verify every calendar request by hand and confirm the reservation with you — submitting this inquiry does not lock inventory and carries no payment.</p>
       </div>
+      <ol class="flow-progress" aria-label="Request progress">
+        <li class="is-current"><span class="flow-progress__num">1</span> Space &amp; schedule</li>
+        <li><span class="flow-progress__num">2</span> Contact details</li>
+        <li><span class="flow-progress__num">3</span> Review &amp; send</li>
+      </ol>
     </header>
 
     ${problems.length
@@ -828,9 +824,9 @@ export function renderBookingRequestPage({
 
     <div class="split-layout inquiry-layout">
       <div class="inquiry-main">
-        <div class="card">
+        <div class="card form-card">
           <div class="card__body">
-            <form method="post" action="/booking-request" class="stack" autocomplete="on">
+            <form method="post" action="/booking-request" class="stack" autocomplete="on" data-submit-once>
               <fieldset class="form-section">
                 <legend class="form-section__title">01 · Space &amp; Preferred Schedule</legend>
                 <p class="form-section__desc hint">All times are in Sri Lanka Standard Time (UTC+5:30). Single requests must start and finish on the same calendar day.</p>
@@ -1135,7 +1131,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
     : '1 exclusive venue';
 
   const body = html`<section class="container stack">
-    <header class="venue-header">
+    <header class="venue-hero" data-reveal>
       <nav class="breadcrumbs" aria-label="Breadcrumb"><ol>
         <li><a href="/">Home</a></li>
         <li><a href="/spaces">Spaces</a></li>
@@ -1150,11 +1146,11 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
             ${space.isPublished ? '' : html`<span class="tag tag--warn">Not published</span>`}
           </div>
           <h1 class="page-title">${space.name}</h1>
-          <p class="section-subtitle">${[
-    space.location || 'Trace Expert City',
-    space.floor ? `Floor ${space.floor}` : null,
-    `Up to ${space.capacity} people`,
-  ].filter(Boolean).join(' · ')}</p>
+          <ul class="venue-facts">
+            <li>${space.location || 'Trace Expert City'}</li>
+            ${space.floor ? html`<li>Floor ${space.floor}</li>` : ''}
+            ${space.capacity ? html`<li>Up to ${space.capacity} people</li>` : ''}
+          </ul>
         </div>
         <div class="venue-header__actions cluster">
           <a class="button button--primary" href="${requestHref}">Request this space</a>
@@ -1164,7 +1160,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
     </header>
 
     ${images.length
-    ? html`<div class="gallery gallery--venue">
+    ? html`<div class="gallery gallery-premium gallery--venue" data-reveal>
         <div class="gallery__stage">
           <img data-gallery-main class="gallery__main"
                src="${(main ?? images[0]).url}" alt="${altFor(main ?? images[0], space)}">
@@ -1190,30 +1186,30 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
       </div>`
     : html`<div class="gallery gallery--venue gallery--empty"><span class="hint">No image has been added for this space yet.</span></div>`}
 
-    <dl class="spec-ribbon" aria-label="Key venue specifications">
-      <div class="spec-ribbon__item">
-        <dt>Capacity</dt>
-        <dd>Up to ${space.capacity} people</dd>
+    <dl class="spec-strip spec-ribbon" aria-label="Key venue specifications" data-reveal>
+      <div class="spec spec-ribbon__item">
+        <dt class="spec__k">Capacity</dt>
+        <dd class="spec__v">Up to ${space.capacity} people</dd>
       </div>
-      <div class="spec-ribbon__item">
-        <dt>Inventory</dt>
-        <dd>${inventoryText}</dd>
+      <div class="spec spec-ribbon__item">
+        <dt class="spec__k">Inventory</dt>
+        <dd class="spec__v">${inventoryText}</dd>
       </div>
-      <div class="spec-ribbon__item">
-        <dt>Operating Hours</dt>
-        <dd>${space.openTime}–${space.closeTime} SLST</dd>
+      <div class="spec spec-ribbon__item">
+        <dt class="spec__k">Operating Hours</dt>
+        <dd class="spec__v">${space.openTime}–${space.closeTime} SLST</dd>
       </div>
-      <div class="spec-ribbon__item">
-        <dt>Booking Duration</dt>
-        <dd>${durationText}</dd>
+      <div class="spec spec-ribbon__item">
+        <dt class="spec__k">Booking Duration</dt>
+        <dd class="spec__v">${durationText}</dd>
       </div>
-      <div class="spec-ribbon__item">
-        <dt>Turnaround Buffer</dt>
-        <dd>${bufferText}</dd>
+      <div class="spec spec-ribbon__item">
+        <dt class="spec__k">Turnaround Buffer</dt>
+        <dd class="spec__v">${bufferText}</dd>
       </div>
     </dl>
 
-    <div class="split-layout venue-layout">
+    <div class="detail-grid split-layout venue-layout" data-reveal>
       <div class="venue-main stack">
         <article class="card">
           <div class="card__body stack">
@@ -1271,12 +1267,12 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
       </div>
 
       <aside class="venue-aside stack">
-        <div class="card card--concierge">
+        <div class="card card--concierge book-panel">
           <div class="card__body stack">
             <div>
               <p class="section-eyebrow">Provisional Schedule Check</p>
               <h2 class="section-title">Check availability &amp; inquire</h2>
-              <p class="price price--accent">${space.rateSummary}</p>
+              <p class="book-panel__price price price--accent">${space.rateSummary}</p>
             </div>
             <form class="availability-checker" method="get" action="/spaces/${space.code}"
                   data-availability-form data-space="${space.code}" data-space-code="${space.code}">
@@ -1311,14 +1307,14 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/booki
     }),
   })}
               <div class="form-actions">
-                <button class="button button--ghost button--block" type="submit">Check availability</button>
+                <button class="button button--primary button--block" type="submit">Check availability</button>
               </div>
               ${availabilityResult(check.result)}
             </form>
-            <div class="cluster">
+            <div class="cluster request-cta">
               <a class="button button--primary button--block" href="${requestHref}">Request this space</a>
             </div>
-            <p class="hint">Checking a window or submitting an inquiry does not lock the room. Nagaro operations staff confirm all bookings.</p>
+            <p class="book-panel__note hint">Checking a window or submitting an inquiry does not lock the room. Nagaro operations staff confirm all bookings.</p>
           </div>
         </div>
 

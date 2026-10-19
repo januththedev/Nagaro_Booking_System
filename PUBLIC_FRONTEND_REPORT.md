@@ -1,6 +1,8 @@
 # Public Frontend Report — Next.js cut-over for TRACE Spaces
 
-**Branch** `ui/premium-hackathon-redesign` · **Commit** `COMMIT_SHA_PLACEHOLDER`
+**Branch** `ui/premium-hackathon-redesign` · **Cut-over commit** `be135e11488e98a3f1a8519c5cd322661c3b8a35`
+The branch tip that records this line is the same commit plus the documentation-only
+follow-up; both are on `ui/premium-hackathon-redesign`.
 **Date** 19 October 2026 · **Scope** public experience only; the staff console, booking engine,
 data model and migrations 0001–0004 are unchanged in behaviour.
 

@@ -23,5 +23,8 @@
     "@vercel/blob": "^2.8.2",
     "nodemailer": "^6.9.16",
     "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "pg-mem": "^3.0.14"
   }
 }

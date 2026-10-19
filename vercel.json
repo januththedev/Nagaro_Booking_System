@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "functions": {
+    "api/index.js": {
+      "runtime": "nodejs24.x"
+    }
+  },
+  "outputFileTracingIncludes": {
+    "api/index.js": [
+      "src/web/public/**/*"
+    ]
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}

@@ -1,0 +1,15 @@
+# Never deploy local state, secrets, or dev-only files.
+.env
+.env.local
+.env.*.local
+data/
+storage/
+node_modules/
+tests/
+scripts/
+presentation/
+docs/
+*.db
+*.db-wal
+*.db-shm
+.git/

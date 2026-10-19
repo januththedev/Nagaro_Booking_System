@@ -52,6 +52,17 @@ export function loadConfig(env = process.env) {
     },
 
     demoSeed: flag('NAGARO_DEMO_SEED', false),
+
+    // Deployment environment. Local development is unchanged: SQLite on disk
+    // plus the local upload directory. These only take effect when set.
+    isVercel: Boolean(env.VERCEL),
+    databaseUrl: env.DATABASE_URL ?? null,
+    directUrl: env.DIRECT_URL ?? env.DATABASE_URL ?? null,
+    // Explicit opt-in for an ephemeral throwaway SQLite file (os.tmpdir()) when
+    // no persistent database is configured. The deployed app must never fall
+    // back to a local SQLite file silently; api/index.js refuses to boot
+    // without either DATABASE_URL or this flag.
+    allowEphemeralSqlite: flag('NAGARO_ALLOW_EPHEMERAL_SQLITE', false),
   };
 }
 

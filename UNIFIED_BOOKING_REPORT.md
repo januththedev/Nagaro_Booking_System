@@ -2,7 +2,8 @@
 
 **Repository** `januththedev/Nagaro_Booking_System` · **Branch** `main`
 **Starting commit** `0abe881` ("Make the full stack Vercel deployable"; the brief's reference
-`54f55c1` is its parent) · **Final commit** see the branch tip that carries this file.
+`54f55c1` is its parent) · **Final commit** `43f084787e3e5bc5f024e6da5f2fe89d895f56ce`
+(branch tip adds this line in a documentation-only follow-up).
 **Date** 20 October 2026
 
 ---

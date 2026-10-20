@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { clientApiPath } from "../lib/api";
 import { formatDateTime, formatMoney } from "../lib/format";
+import { format } from "../lib/i18n";
 import type { Reservation } from "../lib/types";
+import { useT } from "./I18nProvider";
 
 export function ManageBookingClient({
   initialReservation,
@@ -17,6 +19,7 @@ export function ManageBookingClient({
   token: string;
   initiallyCancelled?: boolean;
 }) {
+  const t = useT();
   const [reservation, setReservation] = useState<Reservation>(initialReservation);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export function ManageBookingClient({
       } | null;
 
       if (!res.ok || !body?.ok || !body.data?.reservation) {
-        setError(body?.error?.message || "Could not cancel this reservation online.");
+        setError(body?.error?.message || t.manage.errorCancel);
         setCancelling(false);
         return;
       }
@@ -59,7 +62,7 @@ export function ManageBookingClient({
       setJustCancelled(true);
       setCancelling(false);
     } catch {
-      setError("Network error while cancelling this reservation. Please retry.");
+      setError(t.manage.errorNetwork);
       setCancelling(false);
     }
   }
@@ -72,8 +75,7 @@ export function ManageBookingClient({
             role="status"
             className="p-4 border-l-4 border-[var(--oxidized)] bg-[#e6f2ec] text-[var(--oxidized)] text-sm"
           >
-            Reservation <code>{reservation.reference}</code> has been cancelled and its inventory
-            has been released.
+            {format(t.manage.cancelledBanner, { ref: reservation.reference })}
           </div>
         ) : null}
 
@@ -103,14 +105,14 @@ export function ManageBookingClient({
                 {reservation.spaceName}
               </h1>
               <p className="font-mono text-xs text-[var(--graphite)] m-0">
-                Reference <code className="text-[var(--ink)]">{reservation.reference}</code> · Venue{" "}
-                <code className="text-[var(--ink)]">{reservation.spaceCode}</code>
+                {t.manage.referenceLabel} <code className="text-[var(--ink)]">{reservation.reference}</code> ·{" "}
+                {t.manage.venueLabel} <code className="text-[var(--ink)]">{reservation.spaceCode}</code>
               </p>
             </div>
 
             <div className="font-mono text-left sm:text-right">
               <span className="block text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-                Recorded tariff
+                {t.manage.recordedTariff}
               </span>
               <strong className="text-xl text-[var(--oxidized)]">
                 {formatMoney(reservation.totalCents, reservation.currency)}
@@ -121,7 +123,7 @@ export function ManageBookingClient({
           <dl className="m-0 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-                Start (Sri Lanka Standard Time)
+                {t.manage.startLabel}
               </dt>
               <dd className="m-0 mt-1 text-sm font-medium text-[var(--ink)]">
                 {formatDateTime(reservation.startAt)}
@@ -129,7 +131,7 @@ export function ManageBookingClient({
             </div>
             <div>
               <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-                End (Sri Lanka Standard Time)
+                {t.manage.endLabel}
               </dt>
               <dd className="m-0 mt-1 text-sm font-medium text-[var(--ink)]">
                 {formatDateTime(reservation.endAt)}
@@ -137,16 +139,21 @@ export function ManageBookingClient({
             </div>
             <div>
               <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-                Allocated inventory
+                {t.manage.allocatedLabel}
               </dt>
               <dd className="m-0 mt-1 text-sm font-medium text-[var(--ink)]">
-                {reservation.unitCount} {reservation.unitCount === 1 ? "unit" : "units"}
-                {reservation.attendees ? ` · ${reservation.attendees} attendees` : ""}
+                {format(
+                  reservation.unitCount === 1 ? t.manage.unitsOne : t.manage.unitsMany,
+                  { n: reservation.unitCount },
+                )}
+                {reservation.attendees
+                  ? ` · ${format(t.manage.attendees, { n: reservation.attendees })}`
+                  : ""}
               </dd>
             </div>
             <div>
               <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-                Billing basis
+                {t.manage.billingLabel}
               </dt>
               <dd className="m-0 mt-1 text-sm font-medium text-[var(--ink)]">
                 {reservation.billingQuantity} × {reservation.billingUnit}
@@ -159,10 +166,10 @@ export function ManageBookingClient({
               href={`/spaces/${encodeURIComponent(reservation.spaceCode)}`}
               className="btn-outline"
             >
-              Inspect venue specifications
+              {t.manage.inspectVenue}
             </Link>
             <Link href="/book" className="btn-outline">
-              Book another window
+              {t.manage.bookAnother}
             </Link>
           </div>
         </article>
@@ -177,12 +184,10 @@ export function ManageBookingClient({
               id="cancel-section-heading"
               className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--ink)] m-0"
             >
-              Release reservation inventory
+              {t.manage.cancelHeading}
             </h2>
             <p className="text-xs text-[var(--graphite)] m-0">
-              {isCancelled
-                ? "This reservation has already been cancelled and no longer holds inventory."
-                : "If your plans have changed, you can cancel this reservation before its start time to release the room or desks immediately."}
+              {isCancelled ? t.manage.cancelBodyDone : t.manage.cancelBodyActive}
             </p>
           </div>
 
@@ -195,7 +200,7 @@ export function ManageBookingClient({
                 disabled={cancelling}
                 className="btn-outline text-xs py-2.5 px-4 border-[var(--brick)] text-[var(--brick)]"
               >
-                {cancelling ? "Releasing…" : "Cancel reservation"}
+                {cancelling ? t.manage.cancelling : t.manage.cancelCta}
               </button>
             </form>
           ) : null}

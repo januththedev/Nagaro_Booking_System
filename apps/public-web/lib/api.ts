@@ -1,4 +1,4 @@
-import type { Availability, PublicSpace, Reservation, SpaceListResponse } from "./types";
+import type { Availability, BookingRequest, PublicSpace, Reservation, SpaceListResponse } from "./types";
 
 const serverBase = () => {
   const vercelOrigin = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
@@ -52,6 +52,11 @@ export async function getBooking(reference: string, token: string): Promise<Rese
   } catch {
     return null;
   }
+}
+
+export async function getBookingRequest(reference:string,token:string):Promise<BookingRequest|null>{
+  if(!reference||!token)return null;
+  try{const body=await apiFetch<{ok:true;request:BookingRequest}>(`/api/public/booking-requests/${encodeURIComponent(reference)}`,{headers:{Authorization:`Bearer ${token}`}});return body.request;}catch{return null;}
 }
 
 export type { Availability, PublicSpace, Reservation };

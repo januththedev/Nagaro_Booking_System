@@ -166,6 +166,11 @@ All timestamps are stored as epoch milliseconds in UTC. Every local calculation 
 | `PUBLIC_FRONTEND` | No (`legacy`) | `next` streams public pages to the Next.js process; `legacy` renders them in this process |
 | `PUBLIC_FRONTEND_ORIGIN` | Only when `PUBLIC_FRONTEND=next` | Internal origin of the Next.js process (must not be the public port) |
 | `PUBLIC_FRONTEND_HOST` / `PUBLIC_FRONTEND_PORT` | No (`127.0.0.1:4174`) | Convenience inputs used by `scripts/run-public-stack.js` to build the origin |
+| `PAYHERE_MERCHANT_ID` | Only to collect the booking fee | PayHere merchant id for the configured mode |
+| `PAYHERE_MERCHANT_SECRET` | Only to collect the booking fee | Server-side signing secret; never sent to a browser, may be domain-specific |
+| `PAYHERE_MODE` | No (`sandbox`) | `sandbox` or `live`; selects the gateway host. `PAYHERE_SANDBOX=1` is the equivalent boolean |
+| `OPENROUTER_API_KEY` | Only to enable the AI venue guide | Server-side provider key; without it the assistant degrades gracefully |
+| `OPENROUTER_MODEL` | No (`openai/gpt-4.1-mini`) | Model id, configurable per environment |
 | `API_ORIGIN` (or `API_PROXY_TARGET`) | Only for the Next.js process | Node origin the Next app calls for `/api`, `/assets` and `/media` |
 
 ## 12. Public frontend (Next.js) and the same-origin gateway
@@ -199,7 +204,68 @@ browser ──► Node (public port)
   which process answered, that the no-JavaScript form posts reach the booking engine, that the
   capability pages stay unshareable, and that the legacy flag still works.
 
-## 13. Target production architecture (Supabase + Vercel)
+## 13. Booking requests, temporary holds and PayHere
+
+The public journey is a single channel: **request → staff approval → booking fee → confirmed**.
+There is no immediate self-confirmation and no separate concierge path.
+
+```
+REQUESTED ──approve──► APPROVED_AWAITING_PAYMENT ──verified callback──► CONFIRMED
+    │                        │
+    │                        ├── hold expires ────────────────────────────► EXPIRED
+    │                        └── money that cannot be applied ───────────► PAYMENT_REVIEW_REQUIRED
+    ├── reject ─────────────────────────────────────────────────────────► REJECTED
+    └── customer cancels ───────────────────────────────────────────────► CANCELLED
+```
+
+- **Reservation state and payment state are separate columns** (`booking_request.status`,
+  `booking_request.payment_status`). Payments move through `NOT_REQUIRED / UNPAID / PENDING /
+  PAID / FAILED / REVIEW_REQUIRED / REFUNDED` without rewriting what the reservation means.
+- **Holds are database rows, not timers.** Approval allocates resource units exactly like a
+  confirmed reservation and records `booking_hold_claim` rows with an explicit `expires_at`.
+  Expiry is applied lazily on every read (`expireBookingHolds`), so nothing depends on an
+  in-memory timer or on browser state. The existing anti-overlap triggers arbitrate between
+  holds, reservations and maintenance blocks.
+- **The fee is an immutable snapshot.** `booking_fee_policy` (administrator-configured,
+  `DISABLED` by default — the system never invents a fee) is read once at approval into
+  `payment_obligation`. Later policy changes never rewrite history. Checkout parameters are
+  signed server-side over that snapshot in integer cents; the browser never sends an amount.
+- **The callback is the only proof of payment.** `/api/public/payments/payhere/notify` verifies
+  `md5sig`, merchant id, currency and amount against the snapshot, stores every notification in
+  `payment_event` (including rejected ones) and is idempotent on a payload fingerprint. The
+  browser return URL is never treated as evidence. A successful charge that cannot be safely
+  applied — expired hold, cancelled request, mismatched amount — is escalated to
+  `PAYMENT_REVIEW_REQUIRED` with the provider evidence intact: never silently discarded, never
+  auto-confirmed, and never allowed to grab inventory someone else now holds.
+- **Refunds are manual by design.** PayHere refund capability is merchant-specific; the console
+  records `REFUND_RECORDED` / `PAYMENT_KEPT` reconciliation with an audited note and never
+  claims a provider refund that did not happen.
+
+## 14. The AI venue assistant (OpenRouter)
+
+- **Server-side only.** `OPENROUTER_API_KEY` never reaches the browser, HTML, logs or the
+  repository; the model id is configuration (`OPENROUTER_MODEL`).
+- **Grounded, not creative.** The model may call exactly three whitelisted tools —
+  `list_spaces`, `get_space`, `check_availability` — which read public-safe projections through
+  the same services the pages use. Arguments are schema-validated, unknown tools are refused,
+  tool calls are budgeted, and outgoing conversation text is redacted so contact details never
+  travel to the provider. No raw database handle, no admin data, no file or network access.
+- **Advisory only.** The single write path is a short-lived `ai_booking_draft` row (SHA-256
+  hashed token, one-time read, 15-minute expiry) carrying schema-validated fields the customer
+  actually supplied. The booking form re-validates everything independently; the assistant can
+  never submit, confirm, charge or change administrative state.
+- **Degrades safely.** Without a provider key (or when the provider fails) the assistant
+  answers from a factual local fallback and the booking workflow is completely unaffected.
+
+## 15. Languages
+
+The public experience is served in English, සිංහල and தமிழ். `apps/public-web/lib/i18n.ts` holds
+the three dictionaries as one parallel key tree (enforced by `apps/public-web/tests/i18n.test.mjs`),
+the locale resolves cookie-first then `Accept-Language`, and dates, times and money are formatted
+with the locale's BCP-47 tag pinned to `Asia/Colombo`. The language control lives in the minimal
+header; there is no navigation menu to host it elsewhere.
+
+## 16. Target production architecture (Supabase + Vercel)
 
 The shipped code runs on SQLite + local filesystem by default (development).
 For production, the following environment variables switch the runtime:

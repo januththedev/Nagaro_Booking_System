@@ -16,6 +16,7 @@ import { blobEnabled } from './security/blobStorage.js';
 import { purgeExpiredSessions } from './security/sessions.js';
 import { ensureFirstAdmin } from './services/adminUserService.js';
 import { reconcileCompletedReservations } from './services/bookingService.js';
+import { expireBookingHolds } from './services/bookingRequestService.js';
 import { mailerConfig } from './mail/mailer.js';
 import { maybeSeedDemoData } from './db/seed.js';
 
@@ -60,6 +61,8 @@ if (!blobEnabled()) ensureUploadDir();
 purgeExpiredSessions(db);
 const completed = reconcileCompletedReservations(db);
 if (completed > 0) console.log(`[db] marked ${completed} past reservation(s) as completed`);
+const expiredHolds = expireBookingHolds(db);
+if (expiredHolds > 0) console.log(`[db] expired ${expiredHolds} unpaid booking hold(s)`);
 
 if (config.bootstrapAdmin.email && config.bootstrapAdmin.password) {
   const result = ensureFirstAdmin(db, {

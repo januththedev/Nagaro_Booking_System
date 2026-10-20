@@ -63,6 +63,22 @@ export function loadConfig(env = process.env) {
     // back to a local SQLite file silently; api/index.js refuses to boot
     // without either DATABASE_URL or this flag.
     allowEphemeralSqlite: flag('NAGARO_ALLOW_EPHEMERAL_SQLITE', false),
+
+    payHere: {
+      merchantId: env.PAYHERE_MERCHANT_ID ?? null,
+      merchantSecret: env.PAYHERE_MERCHANT_SECRET ?? null,
+      // PAYHERE_MODE is the documented switch (sandbox|live); PAYHERE_SANDBOX
+      // is the equivalent boolean kept for local runs. Defaults stay sandbox.
+      sandbox: env.PAYHERE_MODE
+        ? String(env.PAYHERE_MODE).trim().toLowerCase() !== 'live'
+        : flag('PAYHERE_SANDBOX', true),
+      baseUrl: env.NAGARO_BASE_URL ?? `http://${env.HOST ?? '127.0.0.1'}:${int('PORT', 4173)}`,
+    },
+    openRouter: {
+      apiKey: env.OPENROUTER_API_KEY ?? null,
+      model: env.OPENROUTER_MODEL ?? 'openai/gpt-4.1-mini',
+      baseUrl: 'https://openrouter.ai/api/v1',
+    },
   };
 }
 

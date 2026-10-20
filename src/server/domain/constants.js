@@ -68,6 +68,26 @@ export const RESERVATION_STATUS_LABEL = Object.freeze({
   COMPLETED: 'Completed',
 });
 
+export const BOOKING_REQUEST_STATUS = Object.freeze({
+  REQUESTED: 'REQUESTED',
+  APPROVED_AWAITING_PAYMENT: 'APPROVED_AWAITING_PAYMENT',
+  CONFIRMED: 'CONFIRMED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+  EXPIRED: 'EXPIRED',
+  PAYMENT_REVIEW_REQUIRED: 'PAYMENT_REVIEW_REQUIRED',
+});
+
+export const PAYMENT_STATUS = Object.freeze({
+  NOT_REQUIRED: 'NOT_REQUIRED',
+  UNPAID: 'UNPAID',
+  PENDING: 'PENDING',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+  REVIEW_REQUIRED: 'REVIEW_REQUIRED',
+  REFUNDED: 'REFUNDED',
+});
+
 /**
  * Occupancy semantics - which reservation states consume inventory.
  * CONFIRMED and COMPLETED consume inventory; CANCELLED releases it.

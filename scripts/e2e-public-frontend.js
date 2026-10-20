@@ -164,16 +164,17 @@ console.log('\n[1] one origin, two owners');
   check(`GET /spaces/${venue.code} -> 200 from Next.js`, detail.ok && isNextPage(detailHtml));
   check('the venue page carries live ledger data', detailHtml.includes(venue.name));
 
-  const booking = await fetch(`${base}/book`);
-  const bookingHtml = await text(booking);
-  check('GET /book -> 200 from Next.js', booking.ok && isNextPage(bookingHtml));
-  check('the direct checkout form is server-rendered', bookingHtml.includes('name="form_token"'));
-  check('the direct checkout form keeps a no-JavaScript fallback', bookingHtml.includes('action="/book"'));
+  const booking = await fetch(`${base}/book`, { redirect: 'manual' });
+  check('GET /book -> catalogue redirect (route retired)', booking.status >= 300 && booking.status < 400 && (booking.headers.get('location') || '').endsWith('/spaces'), `got ${booking.status}`);
 
-  const concierge = await fetch(`${base}/booking-request`);
-  const conciergeHtml = await text(concierge);
-  check('GET /booking-request -> 200 from Next.js', concierge.ok && isNextPage(conciergeHtml));
-  check('the concierge form is readable without JavaScript', conciergeHtml.includes('name="email"'));
+  const concierge = await fetch(`${base}/booking-request`, { redirect: 'manual' });
+  check('GET /booking-request -> catalogue redirect (route retired)', concierge.status >= 300 && concierge.status < 400 && (concierge.headers.get('location') || '').endsWith('/spaces'), `got ${concierge.status}`);
+
+  const requestPage = await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`);
+  const requestHtml = await text(requestPage);
+  check(`GET /spaces/${venue.code}/book -> 200 from Next.js`, requestPage.ok && isNextPage(requestHtml), `got ${requestPage.status}`);
+  check('the unified request form is server-rendered', requestHtml.includes('name="form_token"') && requestHtml.includes('name="email"'));
+  check('the request form keeps a no-JavaScript fallback', /action="\/spaces\/[^"]+\/book"/.test(requestHtml));
 
   const missing = await fetch(`${base}/a-page-that-does-not-exist`);
   const missingHtml = await text(missing);
@@ -186,18 +187,16 @@ console.log('\n[1b] every page is complete before any JavaScript runs');
 {
   const homeHtml = await text(await fetch(base));
   check('the arrival photograph is in the server payload', /<picture[\s\S]{0,400}?loading=|fetchpriority="high"/i.test(homeHtml));
-  check('both arrival actions are in the server payload', homeHtml.includes('href="/spaces"') && homeHtml.includes('href="/book"'));
+  check('the arrival offers the Book a Space call to action', homeHtml.includes('Book a Space') && homeHtml.includes('href="/spaces"'));
   check('no server-rendered block is hidden pending motion', !/style="[^"]*(opacity:\s*0|visibility:\s*hidden)/i.test(homeHtml));
   check('the hero canvas is absent from the server payload', !homeHtml.includes('<canvas'));
   check('the reveal hooks ship without inline hiding', homeHtml.includes('data-editorial-reveal') && !/data-editorial-reveal[^>]*style="/i.test(homeHtml));
+  check('the language switcher is server-rendered', homeHtml.includes('English'));
 
-  const bookHtml = await text(await fetch(`${base}/book`));
-  check('checkout fields are server-rendered', ['name="space_code"', 'name="date"', 'name="start_time"', 'name="end_time"', 'name="customer_name"', 'name="email"'].every((field) => bookHtml.includes(field)));
-  check('the checkout names its stages in words, not numerals', bookHtml.includes('Space &amp; time') && bookHtml.includes('Review &amp; confirm') && !/>\s*0[1-3]\s*</.test(bookHtml));
-
-  const conciergeHtml = await text(await fetch(`${base}/booking-request`));
-  check('the inquiry form is complete without JavaScript', ['name="space_code"', 'name="date"', 'name="start_time"', 'name="customer_name"', 'name="email"', 'name="message"'].every((field) => conciergeHtml.includes(field)));
-  check('direct checkout is described as immediate in the catalogue', !/staff (will|must) confirm/i.test(conciergeHtml));
+  const requestHtml = await text(await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`));
+  check('request fields are server-rendered', ['name="date"', 'name="start_time"', 'name="end_time"', 'name="full_name"', 'name="email"'].every((field) => requestHtml.includes(field)));
+  check('the request form states approval happens before confirmation', /approv/i.test(requestHtml));
+  check('no page promises immediate confirmation', !/confirm(s)? your reservation immediately|confirmed instantly/i.test(requestHtml));
 }
 
 /* ------------------------------------- 2. node-owned surfaces survive */
@@ -244,12 +243,11 @@ console.log('\n[3] capability links are unshareable through the gateway');
 
 /* --------------------------------- 4. no-JavaScript form fallbacks */
 
-console.log('\n[4] form fallbacks reach the booking runtime, not Next.js');
-let confirmedPath = null;
+console.log('\n[4] the no-JavaScript request form reaches the booking runtime');
 {
-  const bookingHtml = await text(await fetch(`${base}/book`));
-  const formToken = formTokenOf(bookingHtml);
-  check('the direct checkout exposes a live form token', typeof formToken === 'string' && formToken.length >= 20);
+  const requestHtml = await text(await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`));
+  const formToken = formTokenOf(requestHtml);
+  check('the request form exposes a live form token', typeof formToken === 'string' && formToken.length >= 20);
 
   const day = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -257,120 +255,90 @@ let confirmedPath = null;
 
   const form = new URLSearchParams({
     form_token: formToken,
-    space_code: venue.code,
     date: day,
     start_time: '10:00',
     end_time: '12:00',
-    desks: '1',
+    unit_count: '1',
     attendees: '4',
-    customer_name: 'Cutover Guest',
+    full_name: 'Cutover Guest',
     email: `cutover-${Date.now()}@public.test`,
     phone: '+94 77 111 2222',
     organization: 'Cutover Labs',
-    message: 'no-JavaScript fallback',
+    purpose: 'no-JavaScript fallback',
   });
 
-  const posted = await fetch(`${base}/book`, {
+  const posted = await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form,
     redirect: 'manual',
   });
-  confirmedPath = locationOf(posted);
-  check('POST /book -> 303 handled by node', posted.status === 303, `got ${posted.status} ${confirmedPath}`);
-  check('POST /book redirects to the private confirmation link', /^\/book\/confirmed\?ref=NG-\d{4}-\d{5}&token=/.test(confirmedPath), confirmedPath);
+  const managePath = locationOf(posted);
+  check('POST /spaces/:code/book -> 303 handled by node', posted.status === 303, `got ${posted.status} ${managePath}`);
+  check('the request redirects to its private status page', /^\/book\/manage\?ref=REQ-\d{4}-\d{5}&token=/.test(managePath), managePath);
 
-  const confirmed = await fetch(base + confirmedPath);
-  const confirmedHtml = await text(confirmed);
-  const reference = (confirmedPath.match(/ref=(NG-\d{4}-\d{5})/) || [])[1];
-  check('the private confirmation renders in Next.js', confirmed.ok && isNextPage(confirmedHtml), `got ${confirmed.status}`);
-  check('the confirmation shows the booking reference', confirmedHtml.includes(reference), reference);
-  check('the confirmation names the reserved venue', confirmedHtml.includes(venue.name));
-  check('direct checkout is stated as confirmed, not pending', /confirm/i.test(confirmedHtml) && !/awaiting confirmation|staff will confirm|pending approval/i.test(confirmedHtml));
-
-  const inquiryHtml = await text(await fetch(`${base}/booking-request`));
-  check('the concierge form exposes its fields without JavaScript', inquiryHtml.includes('name="message"'));
-
-  const inquiry = new URLSearchParams({
-    space_code: venue.code,
-    date: day,
-    start_time: '14:00',
-    end_time: '16:00',
-    desks: '1',
-    customer_name: 'Cutover Concierge',
-    email: `concierge-${Date.now()}@public.test`,
-    phone: '+94 77 333 4444',
-    organization: 'Cutover Labs',
-    attendees: '8',
-    message: 'no-JavaScript concierge inquiry',
-  });
-  const inquiryPosted = await fetch(`${base}/booking-request`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: inquiry,
-    redirect: 'manual',
-  });
-  const receivedPath = locationOf(inquiryPosted);
-  check('POST /booking-request -> 303 handled by node', inquiryPosted.status === 303, `got ${inquiryPosted.status}`);
-  check('the inquiry redirects to its receipt', /^\/booking-request\/received\?ref=INQ-\d{4}-\d+/.test(receivedPath), receivedPath);
-
-  const received = await fetch(base + receivedPath);
-  const receivedHtml = await text(received);
-  check('the inquiry receipt renders in Next.js', received.ok && isNextPage(receivedHtml));
-  check('the receipt states the inquiry is provisional', /provisional/i.test(receivedHtml));
-  check('the receipt offers a withdrawal path', /withdraw/i.test(receivedHtml));
+  const status = await fetch(base + managePath);
+  const statusHtml = await text(status);
+  check('the request status page renders in Next.js', status.ok && isNextPage(statusHtml), `got ${status.status}`);
+  check('the status page is honest about staff review', /Awaiting staff review/i.test(statusHtml));
+  check('the status page is no-store', (status.headers.get('cache-control') || '').includes('no-store'));
 }
 
-/* --------------------------------- 5. JSON contract through the gateway */
+/* --------------------------------- 5. unified request contract through the gateway */
 
-console.log('\n[5] the client-side checkout contract crosses the gateway');
-let jsonReference = null;
-let jsonToken = null;
+console.log('\n[5] the unified request contract crosses the gateway');
 {
   const day = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date(Date.now() + 42 * 86_400_000));
 
-  const create = await fetch(`${base}/api/public/bookings`, {
+  const create = await fetch(`${base}/api/public/booking-requests`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      form_token: `cutover-e2e-${Date.now()}`,
-      space_code: venue.code,
+      formToken: `cutover-e2e-${Date.now()}`,
+      spaceCode: venue.code,
       date: day,
-      start_time: '10:00',
-      end_time: '12:00',
-      desks: '1',
+      startTime: '10:00',
+      endTime: '12:00',
+      unitCount: '1',
       attendees: '3',
-      customer_name: 'Gateway Guest',
+      fullName: 'Gateway Guest',
       email: `gateway-${Date.now()}@public.test`,
       phone: '+94 77 555 6666',
       organization: 'Gateway Labs',
-      message: 'JSON checkout through the gateway',
+      purpose: 'request through the gateway',
     }),
   });
   const created = await create.json().catch(() => null);
-  jsonReference = created?.data?.reservation?.reference ?? null;
-  jsonToken = created?.data?.manageToken ?? null;
+  const jsonReference = created?.request?.reference ?? null;
+  const jsonToken = created?.manageToken ?? null;
 
-  check('POST /api/public/bookings -> 201', create.status === 201, `got ${create.status} ${JSON.stringify(created)?.slice(0, 200)}`);
-  check('the JSON checkout returns a reference and capability', Boolean(jsonReference && jsonToken), JSON.stringify(created)?.slice(0, 200));
-  check('the JSON checkout is no-store', (create.headers.get('cache-control') || '').includes('no-store'));
-  check('the JSON checkout never leaks customer PII', !Object.hasOwn(created?.data?.reservation ?? {}, 'customer'));
+  check('POST /api/public/booking-requests -> 201', create.status === 201, `got ${create.status} ${JSON.stringify(created)?.slice(0, 200)}`);
+  check('the request returns a reference and capability', Boolean(jsonReference && jsonToken), JSON.stringify(created)?.slice(0, 200));
+  check('the request is no-store', (create.headers.get('cache-control') || '').includes('no-store'));
+  check('the request never leaks customer PII', !Object.hasOwn(created?.request ?? {}, 'customer'));
 
-  const manage = await fetch(`${base}/api/public/bookings/${encodeURIComponent(jsonReference)}`, {
+  const manage = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(jsonReference)}`, {
     headers: { Authorization: `Bearer ${jsonToken}`, Accept: 'application/json' },
   });
   check('the capability lookup crosses the gateway -> 200', manage.status === 200, `got ${manage.status}`);
 
-  const cancel = await fetch(`${base}/api/public/bookings/${encodeURIComponent(jsonReference)}/cancel`, {
+  const retired = await fetch(`${base}/api/public/bookings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ form_token: 'retired-through-gateway' }),
+  });
+  check('the retired direct-checkout API -> 410 through the gateway', retired.status === 410, `got ${retired.status}`);
+
+  const cancel = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(jsonReference)}/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${jsonToken}` },
-    body: JSON.stringify({ reference: jsonReference, token: jsonToken }),
+    body: JSON.stringify({ reason: 'changed plans' }),
   });
   const cancelled = await cancel.json().catch(() => null);
   check('cancelling through the gateway -> 200', cancel.status === 200, `got ${cancel.status}`);
-  check('the cancelled reservation is marked CANCELLED', cancelled?.data?.reservation?.status === 'CANCELLED');
+  check('the cancelled request is marked CANCELLED', cancelled?.request?.status === 'CANCELLED');
 }
 
 /* ------------------------------------------------- 6. instant rollback */
@@ -392,10 +360,8 @@ console.log('\n[6] the legacy renderer is still one environment variable away');
   const detailHtml = await text(detail);
   check('legacy venue page -> 200 from node', detail.ok && isLegacyPage(detailHtml));
 
-  const booking = await fetch(`${base}/book`);
-  const bookingHtml = await text(booking);
-  check('legacy checkout still renders', booking.ok && isLegacyPage(bookingHtml));
-  check('legacy checkout keeps its own form token', formTokenOf(bookingHtml) !== null);
+  const booking = await fetch(`${base}/book`, { redirect: 'manual' });
+  check('legacy GET /book still retires to the catalogue', booking.status >= 300 && booking.status < 400, `got ${booking.status}`);
 }
 
 backend.kill();

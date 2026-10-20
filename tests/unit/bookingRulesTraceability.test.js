@@ -443,8 +443,9 @@ test('R-SEC-012 both occupancy triggers exist after migrations', () => {
     [
       '0001_init.sql',
       '0002_blob_columns.sql',
-      '0003_currency_sri_lanka.sql',
-      '0004_public_self_booking.sql',
+    '0003_currency_sri_lanka.sql',
+    '0004_public_self_booking.sql',
+    '0005_booking_request_payments_ai.sql',
     ],
   );
   db.close();

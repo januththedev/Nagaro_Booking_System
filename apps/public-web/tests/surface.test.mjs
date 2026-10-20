@@ -1,17 +1,20 @@
 /**
  * Static guards for the public surface.
  *
- * These are the rules that review would otherwise have to re-check by hand on
- * every change: no horizontal rails or numbered markers, a hero that paints
- * before WebGL is ready and gives up on weak devices, motion that never fights
- * the user, and copy that does not promise "a member of staff will confirm"
- * when checkout is in fact immediate.
+ * These are the rules review would otherwise re-check by hand on every change:
+ * no horizontal rails or numbered markers, a hero that paints before WebGL is
+ * ready and gives up on weak devices, motion that never fights the user, one
+ * unified request flow (no retired dual channel), a navigation-free header
+ * whose single call to action is labelled exactly "Book a Space", and copy
+ * that never promises a reservation is confirmed before staff approval and any
+ * configured booking fee.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dictionaries } from '../lib/i18n.ts';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -47,7 +50,7 @@ test('the hero paints a real photograph before WebGL exists', async () => {
   assert.match(landing, /<picture/, 'the hero must offer a non-canvas paint path');
   const picture = landing.slice(landing.indexOf('<picture'), landing.indexOf('</picture>'));
   assert.match(picture, /<img/, 'the hero picture must contain a real image element');
-  assert.match(picture, /alt="[^"{]/);
+  assert.match(picture, /alt=(\{[^}]+\}|"[^"{][^"]*")/, 'the hero image needs alternative text');
   assert.match(picture, /fetchPriority="high"/);
 
   assert.match(landing, /dynamic\(\(\)\s*=>\s*import\("\.\/HeroWebGLCanvas"\)/);
@@ -58,20 +61,44 @@ test('the hero paints a real photograph before WebGL exists', async () => {
   );
 });
 
-test('the arrival viewport carries the enquiry and booking calls to action', async () => {
+test('the arrival viewport carries the Book a Space call to action', async () => {
   const landing = await readApp('components/LandingExperience.tsx');
   const arrival = landing.slice(
     landing.indexOf('aria-label="TRACE Spaces arrival"'),
     landing.indexOf('HERITAGE & ARCHITECTURAL CHARACTER'),
   );
   assert.ok(arrival.length > 0, 'the arrival section must exist');
-  assert.match(arrival, /href="\/spaces"/);
-  assert.match(arrival, /href="\/book"/);
+  assert.match(arrival, /href="\/spaces"/, 'the primary action leads to the catalogue');
+  assert.doesNotMatch(arrival, /href="\/book(\/|")/, 'the retired direct-booking route must not be offered');
+  assert.doesNotMatch(arrival, /href="\/booking-request(\/|")/, 'the retired inquiry route must not be offered');
   assert.match(
     arrival,
     /min-h-\[(?:100svh|100dvh|calc\(100dvh)/,
     'the arrival block must fill the first viewport',
   );
+});
+
+test('the header is a brand mark with one action — no navigation menu', async () => {
+  const shell = await readApp('components/PublicShell.tsx');
+  assert.doesNotMatch(shell, /<nav/, 'the public header must not carry a navigation menu');
+  assert.doesNotMatch(shell, /menuOpen|hamburger|nav-toggle/i, 'no mobile hamburger menu');
+  for (const retired of ['/book', '/booking-request', '/admin']) {
+    assert.doesNotMatch(shell, new RegExp(`href="${retired.replace('/', '\\/')}"`), `the shell must not link to ${retired}`);
+  }
+  assert.match(shell, /href="\/spaces"/, 'the single call to action leads to the catalogue');
+  assert.match(shell, /LanguageSwitcher/, 'the language control is part of the minimal header');
+  assert.match(shell, /id="main-content"/);
+  assert.match(shell, /useT\(\)/, 'shell copy comes from the dictionary');
+});
+
+test('the English call to action is labelled exactly "Book a Space" in every language', () => {
+  for (const locale of ['en', 'si', 'ta']) {
+    assert.equal(typeof dictionaries[locale].chrome.bookCta, 'string');
+    assert.ok(dictionaries[locale].chrome.bookCta.trim().length > 0);
+  }
+  assert.equal(dictionaries.en.chrome.bookCta, 'Book a Space');
+  assert.equal(dictionaries.en.hero.bookCta, 'Book a Space');
+  assert.equal(dictionaries.en.closing.bookCta, 'Book a Space');
 });
 
 test('WebGL is a capped, lazy, recoverable enhancement', async () => {
@@ -110,33 +137,40 @@ test('smooth scrolling is opt-in and GSAP only animates compositor properties', 
   assert.doesNotMatch(motion, /scroll-behavior:\s*smooth/, 'native smooth scrolling stays with CSS, not JS');
 });
 
-test('direct checkout is a real JSON submission with a no-JavaScript fallback', async () => {
-  const form = await readApp('components/DirectBookingForm.tsx');
+test('the unified request form reaches the booking engine with and without JavaScript', async () => {
+  const form = await readApp('components/UnifiedRequestForm.tsx');
 
-  assert.match(form, /fetch\(clientApiPath\("\/api\/public\/bookings"\)/);
-  assert.match(form, /"Content-Type": "application\/json"/);
-  assert.match(form, /form_token: formToken/);
+  assert.match(form, /fetch\(clientApiPath\(['"]\/api\/public\/booking-requests['"]\)/);
+  assert.match(form, /["']Content-Type["']:\s*["']application\/json["']/);
+  assert.match(form, /formToken/, 'submissions are idempotent');
   assert.match(form, /method="post"/);
-  assert.match(form, /action="\/book"/, 'without JavaScript the same form must reach the Node runtime');
+  assert.match(form, /action=\{`\/spaces\//, 'without JavaScript the form posts back to the Node runtime');
+  assert.match(form, /name="form_token"/);
   assert.match(form, /role="alert"/);
-  assert.match(form, /aria-live="polite"/);
   assert.match(form, /name="email"/);
+  assert.match(form, /name="date"/);
 });
 
-test('direct booking copy never defers confirmation to staff', async () => {
-  const direct = [
-    'components/DirectBookingForm.tsx',
-    'components/VenueDetailClient.tsx',
-    'components/LandingExperience.tsx',
-    'app/book/page.tsx',
-  ];
-  const contradiction = /(staff|team|our office|front desk)[^.]{0,60}confirm|await(ing)?[^.]{0,30}confirmation|(must|will) be confirmed (by|after)/i;
-  for (const file of direct) {
-    const content = await readApp(file);
-    assert.doesNotMatch(content, contradiction, `${file} contradicts immediate direct confirmation`);
+test('no surface promises a reservation is confirmed before approval and payment', async () => {
+  const promise = /(confirm(s|ed)? (your )?reservation immediately|immediate(ly)? confirm|book(ed)? instantly|confirmed instantly|pay later,? confirm now)/i;
+  const contradiction = /(staff|team|our office|front desk)[^.]{0,40}(will|must) (now )?confirm( your)? reservation immediately/i;
+  for (const file of await sourceFiles()) {
+    const content = await readFile(file, 'utf8');
+    const label = file.slice(appRoot.length + 1);
+    assert.doesNotMatch(content, promise, `${label} over-promises confirmation`);
+    assert.doesNotMatch(content, contradiction, `${label} contradicts the approval flow`);
+    assert.doesNotMatch(content, /concierge/i, `${label} must not resurrect the retired concierge channel`);
+    assert.doesNotMatch(content, /Direct booking console/i, `${label} must not describe request-only flow as direct booking`);
   }
-  const venue = await readApp('components/VenueDetailClient.tsx');
-  assert.match(venue, /confirm(s)? your reservation immediately|confirms your reservation immediately/i);
+});
+
+test('the request form states that staff review happens before anything is booked', async () => {
+  const en = dictionaries.en;
+  assert.match(en.request.noticeBody, /approval|staff/i);
+  assert.match(en.request.formEyebrow, /No payment yet/i);
+  assert.match(en.status.bodyRequested, /approves/i);
+  assert.match(en.assistant.intro, /prepare your booking details/i);
+  assert.doesNotMatch(en.assistant.intro, /confirmed|reserved/i, 'the assistant intro must not claim a booking');
 });
 
 test('every photograph carries alternative text', async () => {
@@ -152,7 +186,7 @@ test('every photograph carries alternative text', async () => {
   }
 });
 
-test('inquiry withdrawal keeps a native fallback and a scripted path', async () => {
+test('legacy capability links keep their native fallback and scripted path', async () => {
   const page = await readApp('app/booking-request/withdraw/page.tsx');
   const form = await readApp('components/WithdrawInquiryForm.tsx');
 
@@ -163,14 +197,4 @@ test('inquiry withdrawal keeps a native fallback and a scripted path', async () 
   assert.match(form, /fetch\("\/booking-request\/withdraw"/);
   assert.match(form, /withdrawn=1/);
   assert.match(form, /role="alert"/);
-});
-
-test('the shell exposes the primary routes and a skip link', async () => {
-  const shell = await readApp('components/PublicShell.tsx');
-  for (const route of ['/spaces', '/book', '/booking-request', '/admin']) {
-    assert.match(shell, new RegExp(`href="${route.replace('/', '\\/')}"`), `the shell must link to ${route}`);
-  }
-  assert.match(shell, /Skip to main content/);
-  assert.match(shell, /id="main-content"/);
-  assert.match(shell, /aria-expanded=\{menuOpen\}/);
 });

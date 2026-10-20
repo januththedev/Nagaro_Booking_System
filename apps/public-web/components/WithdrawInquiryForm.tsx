@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { useT } from "./I18nProvider";
 
 /**
  * Withdrawal keeps a native POST to the Node runtime (so it still works with
@@ -11,6 +12,7 @@ import { useState, type FormEvent } from "react";
  * landing on the legacy receipt page.
  */
 export function WithdrawInquiryForm({ reference, token }: { reference: string; token: string }) {
+  const t = useT();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,7 @@ export function WithdrawInquiryForm({ reference, token }: { reference: string; t
     // explanation the visitor needs.
     if (!reference || !token || submitting) return;
     event.preventDefault();
+    if (!window.confirm(t.withdraw.confirm)) return;
     setSubmitting(true);
     setError(null);
 
@@ -41,9 +44,9 @@ export function WithdrawInquiryForm({ reference, token }: { reference: string; t
         );
         return;
       }
-      setError("That withdrawal link was not recognised. Open the complete link from your receipt.");
+      setError(t.withdraw.notFound);
     } catch {
-      setError("Network error while withdrawing this inquiry. Please retry.");
+      setError(t.withdraw.errorNetwork);
     } finally {
       setSubmitting(false);
     }
@@ -69,10 +72,10 @@ export function WithdrawInquiryForm({ reference, token }: { reference: string; t
           disabled={submitting}
           className="btn-primary bg-[var(--brick)] border-[var(--brick)] disabled:opacity-60"
         >
-          {submitting ? "Withdrawing inquiry." : "Confirm withdrawal"}
+          {submitting ? t.withdraw.submitting : t.withdraw.submit}
         </button>
         <Link href="/spaces" className="btn-outline">
-          Keep inquiry
+          {t.withdraw.keepCta}
         </Link>
       </div>
     </form>

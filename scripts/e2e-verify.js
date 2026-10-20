@@ -9,9 +9,12 @@
  * Exit: 0 on full pass, 1 on any failure.
  */
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+const md5Upper = (value) => createHash('md5').update(String(value)).digest('hex').toUpperCase();
 
 const PORT = 4217;
 const dir = mkdtempSync(join(tmpdir(), 'nagaro-e2e-'));
@@ -29,6 +32,11 @@ const env = {
   NAGARO_BOOTSTRAP_ADMIN_NAME: 'E2E Admin',
   NAGARO_ADMIN_NOTIFICATION_EMAIL: 'office@e2e.test',
   NAGARO_IP_SALT: 'e2e-salt',
+  // Sandbox-shaped credentials so the harness can exercise the real PayHere
+  // signature rules locally. They are test values only and grant nothing.
+  PAYHERE_MERCHANT_ID: '1210000',
+  PAYHERE_MERCHANT_SECRET: 'e2e-payhere-secret',
+  PAYHERE_SANDBOX: '1',
 };
 
 // Spaces are bookable 08:00-18:00 Sri Lanka Standard Time (UTC+05:30, no DST).
@@ -354,55 +362,39 @@ console.log('\n[12] cancellation requires a reason; releases inventory');
   check('second cancel -> rejected (409)', r8.status === 409 || r8.status === 422, `got ${r8.status}`);
 }
 
-// 13. inquiry flow
-console.log('\n[13] public inquiry + admin queue + withdraw');
-let inquiryRef, withdrawToken;
+// 13. retired inquiry channel + preserved legacy capability endpoints
+console.log('\n[13] retired inquiry channel + legacy capability endpoints');
 {
   const r = await req('GET', '/booking-request');
-  check('GET /booking-request -> 200', r.status === 200);
-  const html = await r.text();
-  const c = csrfOf(html); if (c) csrf = c;
-  const futureDate = '2026-11-20';
-  const r2 = await req('POST', '/booking-request', { form: {
+  check('GET /booking-request -> catalogue redirect (channel retired)', r.status === 308 && locPath(r) === '/spaces', `${r.status} ${locPath(r)}`);
+
+  const posted = await req('POST', '/booking-request', { form: {
     _csrf: csrf,
     space_code: spaceCode,
-    date: futureDate,
+    date: '2026-11-20',
     start_time: '10:00',
     end_time: '12:00',
     desks: '1',
     customer_name: 'Inquiry Person',
     email: 'inq@e2e.test',
-    phone: '+94911111111',
-    organization: 'Trace Labs',
-    attendees: '3',
     message: 'please confirm',
   } });
-  check('POST inquiry -> 303', r2.status === 303, `got ${r2.status} ${locPath(r2)}`);
-  const receivedUrl = locPath(r2);
-  const r3 = await req('GET', receivedUrl);
-  const html3 = await r3.text();
-  check('received page -> 200', r3.status === 200);
-  check('received page shows reference', /INQ-\d{4}-\d+/.test(html3));
-  check('received page states NOT delivered (honest)', html3.toLowerCase().includes('not') && (html3.toLowerCase().includes('delivered') || html3.toLowerCase().includes('configured')));
-  const m = html3.match(/INQ-\d{4}-\d+/);
-  inquiryRef = m ? m[0] : null;
-  const wm = html3.match(/withdraw\?[^"']*token=([^"&]+)/);
-  withdrawToken = wm ? decodeURIComponent(wm[1]) : null;
-  if (!withdrawToken) { try { withdrawToken = new URL(receivedUrl, base).searchParams.get('token'); } catch { /* ignore */ } }
-  check('received page exposes withdraw token', !!withdrawToken);
+  check('POST inquiry -> catalogue redirect (channel retired)', posted.status === 303 && locPath(posted) === '/spaces', `${posted.status} ${locPath(posted)}`);
+
+  // Historical inquiry links keep working: the withdrawal endpoints stay alive
+  // and unknown tokens are refused without leaking anything.
+  const withdrawForm = await req('GET', '/booking-request/withdraw');
+  check('legacy withdraw page rejects incomplete links -> 400', withdrawForm.status === 400, `got ${withdrawForm.status}`);
+  const withdrawHtml = await withdrawForm.text();
+  check('unknown inquiry reads as unrecognised', /not recognised|withdraw/i.test(withdrawHtml));
+
+  const withdrawToken = 'legacy-token-that-is-long-enough-0123456789';
+  const c = csrfOf(withdrawHtml) || csrf;
+  const postedWithdraw = await req('POST', '/booking-request/withdraw', { form: { _csrf: c, reference: 'INQ-2020-00001', token: withdrawToken } });
+  check('legacy withdraw endpoint stays alive', postedWithdraw.status < 500, `got ${postedWithdraw.status}`);
 
   const r4 = await req('GET', '/admin/inquiries');
-  check('GET /admin/inquiries -> 200', r4.status === 200);
-  const queueHtml = await r4.text();
-  check('inquiry queue lists the reference', !!inquiryRef && queueHtml.includes(inquiryRef));
-
-  if (withdrawToken && inquiryRef) {
-    const r6 = await req('GET', `/booking-request/withdraw?ref=${encodeURIComponent(inquiryRef)}&token=${encodeURIComponent(withdrawToken)}`);
-    check('GET withdraw form -> 200', r6.status === 200);
-    const c = csrfOf(await r6.text()); if (c) csrf = c;
-    const r7 = await req('POST', '/booking-request/withdraw', { form: { _csrf: csrf, reference: inquiryRef, token: withdrawToken } });
-    check('POST withdraw -> 200 (confirmed)', r7.status === 200, `got ${r7.status}`);
-  }
+  check('admin inquiry queue still serves historical inquiries', r4.status === 200, `got ${r4.status}`);
 }
 
 // 14. maintenance block
@@ -446,122 +438,154 @@ console.log('\n[16] media serving is inert');
   }
 }
 
-// 17. public JSON booking contract (the Next.js frontend boundary)
-console.log('\n[17] public JSON booking contract');
+// 17. unified request -> approval -> booking-fee payment contract
+console.log('\n[17] unified request -> approval -> payment contract');
 {
-  const window = slstWindow(31, 14, 2);
-  const token = `e2e-public-${Date.now()}`;
-  const body = {
-    form_token: token,
-    space_code: spaceCode,
-    date: new Date(window.start + 5.5 * 3600000).toISOString().slice(0, 10),
-    start_time: '14:00',
-    end_time: '16:00',
-    desks: '1',
-    attendees: '6',
-    message: 'JSON checkout E2E',
-    customer_name: 'Public Guest',
-    email: `public-guest-${Date.now()}@e2e.test`,
-    phone: '+94 77 000 0000',
-    organization: 'Guest Labs',
+  const jsonHeaders = { 'Content-Type': 'application/json', Accept: 'application/json' };
+
+  // 17a. the retired dual channel is closed: only the unified request remains.
+  const retiredDirect = await fetch(base + '/api/public/bookings', {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ form_token: 'retired', space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' }),
+  });
+  check('POST /api/public/bookings -> 410 (direct confirmation retired)', retiredDirect.status === 410, `got ${retiredDirect.status}`);
+  const retiredConcierge = await fetch(base + '/api/public/inquiries', {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' }),
+  });
+  check('POST /api/public/inquiries -> 410 (concierge channel retired)', retiredConcierge.status === 410, `got ${retiredConcierge.status}`);
+  const retiredForm = await req('POST', '/book', { form: { form_token: 'retired', space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' } });
+  check('POST /book form -> catalogue redirect', retiredForm.status === 303 && locPath(retiredForm) === '/spaces', `${retiredForm.status} ${locPath(retiredForm)}`);
+  const retiredInquiryForm = await req('POST', '/booking-request', { form: { space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' } });
+  check('POST /booking-request form -> catalogue redirect', retiredInquiryForm.status === 303 && locPath(retiredInquiryForm) === '/spaces', `${retiredInquiryForm.status} ${locPath(retiredInquiryForm)}`);
+
+  // 17b. a request records intent; it holds no inventory and confirms nothing.
+  const window = slstWindow(32, 10, 2);
+  const dateKey = new Date(window.start + SLST_OFFSET_MS).toISOString().slice(0, 10);
+  const request = {
+    spaceCode, date: dateKey, startTime: '10:00', endTime: '12:00',
+    unitCount: '1', attendees: '6', purpose: 'Unified request E2E',
+    formToken: `e2e-req-${Date.now()}`,
+    fullName: 'Request Guest', email: `request-guest-${Date.now()}@e2e.test`,
+    phone: '+94 77 000 0001', organization: 'Request Labs',
   };
+  const createRequest = () => fetch(base + '/api/public/booking-requests', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(request) });
+  const created = await createRequest();
+  const createdBody = await created.json().catch(() => null);
+  check('POST /api/public/booking-requests -> 201', created.status === 201, `got ${created.status}`);
+  check('request response is no-store', (created.headers.get('cache-control') || '').includes('no-store'));
+  check('request response is no-referrer', created.headers.get('referrer-policy') === 'no-referrer');
+  const reqRef = createdBody?.request?.reference;
+  const reqToken = createdBody?.manageToken;
+  check('request returns a REQ reference', /^REQ-\d{4}-\d{5}$/.test(reqRef || ''), JSON.stringify(createdBody).slice(0, 200));
+  check('request returns a capability token', typeof reqToken === 'string' && reqToken.length >= 40);
+  check('a new request is honestly unconfirmed', createdBody?.request?.status === 'REQUESTED');
+  check('a new request is honestly unpaid', createdBody?.request?.paymentStatus === 'UNPAID');
 
-  const post = () => fetch(base + '/api/public/bookings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const availabilityUrl = `${base}/api/public/availability?space=${encodeURIComponent(spaceCode)}&start=${encodeURIComponent(new Date(window.start).toISOString())}&end=${encodeURIComponent(new Date(window.end).toISOString())}&desks=1`;
+  const freeBefore = await fetch(availabilityUrl, { headers: { Accept: 'application/json' } });
+  const freeBeforeBody = await freeBefore.json().catch(() => null);
+  check('a pending request holds no inventory', freeBeforeBody?.isAvailable === true, JSON.stringify(freeBeforeBody).slice(0, 160));
 
-  const r = await post();
-  const j = await r.json().catch(() => null);
-  check('POST /api/public/bookings -> 201', r.status === 201, `got ${r.status}`);
-  check('response is no-store', (r.headers.get('cache-control') || '').includes('no-store'));
-  check('response is no-referrer', r.headers.get('referrer-policy') === 'no-referrer');
-  const ref = j?.data?.reservation?.reference;
-  const manageToken = j?.data?.manageToken;
-  check('JSON checkout returns a reference', /^NG-\d{4}-\d{5}$/.test(ref || ''), JSON.stringify(j).slice(0, 200));
-  check('JSON checkout returns a capability token', typeof manageToken === 'string' && manageToken.length >= 40);
-  check('JSON checkout projects no customer PII', !Object.hasOwn(j?.data?.reservation ?? {}, 'customer'));
+  const retried = await createRequest();
+  const retriedBody = await retried.json().catch(() => null);
+  check('idempotent request retry -> 200', retried.status === 200, `got ${retried.status}`);
+  check('idempotent retry keeps one request', retriedBody?.request?.reference === reqRef && retriedBody?.idempotent === true);
 
-  if (ref && manageToken) {
-    const r2 = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}`, {
-      headers: { Authorization: `Bearer ${manageToken}`, Accept: 'application/json' },
-    });
-    const j2 = await r2.json().catch(() => null);
-    check('GET capability booking -> 200', r2.status === 200, `got ${r2.status}`);
-    check('capability booking returns the reference', j2?.data?.reservation?.reference === ref);
-    check('capability lookup is no-store', (r2.headers.get('cache-control') || '').includes('no-store'));
+  if (reqRef && reqToken) {
+    const capability = () => fetch(`${base}/api/public/booking-requests/${encodeURIComponent(reqRef)}`, { headers: { Authorization: `Bearer ${reqToken}`, Accept: 'application/json' } });
 
-    const r3 = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}`, {
-      headers: { Authorization: 'Bearer wrong-token-value-that-is-long-enough', Accept: 'application/json' },
-    });
-    check('wrong capability -> 404', r3.status === 404, `got ${r3.status}`);
+    const read = await capability();
+    const readBody = await read.json().catch(() => null);
+    check('capability lookup -> 200', read.status === 200, `got ${read.status}`);
+    check('capability lookup is no-store', (read.headers.get('cache-control') || '').includes('no-store'));
+    check('capability lookup projects no customer PII', !Object.hasOwn(readBody?.request ?? {}, 'customer'));
 
-    const r4 = await post();
-    const j4 = await r4.json().catch(() => null);
-    check('idempotent retry -> 200', r4.status === 200, `got ${r4.status}`);
-    check('idempotent retry keeps the same reference', j4?.data?.reservation?.reference === ref);
-    check('idempotent retry is flagged', j4?.data?.idempotent === true);
+    const wrongToken = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(reqRef)}`, { headers: { Authorization: 'Bearer wrong-token-value-that-is-long-enough', Accept: 'application/json' } });
+    check('wrong request capability -> 404', wrongToken.status === 404, `got ${wrongToken.status}`);
 
-    const competitor = await fetch(base + '/api/public/bookings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        ...body,
-        form_token: `e2e-competitor-${Date.now()}`,
-        email: `competitor-${Date.now()}@e2e.test`,
-      }),
-    });
+    // 17c. the administrator sets the booking fee and approves the request.
+    const queue = await req('GET', '/admin/booking-requests');
+    const queueHtml = await queue.text();
+    check('admin approval queue renders the request', queue.status === 200 && queueHtml.includes(reqRef), `got ${queue.status}`);
+    const queueToken = csrfOf(queueHtml);
+
+    const policy = await req('POST', '/admin/booking-requests/fee-policy', { form: { _csrf: queueToken, mode: 'FIXED', fixed_cents: '50000', percentage_bps: '0', payment_window_minutes: '30' } });
+    check('booking fee policy is administrator-configurable', [302, 303].includes(policy.status), `got ${policy.status}`);
+
+    const approve = await req('POST', `/admin/booking-requests/${encodeURIComponent(reqRef)}/approve`, { form: { _csrf: queueToken } });
+    check('approval redirects back to the queue', [302, 303].includes(approve.status), `got ${approve.status}`);
+
+    const held = await capability();
+    const heldBody = await held.json().catch(() => null);
+    check('approval moves the request to awaiting payment', heldBody?.request?.status === 'APPROVED_AWAITING_PAYMENT', String(heldBody?.request?.status));
+    check('the fee snapshot is immutable and visible', heldBody?.request?.payment?.bookingFeeCents === 50000);
+    check('approval states the hold deadline', Number(heldBody?.request?.holdExpiresAt) > Date.now());
+
+    const heldNow = await fetch(availabilityUrl, { headers: { Accept: 'application/json' } });
+    const heldNowBody = await heldNow.json().catch(() => null);
+    check('an approved hold reserves inventory', heldNowBody?.isAvailable === false, JSON.stringify(heldNowBody).slice(0, 160));
+
+    // 17d. PayHere checkout parameters, then a correctly signed sandbox callback.
+    const checkoutRes = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(reqRef)}/payment`, { method: 'POST', headers: { Authorization: `Bearer ${reqToken}`, Accept: 'application/json' } });
+    const checkoutBody = await checkoutRes.json().catch(() => null);
+    const checkout = checkoutBody?.checkout;
+    check('payment endpoint returns PayHere checkout parameters', checkoutRes.status === 200 && String(checkout?.action || '').includes('payhere.lk'), JSON.stringify(checkoutBody).slice(0, 160));
+    const fields = checkout?.fields ?? {};
+    check('checkout amounts use PayHere money format', /^\d+\.\d{2}$/.test(fields.amount || ''), String(fields.amount));
+    check('checkout names the notification endpoint', String(fields.notify_url || '').includes('/api/public/payments/payhere/notify'));
+    check('checkout hash matches the documented algorithm', fields.hash === md5Upper(`${fields.merchant_id}${fields.order_id}${fields.amount}${fields.currency}${md5Upper('e2e-payhere-secret')}`));
+
+    const sig = md5Upper(`${fields.merchant_id}${fields.order_id}${fields.amount}${fields.currency}2${md5Upper('e2e-payhere-secret')}`);
+    const notifyBody = new URLSearchParams({
+      merchant_id: fields.merchant_id, order_id: fields.order_id, payment_id: 'E2E-PAY-1',
+      payhere_amount: fields.amount, payhere_currency: fields.currency, status_code: '2',
+      method: 'VISA', status_message: 'Success', md5sig: sig,
+    }).toString();
+    const notify = await fetch(base + '/api/public/payments/payhere/notify', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: notifyBody });
+    check('signed PayHere callback -> 200 OK', notify.status === 200 && (await notify.text()) === 'OK', `got ${notify.status}`);
+
+    const confirmed = await capability();
+    const confirmedBody = await confirmed.json().catch(() => null);
+    check('verified payment confirms the request', confirmedBody?.request?.status === 'CONFIRMED', String(confirmedBody?.request?.status));
+    check('payment state is recorded as paid', confirmedBody?.request?.paymentStatus === 'PAID');
+    check('confirmation creates a real reservation', /^NG-\d{4}-\d{5}$/.test(confirmedBody?.request?.reservationReference || ''), String(confirmedBody?.request?.reservationReference));
+
+    const duplicate = await fetch(base + '/api/public/payments/payhere/notify', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: notifyBody });
+    check('duplicate callback stays idempotent -> 200', duplicate.status === 200, `got ${duplicate.status}`);
+    const afterDuplicate = await capability();
+    const afterDuplicateBody = await afterDuplicate.json().catch(() => null);
+    check('duplicate callback confirms nothing twice', afterDuplicateBody?.request?.reservationReference === confirmedBody?.request?.reservationReference);
+
+    const forged = await fetch(base + '/api/public/payments/payhere/notify', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ merchant_id: fields.merchant_id, order_id: fields.order_id, payment_id: 'E2E-FORGED', payhere_amount: '999999.00', payhere_currency: 'LKR', status_code: '2', md5sig: 'FORGED' }).toString() });
+    check('forged callback -> 400 INVALID', forged.status === 400, `got ${forged.status}`);
+
+    // 17e. a competing request is recorded but can never take the same window.
+    const competitor = await fetch(base + '/api/public/booking-requests', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ ...request, formToken: `e2e-req-competitor-${Date.now()}`, email: `competitor-${Date.now()}@e2e.test`, fullName: 'Competing Guest' }) });
     const competitorBody = await competitor.json().catch(() => null);
-    check('competing JSON checkout -> 409', competitor.status === 409, `got ${competitor.status}`);
-    check(
-      'competing JSON checkout reports a conflict',
-      competitorBody?.error?.code === 'DOUBLE_BOOKING_CONFLICT',
-      JSON.stringify(competitorBody).slice(0, 200),
-    );
+    check('competing request is recorded (requests hold nothing)', competitor.status === 201, `got ${competitor.status}`);
+    const competitorRef = competitorBody?.request?.reference;
+    if (competitorRef) {
+      const competitorApprove = await req('POST', `/admin/booking-requests/${encodeURIComponent(competitorRef)}/approve`, { form: { _csrf: queueToken } });
+      check('approving a conflicting request is refused', competitorApprove.status === 409, `got ${competitorApprove.status}`);
+    }
 
-    const cancel = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}/cancel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${manageToken}`,
-      },
-      body: JSON.stringify({ reference: ref, token: manageToken }),
-    });
-    const cancelBody = await cancel.json().catch(() => null);
-    check('JSON cancel -> 200', cancel.status === 200, `got ${cancel.status}`);
-    check('JSON cancel marks the reservation CANCELLED', cancelBody?.data?.reservation?.status === 'CANCELLED');
-
-    const cancelAgain = await fetch(`${base}/api/public/bookings/${encodeURIComponent(ref)}/cancel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${manageToken}`,
-      },
-      body: JSON.stringify({ reference: ref, token: manageToken }),
-    });
-    check('second JSON cancel -> 409', cancelAgain.status === 409, `got ${cancelAgain.status}`);
+    // 17f. the customer can withdraw a request before any decision.
+    const cancelRequest = await fetch(base + '/api/public/booking-requests', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ ...request, formToken: `e2e-req-cancel-${Date.now()}`, email: `cancel-me-${Date.now()}@e2e.test`, fullName: 'Cancel Guest' }) });
+    const cancelRequestBody = await cancelRequest.json().catch(() => null);
+    const cancelRef = cancelRequestBody?.request?.reference;
+    const cancelToken = cancelRequestBody?.manageToken;
+    if (cancelRef && cancelToken) {
+      const cancel = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(cancelRef)}/cancel`, {
+        method: 'POST',
+        headers: { ...jsonHeaders, Authorization: `Bearer ${cancelToken}` },
+        body: JSON.stringify({ reason: 'Plans changed' }),
+      });
+      const cancelBody = await cancel.json().catch(() => null);
+      check('customer can cancel a request -> 200', cancel.status === 200, `got ${cancel.status}`);
+      check('cancelled request is honestly terminal', cancelBody?.request?.status === 'CANCELLED');
+    }
   }
-
-  const inquiry = await fetch(base + '/api/public/inquiries', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      space_code: spaceCode,
-      date: '2026-12-12',
-      start_time: '10:00',
-      end_time: '12:00',
-      customer_name: 'Concierge Guest',
-      email: `concierge-${Date.now()}@e2e.test`,
-      message: 'JSON inquiry E2E',
-    }),
-  });
-  const inquiryBody = await inquiry.json().catch(() => null);
-  check('POST /api/public/inquiries -> 201', inquiry.status === 201, `got ${inquiry.status}`);
-  check('JSON inquiry returns INQ reference', /^INQ-\d{4}-\d+/.test(inquiryBody?.data?.reference || ''));
-  check('JSON inquiry exposes a withdrawal path', typeof inquiryBody?.data?.withdrawPath === 'string');
 }
 
 child.kill();

@@ -287,19 +287,21 @@ Every route below must exist. Handlers are thin; all rules live in services.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/` | Landing page: hero, category entry points, featured published spaces |
-| GET | `/spaces` | Published space directory with category, capacity, price, amenity and text filters |
-| GET | `/spaces/:code` | Space detail: gallery, amenities, category attributes, rates, availability checker, request CTA |
-| GET | `/book` | Direct guest checkout, optionally pre-filled (`?space=<code>&date=&start=&end=`) |
-| POST | `/book` | Atomically confirm a public reservation; JSON when requested, otherwise redirect |
-| GET | `/book/confirmed` | Capability-protected confirmation page (`?ref=&token=`) |
-| GET | `/book/manage` | Capability-protected booking summary and cancellation action |
-| POST | `/book/cancel` | Cancel a not-yet-started public reservation and release inventory once |
-| GET | `/booking-request` | Request-to-book form, optionally pre-filled (`?space=<code>&date=&start=&end=`) |
-| POST | `/booking-request` | Persist inquiry, attempt notification, redirect to confirmation |
-| GET | `/booking-request/received` | Truthful acknowledgement (reference, provisional wording, delivery status) |
-| GET | `/booking-request/withdraw` | Withdraw form (`?ref=&token=`) |
-| POST | `/booking-request/withdraw` | Mark inquiry WITHDRAWN |
+| GET | `/` | Landing page: photographic hero, "Book a Space" entry point, venue programme, footer |
+| GET | `/spaces` | Published space directory with category, capacity, billing-unit, amenity, text and availability filters |
+| GET | `/spaces/:code` | Space detail: gallery, amenities, category attributes, rates, availability console, request CTA |
+| GET | `/spaces/:code/book` | Unified booking request form for one published space |
+| POST | `/spaces/:code/book` | No-JavaScript fallback for the request form; creates the request and redirects to the private status page |
+| GET | `/book` | **Retired** — 308 redirect to `/spaces` |
+| POST | `/book` | **Retired** — 303 redirect to `/spaces` (immediate self-confirmation removed) |
+| GET | `/book/confirmed` | Legacy capability receipt for pre-request reservations (`?ref=&token=`); kept for existing links |
+| GET | `/book/manage` | Capability-protected status page: request state, hold deadline, PayHere action, cancellation; legacy reservations still manage here |
+| POST | `/book/cancel` | Cancel a not-yet-started legacy reservation and release inventory once |
+| GET | `/booking-request` | **Retired** — 308 redirect to `/spaces` |
+| POST | `/booking-request` | **Retired** — 303 redirect to `/spaces` (concierge channel removed) |
+| GET | `/booking-request/received` | Legacy inquiry acknowledgement, kept for existing links |
+| GET | `/booking-request/withdraw` | Legacy inquiry withdraw form (`?ref=&token=`); incomplete links read 400 |
+| POST | `/booking-request/withdraw` | Mark a legacy inquiry WITHDRAWN |
 | GET | `/media/:storedName` | Serve an uploaded photograph (validated name, inert headers) |
 
 ### Public JSON
@@ -310,10 +312,18 @@ Every route below must exist. Handlers are thin; all rules live in services.
 | GET | `/api/public/spaces/:code` | One published space |
 | GET | `/api/public/availability` | `?space=<code>&start=&end=&desks=` → provisional availability, counts only |
 | GET | `/api/public/availability/day` | `?space=<code>&date=` → hourly slots for one day |
-| POST | `/api/public/bookings` | Atomically confirm a public reservation; returns `{ ok: true, data: { reservation, manageToken, managePath, idempotent } }` (`no-store, private`, `no-referrer`) |
-| GET | `/api/public/bookings/:reference` | Load a public reservation with capability token (`Authorization: Bearer <token>`, `x-booking-capability`, or `?token=`) |
-| POST | `/api/public/bookings/:reference/cancel` | Cancel a future public reservation with capability token and release inventory once |
-| POST | `/api/public/inquiries` | Persist a provisional concierge inquiry and return `{ ok: true, data: { requestRef, reference, ... } }` |
+| POST | `/api/public/booking-requests` | Create a booking request (status `REQUESTED`, no inventory held): `{ ok, request, manageToken, idempotent }` (`no-store, private`, `no-referrer`); idempotent on `formToken` |
+| GET | `/api/public/booking-requests/:reference` | Capability-protected request state, fee snapshot and hold deadline |
+| POST | `/api/public/booking-requests/:reference/cancel` | Customer cancellation through the capability link; releases any active hold |
+| POST | `/api/public/booking-requests/:reference/payment` | Produce signed PayHere checkout parameters for the snapshotted fee (409 when not payable) |
+| POST | `/api/public/payments/payhere/notify` | PayHere server-to-server callback (form-encoded): `md5sig` verified, amount checked against the immutable snapshot, idempotent, never trusts the browser return |
+| POST | `/api/public/assistant/chat` | Venue assistant turn (OpenRouter through whitelisted tools; contact details redacted; bounded tool budget) |
+| POST | `/api/public/assistant/drafts` | Create a short-lived, schema-validated booking draft (token hashed at rest) |
+| POST | `/api/public/assistant/drafts/resolve` | Burn a draft token and return the prepared fields |
+| GET | `/api/public/bookings/:reference` | Load a legacy public reservation with capability token (`Authorization: Bearer <token>`, `x-booking-capability`, or `?token=`) |
+| POST | `/api/public/bookings/:reference/cancel` | Cancel a future legacy reservation with capability token and release inventory once |
+| POST | `/api/public/bookings` | **Retired** — 410; immediate confirmation bypassed approval and fees |
+| POST | `/api/public/inquiries` | **Retired** — 410; the concierge channel is replaced by booking requests |
 
 ### Admin pages (HTML)
 
@@ -350,6 +360,12 @@ Every route below must exist. Handlers are thin; all rules live in services.
 | GET | `/admin/maintenance`, POST `/admin/maintenance` | List / create maintenance blocks |
 | POST | `/admin/maintenance/:id/cancel` | Cancel maintenance block |
 | GET | `/admin/audit` | Activity log with filters |
+
+| GET | `/admin/booking-requests` | Approval queue: request, space, customer, amounts, payment and hold state |
+| POST | `/admin/booking-requests/fee-policy` | Administrator-configured booking fee (DISABLED/FIXED/PERCENTAGE + payment window); snapshotted at approval |
+| POST | `/admin/booking-requests/:reference/approve` | Approve a request: recheck availability atomically, create a database-enforced hold and the fee obligation |
+| POST | `/admin/booking-requests/:reference/reject` | Reject a request with a recorded reason |
+| POST | `/admin/booking-requests/:reference/resolve-payment` | Reconcile a payment exception (`REFUND_RECORDED` / `PAYMENT_KEPT`) with an audited note |
 
 ### Admin JSON
 

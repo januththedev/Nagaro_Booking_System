@@ -32,8 +32,8 @@ export default async function BookingConfirmedPage({
             private capability token issued at checkout.
           </p>
           <div className="pt-2 flex flex-wrap gap-3">
-            <Link href="/book" className="btn-primary">
-              Make a new booking
+            <Link href="/spaces" className="btn-primary">
+              Book a Space
             </Link>
             <Link href="/spaces" className="btn-outline">
               Browse venues

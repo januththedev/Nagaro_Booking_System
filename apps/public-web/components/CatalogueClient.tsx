@@ -4,24 +4,26 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { clientApiPath } from "../lib/api";
 import { spaceMeta } from "../lib/format";
+import { format } from "../lib/i18n";
 import { coverFor } from "../lib/media";
 import type { Availability, PublicSpace } from "../lib/types";
+import { useT } from "./I18nProvider";
 
 const CATEGORIES = [
-  { code: "", label: "All venues" },
-  { code: "MEETING_ROOM", label: "Meeting & training" },
-  { code: "AUDITORIUM", label: "Auditorium" },
-  { code: "COWORKING", label: "Co-working desks" },
-];
+  { code: "", labelKey: "catAll" },
+  { code: "MEETING_ROOM", labelKey: "catMeeting" },
+  { code: "AUDITORIUM", labelKey: "catAuditorium" },
+  { code: "COWORKING", labelKey: "catCoworking" },
+] as const;
 
 const PRICING_UNITS = [
-  { code: "", label: "Any billing unit" },
-  { code: "HOUR", label: "Per hour" },
-  { code: "HALF_DAY", label: "Per half day" },
-  { code: "DAY", label: "Per day" },
-  { code: "WEEK", label: "Per week" },
-  { code: "MONTH", label: "Per month" },
-];
+  { code: "", labelKey: "unitAny" },
+  { code: "HOUR", labelKey: "unitHour" },
+  { code: "HALF_DAY", labelKey: "unitHalfDay" },
+  { code: "DAY", labelKey: "unitDay" },
+  { code: "WEEK", labelKey: "unitWeek" },
+  { code: "MONTH", labelKey: "unitMonth" },
+] as const;
 
 const GRID_RATIOS = [
   "aspect-[16/10]",
@@ -60,12 +62,19 @@ export function CatalogueClient({
   initialStart?: string;
   initialEnd?: string;
 }) {
+  const t = useT();
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState(initialCategory);
   const [minCapacity, setMinCapacity] = useState("");
   const [pricingUnit, setPricingUnit] = useState("");
   const [sort, setSort] = useState<"name" | "capacity" | "price">("name");
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [draftToken, setDraftToken] = useState("");
+
+  useEffect(() => {
+    const token = window.location.hash.match(/(?:^#|&)draft=([^&]+)/)?.[1];
+    if (token) setDraftToken(decodeURIComponent(token));
+  }, []);
 
   const [checkDate, setCheckDate] = useState(initialDate);
   const [checkStart, setCheckStart] = useState(initialStart);
@@ -103,13 +112,13 @@ export function CatalogueClient({
 
   async function verifyAvailabilityWindow() {
     if (!checkDate || !checkStart || !checkEnd) {
-      setWindowError("Select a date, start time and end time (SLST) to check availability.");
+      setWindowError(t.catalogue.windowErrorSelect);
       return;
     }
     const startIso = `${checkDate}T${checkStart}:00+05:30`;
     const endIso = `${checkDate}T${checkEnd}:00+05:30`;
     if (Date.parse(endIso) <= Date.parse(startIso)) {
-      setWindowError("End time must be after the start time.");
+      setWindowError(t.catalogue.windowErrorOrder);
       return;
     }
     setWindowError(null);
@@ -137,7 +146,7 @@ export function CatalogueClient({
       }
       setAvailabilityMap(next);
     } catch {
-      setWindowError("Could not reach the availability service.");
+      setWindowError(t.catalogue.windowErrorService);
     } finally {
       setCheckingWindow(false);
     }
@@ -231,19 +240,18 @@ export function CatalogueClient({
       <header className="pb-8 hairline-b grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-end">
         <div className="lg:col-span-8 flex flex-col gap-4">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brick)]">
-            TRACE Expert City · Venue Catalogue
+            {t.catalogue.eyebrow}
           </p>
           <h1 className="font-display text-4xl sm:text-6xl text-[var(--ink)] max-w-[13ch]">
-            Find the room that fits the ambition.
+            {t.catalogue.headline}
           </h1>
         </div>
         <p className="lg:col-span-4 text-base text-[var(--graphite)] max-w-xl lg:pb-1">
-          Browse verified campus spaces, compare practical specifications, then check live SLST
-          availability and reserve directly.
+          {t.catalogue.intro}
         </p>
 
         {/* WRAPPING CATEGORY CHIPS */}
-        <div className="lg:col-span-12 pt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Venue category filter">
+        <div className="lg:col-span-12 pt-2 flex flex-wrap items-center gap-2" role="group" aria-label={t.catalogue.categoryGroup}>
           {CATEGORIES.map((item) => {
             const active = category === item.code;
             return (
@@ -258,7 +266,7 @@ export function CatalogueClient({
                     : "bg-[var(--paper-card)] text-[var(--graphite)] border-[var(--rule-strong)] hover:text-[var(--ink)]"
                 }`}
               >
-                {item.label}
+                {t.catalogue[item.labelKey]}
               </button>
             );
           })}
@@ -270,20 +278,20 @@ export function CatalogueClient({
         <div className="hidden lg:grid lg:grid-cols-12 gap-3 items-end">
           <div className="lg:col-span-6 flex flex-col gap-1">
             <label htmlFor="catalogue-q-compact" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Search the campus
+              {t.catalogue.searchLabel}
             </label>
             <input
               id="catalogue-q-compact"
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Venue, code or facility"
+              placeholder={t.catalogue.searchPlaceholder}
               className="field-input"
             />
           </div>
           <div className="lg:col-span-2 flex flex-col gap-1">
             <label htmlFor="catalogue-sort-compact" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Arrange by
+              {t.catalogue.sortLabel}
             </label>
             <select
               id="catalogue-sort-compact"
@@ -291,9 +299,9 @@ export function CatalogueClient({
               onChange={(e) => setSort(e.target.value as "name" | "capacity" | "price")}
               className="field-input"
             >
-              <option value="name">Name (A–Z)</option>
-              <option value="capacity">Largest capacity</option>
-              <option value="price">Lowest starting rate</option>
+              <option value="name">{t.catalogue.sortName}</option>
+              <option value="capacity">{t.catalogue.sortCapacity}</option>
+              <option value="price">{t.catalogue.sortPrice}</option>
             </select>
           </div>
           <div className="lg:col-span-2 flex items-end">
@@ -304,11 +312,11 @@ export function CatalogueClient({
               onClick={() => setDesktopFiltersOpen((open) => !open)}
               className="btn-outline w-full min-h-[2.85rem]"
             >
-              {desktopFiltersOpen ? "Close filters" : "More filters"}
+              {desktopFiltersOpen ? t.catalogue.closeFilters : t.catalogue.moreFilters}
             </button>
           </div>
           <div className="lg:col-span-2 min-h-[2.85rem] flex items-center justify-end border-l border-[var(--rule)] pl-4 font-mono text-xs text-[var(--graphite)]">
-            <span><strong className="text-[var(--ink)]">{filteredSpaces.length}</strong> spaces ready to inspect</span>
+            <span>{format(t.catalogue.countReady, { count: filteredSpaces.length })}</span>
           </div>
         </div>
 
@@ -318,16 +326,16 @@ export function CatalogueClient({
         >
           <div className="lg:col-span-3 min-h-[4.35rem] flex flex-col justify-center gap-1 border-l-2 border-[var(--brick)] pl-4">
             <span className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--brick)]">
-              Refine the shortlist
+              {t.catalogue.refineTitle}
             </span>
             <span className="text-sm text-[var(--graphite)]">
-              Optional capacity, rate and availability controls.
+              {t.catalogue.refineBody}
             </span>
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-1">
             <label htmlFor="catalogue-cap" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Min capacity
+              {t.catalogue.minCapacity}
             </label>
             <input
               id="catalogue-cap"
@@ -335,14 +343,14 @@ export function CatalogueClient({
               min={1}
               value={minCapacity}
               onChange={(e) => setMinCapacity(e.target.value)}
-              placeholder="People"
+              placeholder={t.catalogue.capacityPlaceholder}
               className="field-input"
             />
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-1">
             <label htmlFor="catalogue-unit" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Billing unit
+              {t.catalogue.billingUnit}
             </label>
             <select
               id="catalogue-unit"
@@ -352,7 +360,7 @@ export function CatalogueClient({
             >
               {PRICING_UNITS.map((u) => (
                 <option key={u.code || "any"} value={u.code}>
-                  {u.label}
+                  {t.catalogue[u.labelKey]}
                 </option>
               ))}
             </select>
@@ -361,7 +369,7 @@ export function CatalogueClient({
           <div className="lg:col-span-3 grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-1">
               <label htmlFor="catalogue-date" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-                Date
+                {t.catalogue.dateLabel}
               </label>
               <input
                 id="catalogue-date"
@@ -373,7 +381,7 @@ export function CatalogueClient({
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="catalogue-start" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-                From
+                {t.catalogue.fromLabel}
               </label>
               <input
                 id="catalogue-start"
@@ -386,7 +394,7 @@ export function CatalogueClient({
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="catalogue-end" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-                To
+                {t.catalogue.toLabel}
               </label>
               <input
                 id="catalogue-end"
@@ -406,7 +414,7 @@ export function CatalogueClient({
               disabled={checkingWindow}
               className="btn-primary w-full min-h-[2.85rem]"
             >
-              {checkingWindow ? "Checking…" : "Check window"}
+              {checkingWindow ? t.catalogue.checking : t.catalogue.checkWindow}
             </button>
           </div>
         </div>
@@ -415,7 +423,7 @@ export function CatalogueClient({
         <div className={`${desktopFiltersOpen ? "lg:flex" : "lg:hidden"} hidden flex-wrap items-center justify-between gap-4 pt-3 mt-3 border-t border-[var(--rule)]`}>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)] mr-1">
-              Amenities:
+              {t.catalogue.amenitiesLabel}:
             </span>
             {allAmenities.map((amenity) => {
               const active = selectedAmenities.includes(amenity);
@@ -445,7 +453,7 @@ export function CatalogueClient({
                   checked={onlyAvailableForWindow}
                   onChange={(e) => setOnlyAvailableForWindow(e.target.checked)}
                 />
-                <span>Only free in window</span>
+                <span>{t.catalogue.onlyFree}</span>
               </label>
             ) : null}
             {hasActiveFilters ? (
@@ -454,7 +462,7 @@ export function CatalogueClient({
                 onClick={resetAllFilters}
                 className="font-mono text-xs uppercase tracking-wider text-[var(--brick)] underline cursor-pointer bg-transparent border-0"
               >
-                Reset filters
+                {t.catalogue.resetFilters}
               </button>
             ) : null}
           </div>
@@ -464,14 +472,14 @@ export function CatalogueClient({
         <div className="flex lg:hidden flex-wrap items-center justify-between gap-3">
           <div className="flex-1 min-w-[11rem]">
             <label htmlFor="mobile-catalogue-q" className="sr-only">
-              Search venues
+              {t.catalogue.mobileSearchLabel}
             </label>
             <input
               id="mobile-catalogue-q"
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search venues…"
+              placeholder={t.catalogue.mobileSearchPlaceholder}
               className="field-input py-2 text-sm"
             />
           </div>
@@ -483,7 +491,7 @@ export function CatalogueClient({
             onClick={() => setMobileSheetOpen(true)}
             className="btn-primary py-2.5 px-3.5 text-xs"
           >
-            Filters &amp; sort
+            {t.catalogue.filtersSort}
           </button>
         </div>
       </div>
@@ -494,13 +502,13 @@ export function CatalogueClient({
           id="mobile-filter-sheet"
           role="dialog"
           aria-modal="true"
-          aria-label="Filter and sort venues"
+          aria-label={t.catalogue.sheetTitle}
           className="fixed inset-0 z-50 bg-[var(--obsidian)]/65 flex flex-col justify-end lg:hidden"
         >
           <div className="bg-[var(--bone)] hairline-t max-h-[88dvh] overflow-y-auto p-5 flex flex-col gap-5">
             <div className="flex items-center justify-between gap-4 hairline-b pb-3">
               <h2 className="font-display text-2xl text-[var(--ink)] m-0">
-                Filter &amp; sort venues
+                {t.catalogue.sheetTitle}
               </h2>
               <button
                 ref={sheetCloseRef}
@@ -511,13 +519,13 @@ export function CatalogueClient({
                 }}
                 className="font-mono text-xs uppercase tracking-wider px-3 py-1.5 border border-[var(--ink)] bg-[var(--paper-card)]"
               >
-                Close
+                {t.catalogue.close}
               </button>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="m-category" className="font-mono text-xs uppercase tracking-wider">
-                Category
+                {t.catalogue.categoryLabel}
               </label>
               <select
                 id="m-category"
@@ -527,7 +535,7 @@ export function CatalogueClient({
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.code || "all"} value={c.code}>
-                    {c.label}
+                    {t.catalogue[c.labelKey]}
                   </option>
                 ))}
               </select>
@@ -536,7 +544,7 @@ export function CatalogueClient({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="m-cap" className="font-mono text-xs uppercase tracking-wider">
-                  Minimum capacity
+                  {t.catalogue.minCapacityLabel}
                 </label>
                 <input
                   id="m-cap"
@@ -549,7 +557,7 @@ export function CatalogueClient({
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="m-unit" className="font-mono text-xs uppercase tracking-wider">
-                  Billing unit
+                  {t.catalogue.billingUnit}
                 </label>
                 <select
                   id="m-unit"
@@ -559,7 +567,7 @@ export function CatalogueClient({
                 >
                   {PRICING_UNITS.map((u) => (
                     <option key={u.code || "any"} value={u.code}>
-                      {u.label}
+                      {t.catalogue[u.labelKey]}
                     </option>
                   ))}
                 </select>
@@ -568,7 +576,7 @@ export function CatalogueClient({
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="m-sort" className="font-mono text-xs uppercase tracking-wider">
-                Sort order
+                {t.catalogue.sortLabel}
               </label>
               <select
                 id="m-sort"
@@ -576,14 +584,14 @@ export function CatalogueClient({
                 onChange={(e) => setSort(e.target.value as "name" | "capacity" | "price")}
                 className="field-input"
               >
-                <option value="name">Name (A–Z)</option>
-                <option value="capacity">Capacity (high to low)</option>
-                <option value="price">Starting rate (low to high)</option>
+                <option value="name">{t.catalogue.sortName}</option>
+                <option value="capacity">{t.catalogue.sortCapacity}</option>
+                <option value="price">{t.catalogue.sortPrice}</option>
               </select>
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="font-mono text-xs uppercase tracking-wider">Amenities</span>
+              <span className="font-mono text-xs uppercase tracking-wider">{t.catalogue.amenitiesLabel}</span>
               <div className="flex flex-wrap gap-2">
                 {allAmenities.map((amenity) => {
                   const active = selectedAmenities.includes(amenity);
@@ -608,7 +616,7 @@ export function CatalogueClient({
 
             <div className="flex flex-wrap items-center justify-between gap-3 hairline-t pt-4">
               <button type="button" onClick={resetAllFilters} className="btn-outline py-2 px-4 text-xs">
-                Reset all
+                {t.catalogue.resetAll}
               </button>
               <button
                 type="button"
@@ -618,7 +626,7 @@ export function CatalogueClient({
                 }}
                 className="btn-primary py-2.5 px-5 text-xs"
               >
-                Show {filteredSpaces.length} {filteredSpaces.length === 1 ? "venue" : "venues"}
+                {format(t.catalogue.showCount, { count: filteredSpaces.length })}
               </button>
             </div>
           </div>
@@ -634,8 +642,10 @@ export function CatalogueClient({
       {/* RESULT COUNT BAR */}
       <div className="py-6 flex flex-wrap items-center justify-between gap-3 font-mono text-xs text-[var(--graphite)]">
         <p className="m-0">
-          Showing <strong className="text-[var(--ink)]">{filteredSpaces.length}</strong> of{" "}
-          {initialSpaces.length} published {initialSpaces.length === 1 ? "venue" : "venues"}
+          {format(t.catalogue.resultsBar, {
+            shown: filteredSpaces.length,
+            total: initialSpaces.length,
+          })}
         </p>
         {hasActiveFilters ? (
           <button
@@ -643,7 +653,7 @@ export function CatalogueClient({
             onClick={resetAllFilters}
             className="text-[var(--brick)] underline bg-transparent border-0 cursor-pointer font-mono text-xs"
           >
-            Clear active filters
+            {t.catalogue.clearFilters}
           </button>
         ) : null}
       </div>
@@ -656,10 +666,7 @@ export function CatalogueClient({
             const ratio = GRID_RATIOS[idx % GRID_RATIOS.length];
             const span = GRID_SPANS[idx % GRID_SPANS.length];
             const avail = availabilityMap[space.code];
-            const bookHref =
-              checkDate && checkStart && checkEnd
-                ? `/book?space=${encodeURIComponent(space.code)}&date=${encodeURIComponent(checkDate)}&start=${encodeURIComponent(checkStart)}&end=${encodeURIComponent(checkEnd)}`
-                : `/book?space=${encodeURIComponent(space.code)}`;
+            const bookHref = `/spaces/${encodeURIComponent(space.code)}/book${draftToken ? `#draft=${encodeURIComponent(draftToken)}` : ""}`;
 
             return (
               <article
@@ -690,9 +697,12 @@ export function CatalogueClient({
                     >
                       {avail.isAvailable
                         ? avail.isPooled
-                          ? `${avail.freeUnits} of ${avail.totalUnits} desks open`
-                          : "Available for selected window"
-                        : "Occupied in selected window"}
+                          ? format(t.catalogue.badgeDesks, {
+                              free: avail.freeUnits,
+                              total: avail.totalUnits,
+                            })
+                          : t.catalogue.badgeAvailable
+                        : t.catalogue.badgeOccupied}
                     </span>
                   ) : null}
                 </Link>
@@ -737,10 +747,10 @@ export function CatalogueClient({
                       href={`/spaces/${encodeURIComponent(space.code)}`}
                       className="font-mono text-xs uppercase tracking-[0.12em] text-[var(--ink)] hover:text-[var(--brick)]"
                     >
-                      Inspect venue →
+                      {t.catalogue.inspectVenue} →
                     </Link>
                     <Link href={bookHref} className="btn-primary py-2 px-3.5 text-xs">
-                      Book directly
+                      {t.catalogue.bookDirectly}
                     </Link>
                   </div>
                 </div>
@@ -751,14 +761,13 @@ export function CatalogueClient({
       ) : (
         <div className="hairline-box bg-[var(--paper-card)] p-10 text-center flex flex-col items-center gap-4">
           <h2 className="font-display text-3xl text-[var(--ink)] m-0">
-            No venues match those filters.
+            {t.catalogue.emptyTitle}
           </h2>
           <p className="text-sm text-[var(--graphite)] max-w-md m-0">
-            Try clearing a facility constraint or lowering the minimum capacity to view the rest of
-            the published TRACE Expert City catalogue.
+            {t.catalogue.emptyBody}
           </p>
           <button type="button" onClick={resetAllFilters} className="btn-primary">
-            Reset all filters
+            {t.catalogue.resetAll}
           </button>
         </div>
       )}

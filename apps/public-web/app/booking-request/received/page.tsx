@@ -1,5 +1,12 @@
 import Link from "next/link";
+import { cookies, headers } from "next/headers";
+import { LOCALE_COOKIE, getDictionary, resolveLocale } from "../../../lib/i18n";
 
+/**
+ * Legacy inquiry receipt. Existing inquiry links keep working, but the copy
+ * now reflects the unified flow: an inquiry reserves nothing, and requests are
+ * made per venue from the catalogue.
+ */
 export default async function BookingRequestReceivedPage({
   searchParams,
 }: {
@@ -10,6 +17,10 @@ export default async function BookingRequestReceivedPage({
     const val = params[key];
     return typeof val === "string" ? val : Array.isArray(val) ? val[0] ?? "" : "";
   };
+
+  const store = await cookies();
+  const headerStore = await headers();
+  const t = getDictionary(resolveLocale(store.get(LOCALE_COOKIE)?.value, headerStore.get("accept-language")));
 
   const ref = pick("ref") || pick("reference");
   const token = pick("token");
@@ -24,17 +35,15 @@ export default async function BookingRequestReceivedPage({
     <div className="mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 py-16">
       <article className="mx-auto max-w-2xl hairline-box bg-[var(--paper-card)] p-8 sm:p-12 flex flex-col gap-6">
         <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--brick)] m-0">
-          Provisional concierge inquiry recorded
+          {t.inquiry.eyebrow}
         </p>
         <h1 className="font-display text-3xl sm:text-5xl text-[var(--ink)] m-0">
-          Your inquiry has been received.
+          {t.inquiry.title}
         </h1>
         <p className="text-sm text-[var(--graphite)] m-0">
-          <strong>This inquiry is provisional and has not locked inventory.</strong> Our operations
-          desk will review your brief in the queue and contact you. If you want to lock a slot
-          immediately instead, use{" "}
-          <Link href="/book" className="text-[var(--oxidized)] underline">
-            direct online checkout
+          <strong>{t.inquiry.bodyLead}</strong>{" "}
+          <Link href="/spaces" className="text-[var(--oxidized)] underline">
+            {t.inquiry.catalogueLink}
           </Link>
           .
         </p>
@@ -42,37 +51,35 @@ export default async function BookingRequestReceivedPage({
         <dl className="m-0 grid grid-cols-1 sm:grid-cols-2 gap-4 hairline-t hairline-b py-5 text-sm">
           <div>
             <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-              Inquiry reference
+              {t.inquiry.refLabel}
             </dt>
             <dd className="m-0 mt-1 font-mono font-semibold text-[var(--ink)]">{ref || "—"}</dd>
           </div>
           {space ? (
             <div>
               <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-                Space code
+                {t.inquiry.spaceLabel}
               </dt>
               <dd className="m-0 mt-1 font-mono text-[var(--ink)]">{space}</dd>
             </div>
           ) : null}
           <div className="sm:col-span-2">
             <dt className="font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
-              Notification status
+              {t.inquiry.notificationLabel}
             </dt>
             <dd className="m-0 mt-1 text-xs text-[var(--graphite)]">
-              {emailStatus === "SENT"
-                ? "A notification email was sent to the operations desk."
-                : "Email delivery is not configured on this server; your request is saved directly in the staff inquiry queue."}
+              {emailStatus === "SENT" ? t.inquiry.emailSent : t.inquiry.emailNotConfigured}
             </dd>
           </div>
         </dl>
 
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/spaces" className="btn-primary">
-            Browse venues
+            {t.inquiry.browseCta}
           </Link>
           {withdrawHref ? (
             <Link href={withdrawHref} className="btn-outline text-[var(--brick)] border-[var(--brick)]">
-              Withdraw this inquiry
+              {t.inquiry.withdrawCta}
             </Link>
           ) : null}
         </div>

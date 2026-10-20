@@ -4,7 +4,7 @@ A centralized space-booking and rental-management system for Nagaro at **Trace E
 
 Two experiences:
 
-- **Public** — visitors browse published spaces, check live availability, and either confirm a guest reservation immediately or send a concierge inquiry for a complex event. No account or online payment is required; confirmed checkouts receive a private management link.
+- **Public** — visitors browse published spaces, check live availability, and send a booking request for the space they chose. Staff approve it, approval places a temporary hold, and any configured booking fee is paid through PayHere before the reservation is confirmed. No account is required; every request and reservation gets a private management link. The public experience is served in English, සිංහල and தமிழ், with an optional AI venue guide that can prepare an editable request draft.
 - **Administrative** — staff manage spaces, photographs, customers, reservations, cancellations, maintenance and inquiries from one place.
 
 Three space categories are supported: **meeting/training rooms**, the **auditorium**, and **co-working desks** (individually bookable).
@@ -108,7 +108,7 @@ reservation exists for that period and exits non-zero if the guarantee is violat
 ```
 src/server/    HTTP layer, domain rules, business services, security, routes, migrations
 src/web/       server-rendered views (legacy renderer and admin console), static CSS/JS
-apps/public-web/ Next.js public frontend (landing, catalogue, checkout, management, concierge)
+apps/public-web/ Next.js public frontend (landing, catalogue, venue pages, unified request form, request/payment status, AI guide)
 tests/         unit, integration and concurrency suites
 scripts/       database provisioning, inspection, the demo and the acceptance harnesses
 storage/       uploaded space photographs (created at runtime, not committed)
@@ -136,6 +136,7 @@ data/          the SQLite database (created at runtime, not committed)
 | `PRESENTATION.md` | 10-slide presentation outline, speaker script and demo run-sheet |
 | `presentation/slides.html` | Self-contained 10-slide deck (screenshots in `presentation/assets/`) |
 | `PUBLIC_FRONTEND_REPORT.md` | The Next.js public frontend: what changed, how it was verified, rollback, limitations |
+| `UNIFIED_BOOKING_REPORT.md` | Unified request flow, AI venue assistant, PayHere fees and trilingual UI: design, evidence and verdict levels |
 | `VERCEL_DEPLOYMENT.md` | Supabase, Vercel Blob, environment variables and deployment smoke-test checklist |
 
 ## Project status

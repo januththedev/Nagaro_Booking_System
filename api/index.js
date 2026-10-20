@@ -49,6 +49,7 @@ async function buildApp() {
   const { blobEnabled } = await import('../src/server/security/blobStorage.js');
   const { purgeExpiredSessions } = await import('../src/server/security/sessions.js');
   const { reconcileCompletedReservations } = await import('../src/server/services/bookingService.js');
+  const { expireBookingHolds } = await import('../src/server/services/bookingRequestService.js');
   const { ensureFirstAdmin } = await import('../src/server/services/adminUserService.js');
 
   if (config.isVercel && !config.databaseUrl) {
@@ -86,6 +87,7 @@ async function buildApp() {
   if (!blobEnabled()) ensureUploadDir();
   purgeExpiredSessions(db);
   reconcileCompletedReservations(db);
+  expireBookingHolds(db);
 
   if (config.bootstrapAdmin.email && config.bootstrapAdmin.password) {
     const result = ensureFirstAdmin(db, {

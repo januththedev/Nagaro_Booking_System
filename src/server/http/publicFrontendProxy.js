@@ -45,7 +45,8 @@ function pathMatchesPrefix(pathname, prefix) {
 export function isBackendOwnedPath(pathname, method = 'GET') {
   if (BACKEND_PREFIXES.some((prefix) => pathMatchesPrefix(pathname, prefix))) return true;
   return String(method ?? 'GET').toUpperCase() === 'POST'
-    && BACKEND_FORM_POSTS.some((path) => pathname === path);
+    && (BACKEND_FORM_POSTS.some((path) => pathname === path)
+      || /^\/spaces\/[^/]+\/book$/.test(pathname));
 }
 
 export function loadPublicFrontendProxyConfig(env = process.env) {

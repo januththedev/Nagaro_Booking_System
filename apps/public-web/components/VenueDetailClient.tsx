@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { clientApiPath } from "../lib/api";
 import { isoDateInColombo } from "../lib/format";
+import { format } from "../lib/i18n";
 import { galleryFor } from "../lib/media";
 import type { Availability, PublicSpace } from "../lib/types";
+import { useT } from "./I18nProvider";
 
-function formatDurationMinutes(mins: number | null | undefined): string {
-  if (!mins) return "Flexible";
+function formatDurationMinutes(mins: number | null | undefined, flexible: string): string {
+  if (!mins) return flexible;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   if (h && m) return `${h}h ${m}m`;
@@ -20,13 +22,14 @@ function formatAttributeKey(key: string): string {
   return key.replace(/_/g, " ");
 }
 
-function formatAttributeValue(val: unknown): string {
-  if (typeof val === "boolean") return val ? "Included" : "No";
+function formatAttributeValue(val: unknown, included: string, no: string): string {
+  if (typeof val === "boolean") return val ? included : no;
   if (Array.isArray(val)) return val.join(", ");
   return String(val ?? "—");
 }
 
 export function VenueDetailClient({ space }: { space: PublicSpace }) {
+  const t = useT();
   const galleryItems = galleryFor(space);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -42,7 +45,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
     detail?: string;
   }>({
     state: "idle",
-    headline: "Select a date and Sri Lanka Standard Time window to verify live inventory.",
+    headline: t.venue.availabilityIdle,
   });
 
   async function handleAvailabilityCheck(e: React.FormEvent<HTMLFormElement>) {
@@ -52,11 +55,11 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
     if (Date.parse(endIso) <= Date.parse(startIso)) {
       setAvailability({
         state: "error",
-        headline: "The end time must be after the start time.",
+        headline: t.catalogue.windowErrorOrder,
       });
       return;
     }
-    setAvailability({ state: "checking", headline: "Checking live occupancy ledger…" });
+    setAvailability({ state: "checking", headline: t.venue.availabilityChecking });
     try {
       const qs = new URLSearchParams({
         space: space.code,
@@ -73,7 +76,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
       if (!res.ok || !body) {
         setAvailability({
           state: "error",
-          headline: body?.error?.message || "Could not verify that window.",
+          headline: body?.error?.message || t.venue.availabilityErrorWindow,
         });
         return;
       }
@@ -81,29 +84,29 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
         setAvailability({
           state: "ok",
           headline: body.isPooled
-            ? `Available — ${body.freeUnits} of ${body.totalUnits} desks free.`
-            : "Available for immediate direct confirmation.",
-          detail: "Proceed to checkout to lock this window in the booking ledger.",
+            ? format(t.venue.availabilityOkPooled, {
+                free: body.freeUnits,
+                total: body.totalUnits,
+              })
+            : t.venue.availabilityOk,
+          detail: t.venue.availabilityOkDetail,
         });
       } else {
         setAvailability({
           state: "busy",
-          headline: body.label || "Not available for the selected window.",
-          detail: "Choose another time or date.",
+          headline: body.label || t.venue.availabilityBusy,
+          detail: t.venue.availabilityBusyDetail,
         });
       }
     } catch {
       setAvailability({
         state: "error",
-        headline: "Availability service could not be reached.",
+        headline: t.venue.availabilityError,
       });
     }
   }
 
-  const directBookHref = `/book?space=${encodeURIComponent(space.code)}&date=${encodeURIComponent(date)}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}${
-    space.category === "COWORKING" && Number(desks) > 1 ? `&desks=${encodeURIComponent(desks)}` : ""
-  }`;
-  const inquiryHref = `/booking-request?space=${encodeURIComponent(space.code)}&date=${encodeURIComponent(date)}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}`;
+  const directBookHref = `/spaces/${encodeURIComponent(space.code)}/book`;
 
   const attributeEntries = Object.entries(space.attributes ?? {});
 
@@ -111,17 +114,17 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
     <div className="pb-24 lg:pb-12">
       {/* VENUE MEDIA-LED HERO */}
       <section className="mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 pt-8 pb-10 hairline-b">
-        <nav aria-label="Breadcrumb" className="mb-6 font-mono text-xs text-[var(--graphite)]">
+        <nav aria-label={t.venue.breadcrumbLabel} className="mb-6 font-mono text-xs text-[var(--graphite)]">
           <ol className="list-none p-0 m-0 flex flex-wrap items-center gap-2">
             <li>
               <Link href="/" className="hover:underline text-[var(--graphite)] no-underline">
-                Campus
+                {t.venue.breadcrumbCampus}
               </Link>
             </li>
             <li aria-hidden="true">/</li>
             <li>
               <Link href="/spaces" className="hover:underline text-[var(--graphite)] no-underline">
-                Spaces
+                {t.venue.breadcrumbSpaces}
               </Link>
             </li>
             <li aria-hidden="true">/</li>
@@ -138,7 +141,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                 {space.categoryLabel}
               </span>
               <span className="text-[var(--graphite)]">
-                Code <code className="text-[var(--ink)]">{space.code}</code>
+                {t.venue.codeLabel} <code className="text-[var(--ink)]">{space.code}</code>
               </span>
             </div>
             <h1 className="font-display text-4xl sm:text-6xl text-[var(--ink)] m-0">
@@ -146,9 +149,9 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
             </h1>
             <p className="text-base sm:text-lg text-[var(--graphite)] max-w-2xl m-0">
               {[
-                space.location || "TRACE Expert City, Maradana",
-                space.floor ? `Floor: ${space.floor}` : null,
-                space.capacity ? `Up to ${space.capacity} people` : null,
+                space.location || t.venue.locationFallback,
+                space.floor ? format(t.venue.floor, { floor: space.floor }) : null,
+                space.capacity ? format(t.venue.upTo, { n: space.capacity }) : null,
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -157,10 +160,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
 
           <div className="lg:col-span-4 flex flex-wrap lg:justify-end gap-3">
             <Link href={directBookHref} className="btn-primary">
-              Book this space
-            </Link>
-            <Link href={inquiryHref} className="btn-outline">
-              Concierge inquiry
+              {t.venue.requestCta}
             </Link>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
           </div>
           <div
             role="group"
-            aria-label="Venue gallery thumbnails"
+            aria-label={t.venue.galleryLabel}
             className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3 content-start"
           >
             {galleryItems.map((item, idx) => {
@@ -186,7 +186,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                   key={item.id}
                   type="button"
                   aria-current={selected ? "true" : "false"}
-                  aria-label={`Show venue view ${idx + 1}: ${item.alt}`}
+                  aria-label={format(t.venue.thumbLabel, { n: idx + 1, alt: item.alt })}
                   onClick={() => setActiveImageIndex(idx)}
                   className={`relative aspect-[16/10] w-full overflow-hidden p-0 cursor-pointer border-2 transition-opacity ${
                     selected
@@ -202,7 +202,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                   />
                   {item.isCover ? (
                     <span className="absolute bottom-2 left-2 bg-[var(--obsidian)]/85 text-[var(--bone)] font-mono text-[0.65rem] uppercase tracking-wider px-2 py-0.5">
-                      Primary view
+                      {t.venue.primaryView}
                     </span>
                   ) : null}
                 </button>
@@ -215,47 +215,49 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
         <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 hairline-t pt-6 m-0">
           <div className="border-l-2 border-[var(--oxidized)] pl-3">
             <dt className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Capacity
+              {t.venue.capacityLabel}
             </dt>
             <dd className="m-0 mt-1 font-mono text-sm font-medium text-[var(--ink)]">
-              {space.capacity ? `Up to ${space.capacity} people` : "Flexible"}
+              {space.capacity ? format(t.venue.upTo, { n: space.capacity }) : t.venue.flexible}
             </dd>
           </div>
           <div className="border-l-2 border-[var(--oxidized)] pl-3">
             <dt className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Inventory model
+              {t.venue.inventoryLabel}
             </dt>
             <dd className="m-0 mt-1 font-mono text-sm font-medium text-[var(--ink)]">
               {space.category === "COWORKING"
-                ? `${space.unitCount} individual desks`
-                : "1 exclusive room"}
+                ? format(t.venue.inventoryDesks, { n: space.unitCount })
+                : t.venue.inventoryRoom}
             </dd>
           </div>
           <div className="border-l-2 border-[var(--oxidized)] pl-3">
             <dt className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Operating window
+              {t.venue.operatingLabel}
             </dt>
             <dd className="m-0 mt-1 font-mono text-sm font-medium text-[var(--ink)]">
-              {space.openTime}–{space.closeTime} SLST
+              {format(t.venue.operatingWindow, { open: space.openTime, close: space.closeTime })}
             </dd>
           </div>
           <div className="border-l-2 border-[var(--oxidized)] pl-3">
             <dt className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Duration bounds
+              {t.venue.durationLabel}
             </dt>
             <dd className="m-0 mt-1 font-mono text-sm font-medium text-[var(--ink)]">
-              {formatDurationMinutes(space.minDurationMinutes)} –{" "}
-              {space.maxDurationMinutes ? formatDurationMinutes(space.maxDurationMinutes) : "Open"}
+              {formatDurationMinutes(space.minDurationMinutes, t.venue.flexible)} –{" "}
+              {space.maxDurationMinutes
+                ? formatDurationMinutes(space.maxDurationMinutes, t.venue.flexible)
+                : t.venue.durationOpen}
             </dd>
           </div>
           <div className="border-l-2 border-[var(--oxidized)] pl-3">
             <dt className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Turnaround buffer
+              {t.venue.bufferLabel}
             </dt>
             <dd className="m-0 mt-1 font-mono text-sm font-medium text-[var(--ink)]">
               {space.bufferMinutes > 0
-                ? `${space.bufferMinutes}m reset between bookings`
-                : "Adjacent bookings permitted"}
+                ? format(t.venue.bufferReset, { m: space.bufferMinutes })
+                : t.venue.bufferNone}
             </dd>
           </div>
         </dl>
@@ -266,23 +268,23 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
         <div className="lg:col-span-7 flex flex-col gap-12">
           <article className="flex flex-col gap-4 hairline-b pb-10">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--brick)] m-0">
-              Architectural overview
+              {t.venue.overviewEyebrow}
             </p>
-            <h2 className="font-display text-3xl text-[var(--ink)] m-0">About this venue</h2>
+            <h2 className="font-display text-3xl text-[var(--ink)] m-0">{t.venue.overviewTitle}</h2>
             <p className="text-base sm:text-lg text-[var(--graphite)] leading-relaxed m-0">
               {space.description ||
                 space.shortDescription ||
-                "A dedicated venue inside TRACE Expert City, Maradana, Colombo."}
+                t.venue.overviewFallback}
             </p>
           </article>
 
           {space.amenities?.length > 0 ? (
             <article className="flex flex-col gap-4 hairline-b pb-10">
               <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--oxidized)] m-0">
-                Included equipment &amp; services
+                {t.venue.facilitiesEyebrow}
               </p>
               <h2 className="font-display text-3xl text-[var(--ink)] m-0">
-                Facilities &amp; amenities
+                {t.venue.facilitiesTitle}
               </h2>
               <ul className="list-none p-0 m-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {space.amenities.map((item) => (
@@ -301,9 +303,9 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
           {attributeEntries.length > 0 ? (
             <article className="flex flex-col gap-4 hairline-b pb-10">
               <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--oxidized)] m-0">
-                Technical specifications
+                {t.venue.specEyebrow}
               </p>
-              <h2 className="font-display text-3xl text-[var(--ink)] m-0">Spatial configuration</h2>
+              <h2 className="font-display text-3xl text-[var(--ink)] m-0">{t.venue.specTitle}</h2>
               <dl className="m-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {attributeEntries.map(([k, v]) => (
                   <div key={k} className="hairline-box bg-[var(--paper-card)] p-4">
@@ -311,7 +313,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                       {formatAttributeKey(k)}
                     </dt>
                     <dd className="m-0 mt-1 text-sm font-medium text-[var(--ink)] break-words">
-                      {formatAttributeValue(v)}
+                      {formatAttributeValue(v, t.venue.attrIncluded, t.venue.attrNo)}
                     </dd>
                   </div>
                 ))}
@@ -321,19 +323,19 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
 
           <article className="flex flex-col gap-4">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--brick)] m-0">
-              Transparent LKR tariff
+              {t.venue.ratesEyebrow}
             </p>
-            <h2 className="font-display text-3xl text-[var(--ink)] m-0">Rate schedule</h2>
+            <h2 className="font-display text-3xl text-[var(--ink)] m-0">{t.venue.ratesTitle}</h2>
             {space.rateList?.length > 0 ? (
               <div className="hairline-box bg-[var(--paper-card)]">
                 <table className="w-full border-collapse text-left text-sm">
                   <thead>
                     <tr className="hairline-b bg-[var(--concrete)]/60 font-mono text-xs uppercase tracking-wider text-[var(--graphite)]">
                       <th scope="col" className="py-3 px-4">
-                        Billing unit
+                        {t.venue.billingUnitCol}
                       </th>
                       <th scope="col" className="py-3 px-4 text-right">
-                        Rate (LKR)
+                        {t.venue.rateCol}
                       </th>
                     </tr>
                   </thead>
@@ -344,7 +346,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                           {rate.unitLabel}
                           {rate.isDefault ? (
                             <span className="ml-2 font-mono text-[0.68rem] uppercase tracking-wider px-2 py-0.5 bg-[var(--concrete)] text-[var(--oxidized)]">
-                              Default
+                              {t.venue.rateDefault}
                             </span>
                           ) : null}
                         </th>
@@ -357,11 +359,10 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-[var(--graphite)]">Rate on request.</p>
+              <p className="text-sm text-[var(--graphite)]">{t.venue.rateOnRequest}</p>
             )}
             <p className="text-xs font-mono text-[var(--graphite)] m-0">
-              Direct checkout confirms your reservation immediately and records the LKR total for
-              offline settlement.
+              {t.venue.ratesNote}
             </p>
           </article>
         </div>
@@ -371,10 +372,10 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
           <div className="hairline-box bg-[var(--paper-card)] p-6 sm:p-7 flex flex-col gap-5">
             <div className="hairline-b pb-4">
               <p className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--oxidized)] m-0">
-                Direct booking console
+                {t.venue.consoleEyebrow}
               </p>
               <h2 className="font-display text-2xl sm:text-3xl text-[var(--ink)] mt-1 mb-2">
-                Check schedule &amp; book
+                {t.venue.consoleTitle}
               </h2>
               <p className="font-mono text-xs text-[var(--brick)] m-0">{space.rateSummary}</p>
             </div>
@@ -382,7 +383,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
             <form onSubmit={handleAvailabilityCheck} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
                 <label htmlFor="detail-date" className="font-mono text-xs uppercase tracking-wider">
-                  Date (SLST)
+                  {t.venue.dateLabel}
                 </label>
                 <input
                   id="detail-date"
@@ -397,7 +398,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label htmlFor="detail-start" className="font-mono text-xs uppercase tracking-wider">
-                    From
+                    {t.venue.fromLabel}
                   </label>
                   <input
                     id="detail-start"
@@ -411,7 +412,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="detail-end" className="font-mono text-xs uppercase tracking-wider">
-                    To
+                    {t.venue.toLabel}
                   </label>
                   <input
                     id="detail-end"
@@ -428,7 +429,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
               {space.category === "COWORKING" ? (
                 <div className="flex flex-col gap-1">
                   <label htmlFor="detail-desks" className="font-mono text-xs uppercase tracking-wider">
-                    Desks needed (up to {space.unitCount})
+                    {format(t.venue.desksLabel, { n: space.unitCount })}
                   </label>
                   <input
                     id="detail-desks"
@@ -443,7 +444,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
               ) : null}
 
               <button type="submit" className="btn-outline w-full">
-                {availability.state === "checking" ? "Checking ledger…" : "Check live availability"}
+                {availability.state === "checking" ? t.venue.checkingCta : t.venue.checkCta}
               </button>
 
               <div
@@ -466,18 +467,12 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
 
             <div className="flex flex-col gap-2.5 hairline-t pt-4">
               <Link href={directBookHref} className="btn-primary w-full text-center">
-                Confirm booking online →
-              </Link>
-              <Link href={inquiryHref} className="btn-outline w-full text-center text-xs">
-                Send bespoke concierge inquiry
+                {t.venue.requestCta} →
               </Link>
             </div>
 
             <p className="text-xs text-[var(--graphite)] m-0 leading-relaxed">
-              <strong>Direct booking vs. Concierge inquiry:</strong> Direct checkout confirms your
-              reservation immediately in the database and issues a private management token. Use a
-              concierge inquiry only if you need custom multi-day staging or non-standard hours
-              (inquiries remain provisional until reviewed by staff).
+              {t.venue.consoleNote}
             </p>
           </div>
         </aside>
@@ -492,7 +487,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
           </p>
         </div>
         <Link href={directBookHref} className="btn-primary py-2.5 px-4 text-xs shrink-0">
-          Book now
+          {t.venue.requestSpace}
         </Link>
       </div>
     </div>

@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { clientApiPath } from "../lib/api";
 import { isoDateInColombo, spaceMeta } from "../lib/format";
+import { format } from "../lib/i18n";
 import { OFFICIAL_MEDIA, coverFor } from "../lib/media";
 import type { Availability, PublicSpace } from "../lib/types";
+import { useT } from "./I18nProvider";
 
 const HeroWebGLCanvas = dynamic(() => import("./HeroWebGLCanvas"), {
   ssr: false,
@@ -15,45 +17,37 @@ const HeroWebGLCanvas = dynamic(() => import("./HeroWebGLCanvas"), {
 const NARRATIVE_CHAPTERS = [
   {
     key: "Meet",
-    verb: "Meet",
-    headline: "Quiet acoustic rooms for board reviews, sprint planning and executive alignment.",
-    body: "High-ceilinged meeting studios set behind brick colonnades isolate teams from city noise while keeping wall-mounted projection, whiteboards and enterprise fibre within arm’s reach.",
-    caption: "Idea Studio · intimate table geometry for 10 to 30 participants",
     image: OFFICIAL_MEDIA.studio,
     alt: "TRACE Idea Studio arranged for a focused team session",
     filterHref: "/spaces?category=MEETING_ROOM",
   },
   {
     key: "Make",
-    verb: "Make",
-    headline: "Open-span coworking bays engineered for deep engineering and design residencies.",
-    body: "Long timber workbenches under exposed steel trusses give individual builders and visiting squads a permanent-feeling desk for a day, a week or a month.",
-    caption: "Coworking Hall · individual desks · allocated in real time",
     image: OFFICIAL_MEDIA.coworking,
     alt: "Active coworking floor inside the restored brick-and-steel hall at TRACE Expert City",
     filterHref: "/spaces?category=COWORKING",
   },
   {
     key: "Gather",
-    verb: "Gather",
-    headline: "Daylit training halls and seminar rooms that adapt to workshops and cohorts.",
-    body: "Modular seating, dual-display sightlines and direct courtyard access let educators, accelerators and engineering leaders run full-day intensives without hotel-ballroom sterility.",
-    caption: "Creator Space · configured for hands-on cohorts and technical forums",
     image: OFFICIAL_MEDIA.creator,
     alt: "Creator Space at TRACE Expert City during an interactive presentation",
     filterHref: "/spaces?category=MEETING_ROOM",
   },
   {
     key: "Launch",
-    verb: "Launch",
-    headline: "Industrial-scale auditorium and event bays for keynotes, screenings and town halls.",
-    body: "Restored warehouse spans accommodate raked seating, stage lighting rigs and full-room audio so flagship announcements command architectural presence.",
-    caption: "Bay 07 & Auditorium · full production scale in central Colombo",
     image: OFFICIAL_MEDIA.bay,
     alt: "Bay 07 brick event hall staged with conference lighting at TRACE Expert City",
     filterHref: "/spaces?category=AUDITORIUM",
   },
 ] as const;
+
+/** Maps each chapter key onto its t.programme.chapters slug. */
+const CHAPTER_TEXT_KEYS = {
+  Meet: "meet",
+  Make: "make",
+  Gather: "gather",
+  Launch: "launch",
+} as const;
 
 const GALLERY_RATIOS = [
   "aspect-[16/10]",
@@ -72,6 +66,7 @@ const GALLERY_SPANS = [
 ] as const;
 
 export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
+  const t = useT();
   const [activeChapter, setActiveChapter] = useState<number>(0);
   const chapterRefs = useRef<Array<HTMLElement | null>>([]);
 
@@ -85,7 +80,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
     message: string;
   }>({
     state: "idle",
-    message: "Select a venue and Sri Lanka Standard Time window to inspect live inventory before checkout.",
+    message: t.bridge.idle,
   });
 
   useEffect(() => {
@@ -117,16 +112,16 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
   async function handleBridgeCheck(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!bridgeSpace) {
-      setBridgeStatus({ state: "error", message: "Choose a published venue to check." });
+      setBridgeStatus({ state: "error", message: t.bridge.errorChoose });
       return;
     }
     const startIso = `${bridgeDate}T${bridgeStart}:00+05:30`;
     const endIso = `${bridgeDate}T${bridgeEnd}:00+05:30`;
     if (Date.parse(endIso) <= Date.parse(startIso)) {
-      setBridgeStatus({ state: "error", message: "End time must be after the start time." });
+      setBridgeStatus({ state: "error", message: t.bridge.errorOrder });
       return;
     }
-    setBridgeStatus({ state: "checking", message: "Checking live occupancy ledger…" });
+    setBridgeStatus({ state: "checking", message: t.bridge.checking });
     try {
       const qs = new URLSearchParams({
         space: bridgeSpace,
@@ -143,7 +138,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
       if (!res.ok || !body) {
         setBridgeStatus({
           state: "error",
-          message: body?.error?.message || "Could not verify that window. Try another time.",
+          message: body?.error?.message || t.bridge.errorWindow,
         });
         return;
       }
@@ -151,26 +146,31 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         setBridgeStatus({
           state: "ok",
           message: body.isPooled
-            ? `Available — ${body.freeUnits} of ${body.totalUnits} desks open for immediate confirmation.`
-            : `Available — ${body.spaceName} is open for immediate confirmation in this window.`,
+            ? format(t.bridge.okPooled, { free: body.freeUnits, total: body.totalUnits })
+            : format(t.bridge.okSingle, { name: body.spaceName }),
         });
       } else {
         setBridgeStatus({
           state: "busy",
-          message: body.label || "That window is already committed. Choose an adjacent time.",
+          message: body.label || t.bridge.busyFallback,
         });
       }
     } catch {
       setBridgeStatus({
         state: "error",
-        message: "Live availability service could not be reached. You can still proceed to booking.",
+        message: t.bridge.errorService,
       });
     }
   }
 
   const bookingBridgeHref = bridgeSpace
-    ? `/book?space=${encodeURIComponent(bridgeSpace)}&date=${encodeURIComponent(bridgeDate)}&start=${encodeURIComponent(bridgeStart)}&end=${encodeURIComponent(bridgeEnd)}`
-    : "/book";
+    ? `/spaces/${encodeURIComponent(bridgeSpace)}/book`
+    : "/spaces";
+
+  const activeChapterData = NARRATIVE_CHAPTERS[activeChapter];
+  const activeChapterText = activeChapterData
+    ? t.programme.chapters[CHAPTER_TEXT_KEYS[activeChapterData.key]]
+    : undefined;
 
   return (
     <div className="flex flex-col">
@@ -182,7 +182,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         <picture className="absolute inset-0 w-full h-full">
           <img
             src={OFFICIAL_MEDIA.hero}
-            alt="Restored red-brick warehouse arches framed by mature trees at TRACE Expert City, Colombo"
+            alt={t.hero.imageAlt}
             fetchPriority="high"
             className="w-full h-full object-cover opacity-85 scale-[1.015]"
           />
@@ -205,33 +205,30 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         <div className="relative z-10 mx-auto w-full max-w-[96rem] px-4 sm:px-6 lg:px-10 pt-28 pb-7 sm:pt-36 sm:pb-14 grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
           <div className="hero-arrival lg:col-span-9 flex flex-col gap-4 sm:gap-5">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--chartreuse)]">
-              TRACE Expert City · Maradana, Colombo
+              {t.hero.eyebrow}
             </p>
             <h1 className="font-display text-[2.7rem] sm:text-[clamp(4.25rem,7vw,7.35rem)] text-[var(--bone)] leading-[0.9] tracking-[-0.045em] max-w-[12ch]">
-              Colombo&apos;s room for bold ideas.
+              {t.hero.headline}
             </h1>
             <p className="text-[0.98rem] sm:text-lg text-[var(--bone)]/82 max-w-xl leading-relaxed">
-              Book restored boardrooms, studios, desks and the grand auditorium inside Colombo&apos;s
-              red-brick innovation campus—with live availability and immediate confirmation.
+              {t.hero.body}
             </p>
             <div className="hero-actions flex flex-wrap items-center gap-2 sm:gap-3 pt-2">
               <Link href="/spaces" className="btn-chartreuse">
-                Explore spaces
+                {t.hero.exploreCta}
               </Link>
-              <Link href="/book" className="btn-outline text-[var(--bone)]">
-                Book now
-              </Link>
+              <Link href="/spaces" className="btn-outline text-[var(--bone)]">{t.hero.bookCta}</Link>
             </div>
           </div>
 
           <div className="hidden lg:col-span-3 lg:border-l border-[var(--rule-dark)] lg:pl-6 lg:flex flex-col gap-2 text-xs font-mono text-[var(--bone)]/70">
             <span className="uppercase tracking-[0.14em] text-[var(--chartreuse)]">
-              Enter TRACE
+              {t.hero.enterLabel}
             </span>
-            <span>Trippane Road · Maradana Railway Precinct</span>
-            <span>Live inventory · Sri Lanka Standard Time</span>
-            <span>One desk to a full hall · confirmed online</span>
-            <span className="mt-5 uppercase tracking-[0.16em] text-[var(--bone)]/50">Scroll to enter ↓</span>
+            <span>{t.hero.address}</span>
+            <span>{t.hero.liveLine}</span>
+            <span>{t.hero.scaleLine}</span>
+            <span className="mt-5 uppercase tracking-[0.16em] text-[var(--bone)]/50">{t.hero.scrollNote} ↓</span>
           </div>
         </div>
       </section>
@@ -244,20 +241,18 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
           <div className="lg:col-span-5 flex flex-col gap-4">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--brick)]">
-              Architectural character
+              {t.heritage.eyebrow}
             </p>
             <h2 className="font-display text-3xl sm:text-5xl text-[var(--ink)]">
-              Industrial permanence adapted for contemporary engineering and discourse.
+              {t.heritage.headline}
             </h2>
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 text-base sm:text-lg text-[var(--graphite)]">
             <p>
-              Built across historic load-bearing masonry bays in Maradana, TRACE Expert City pairs
-              deep brick arcades, cast-iron trusses and shaded water courts with acoustic glass
-              enclosures, high-density fibre and production-grade audiovisual rigs.
+              {t.heritage.body}
             </p>
             <p className="text-sm font-mono uppercase tracking-[0.1em] text-[var(--ink)]">
-              Load-bearing kiln brick · Cast-iron roof spans · Tropical courtyard canopy · Studio daylight
+              {t.heritage.facts}
             </p>
           </div>
         </div>
@@ -272,8 +267,8 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
             />
           </div>
           <figcaption className="mt-3 flex flex-wrap justify-between gap-2 font-mono text-xs text-[var(--graphite)]">
-            <span>TRACE Expert City — restored warehouse bays along the Maradana precinct</span>
-            <span>Official campus photography</span>
+            <span>{t.heritage.figureCaption}</span>
+            <span>{t.heritage.figureCredit}</span>
           </figcaption>
         </figure>
       </section>
@@ -305,23 +300,19 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
 
           <div className="lg:col-span-5 flex flex-col gap-5">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--oxidized)]">
-              Campus manifesto
+              {t.manifesto.eyebrow}
             </p>
             <h2 className="font-display text-3xl sm:text-5xl text-[var(--ink)]">
-              Rooms with weight, proportion and natural light change how people think together.
+              {t.manifesto.headline}
             </h2>
             <p className="text-[var(--graphite)]">
-              Whether you are convening a twelve-person architecture review, hosting a 400-delegate
-              keynote or claiming a quiet desk for the week, every space at TRACE is operated as a
-              real architectural room—never a partitioned convention booth.
+              {t.manifesto.body}
             </p>
             <div className="pt-2 flex flex-wrap gap-3">
               <Link href="/spaces" className="btn-primary">
-                Inspect all venues
+                {t.manifesto.primaryCta}
               </Link>
-              <Link href="/booking-request" className="btn-outline">
-                Concierge brief
-              </Link>
+              <Link href="/spaces" className="btn-outline">{t.manifesto.secondaryCta}</Link>
             </div>
           </div>
         </div>
@@ -332,10 +323,10 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         <div className="mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10">
           <div className="max-w-3xl mb-14">
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--chartreuse)]">
-              Spatial programme
+              {t.programme.eyebrow}
             </p>
             <h2 className="font-display text-3xl sm:text-5xl text-[var(--bone)] mt-2">
-              Four ways the campus works across a single week.
+              {t.programme.headline}
             </h2>
           </div>
 
@@ -355,10 +346,10 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
                 ))}
                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#0d110f] via-[#0d110f]/80 to-transparent p-6 flex items-center justify-between gap-4">
                   <span className="font-display text-2xl text-[var(--bone)]">
-                    {NARRATIVE_CHAPTERS[activeChapter]?.verb}
+                    {activeChapterText?.verb}
                   </span>
                   <span className="font-mono text-xs text-[var(--chartreuse)]">
-                    {NARRATIVE_CHAPTERS[activeChapter]?.caption}
+                    {activeChapterText?.caption}
                   </span>
                 </div>
               </div>
@@ -367,6 +358,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
             <div className="lg:col-span-6 flex flex-col divide-y divide-[var(--rule-dark)]">
               {NARRATIVE_CHAPTERS.map((chapter, index) => {
                 const isCurrent = activeChapter === index;
+                const chapterText = t.programme.chapters[CHAPTER_TEXT_KEYS[chapter.key]];
                 return (
                   <article
                     key={chapter.key}
@@ -384,10 +376,10 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
                             : "border-[var(--rule-dark)] text-[var(--bone)]/60"
                         }`}
                       >
-                        {chapter.verb}
+                        {chapterText.verb}
                       </span>
                       <span className="font-mono text-xs text-[var(--bone)]/60">
-                        {chapter.caption}
+                        {chapterText.caption}
                       </span>
                     </div>
 
@@ -401,17 +393,17 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
                     </div>
 
                     <h3 className="font-display text-2xl sm:text-4xl text-[var(--bone)]">
-                      {chapter.headline}
+                      {chapterText.headline}
                     </h3>
                     <p className="text-[var(--bone)]/75 text-base leading-relaxed">
-                      {chapter.body}
+                      {chapterText.body}
                     </p>
                     <div className="pt-1">
                       <Link
                         href={chapter.filterHref}
                         className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--chartreuse)] hover:underline no-underline"
                       >
-                        Explore {chapter.verb.toLowerCase()} venues →
+                        {chapterText.link} →
                       </Link>
                     </div>
                   </article>
@@ -430,14 +422,14 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         <div className="flex flex-wrap items-end justify-between gap-6 mb-14">
           <div className="max-w-2xl">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--brick)]">
-              Published venue ledger
+              {t.ledger.eyebrow}
             </p>
             <h2 className="font-display text-3xl sm:text-5xl text-[var(--ink)] mt-2">
-              Spaces open for direct reservation at TRACE Expert City.
+              {t.ledger.headline}
             </h2>
           </div>
           <Link href="/spaces" className="btn-outline">
-            Full venue catalogue →
+            {t.ledger.catalogueCta} →
           </Link>
         </div>
 
@@ -494,13 +486,13 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
                         href={`/spaces/${encodeURIComponent(space.code)}`}
                         className="font-mono text-xs uppercase tracking-[0.12em] text-[var(--ink)] hover:text-[var(--brick)]"
                       >
-                        Venue specifications →
+                        {t.ledger.specsCta} →
                       </Link>
                       <Link
-                        href={`/book?space=${encodeURIComponent(space.code)}`}
+                        href={`/spaces/${encodeURIComponent(space.code)}/book`}
                         className="btn-primary py-2 px-3.5 text-xs"
                       >
-                        Book venue
+                        {t.ledger.bookVenue}
                       </Link>
                     </div>
                   </div>
@@ -511,10 +503,10 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         ) : (
           <div className="hairline-box bg-[var(--paper-card)] p-8">
             <p className="font-display text-2xl text-[var(--ink)]">
-              Venue catalogue is currently being updated.
+              {t.ledger.emptyTitle}
             </p>
             <p className="text-sm text-[var(--graphite)] mt-2">
-              You can still submit a bespoke request through our concierge desk.
+              {t.ledger.emptyBody}
             </p>
           </div>
         )}
@@ -528,14 +520,13 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         <div className="mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           <div className="lg:col-span-5 flex flex-col gap-3">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--oxidized)]">
-              Live availability bridge
+              {t.bridge.eyebrow}
             </p>
             <h2 className="font-display text-3xl sm:text-4xl text-[var(--ink)]">
-              Test a window against the booking ledger, then lock it in.
+              {t.bridge.headline}
             </h2>
             <p className="text-sm text-[var(--graphite)]">
-              Every query checks active room and desk allocations in Sri Lanka Standard Time
-              (UTC+05:30), including turnaround buffers and scheduled maintenance blocks.
+              {t.bridge.body}
             </p>
           </div>
 
@@ -543,7 +534,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
             <form onSubmit={handleBridgeCheck} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2 flex flex-col gap-1.5">
                 <label htmlFor="bridge-space" className="font-mono text-xs uppercase tracking-wider">
-                  Venue
+                  {t.bridge.venueLabel}
                 </label>
                 <select
                   id="bridge-space"
@@ -561,7 +552,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
 
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="bridge-date" className="font-mono text-xs uppercase tracking-wider">
-                  Date (SLST)
+                  {t.bridge.dateLabel}
                 </label>
                 <input
                   id="bridge-date"
@@ -576,7 +567,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="bridge-start" className="font-mono text-xs uppercase tracking-wider">
-                    Start
+                    {t.bridge.startLabel}
                   </label>
                   <input
                     id="bridge-start"
@@ -590,7 +581,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="bridge-end" className="font-mono text-xs uppercase tracking-wider">
-                    End
+                    {t.bridge.endLabel}
                   </label>
                   <input
                     id="bridge-end"
@@ -620,10 +611,10 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
 
               <div className="sm:col-span-2 flex flex-wrap items-center gap-3 pt-1">
                 <button type="submit" className="btn-outline">
-                  Check live availability
+                  {t.bridge.checkCta}
                 </button>
                 <Link href={bookingBridgeHref} className="btn-primary">
-                  Continue to direct booking →
+                  {t.bridge.requestCta} →
                 </Link>
               </div>
             </form>
@@ -645,22 +636,18 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
         />
         <div className="relative z-10 mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 flex flex-col gap-6 max-w-3xl">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--chartreuse)]">
-            Reserve at TRACE Expert City
+            {t.closing.eyebrow}
           </p>
           <h2 className="font-display text-4xl sm:text-6xl text-[var(--bone)]">
-            Claim your room, desk or hall in Colombo’s innovation precinct.
+            {t.closing.headline}
           </h2>
           <p className="text-base sm:text-lg text-[var(--bone)]/80 max-w-2xl">
-            Direct bookings confirm immediately and issue a private capability link for managing
-            your reservation. Complex multi-space or custom AV productions can also be routed to our
-            concierge team.
+            {t.closing.body}
           </p>
           <div className="flex flex-wrap items-center gap-4 pt-2">
-            <Link href="/book" className="btn-chartreuse">
-              Book now
-            </Link>
+            <Link href="/spaces" className="btn-chartreuse">{t.closing.bookCta}</Link>
             <Link href="/spaces" className="btn-outline text-[var(--bone)]">
-              Explore spaces
+              {t.closing.exploreCta}
             </Link>
           </div>
         </div>

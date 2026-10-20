@@ -79,6 +79,16 @@ export type Reservation = {
   currency: string;
 };
 
+export type BookingRequest = {
+  reference: string; status: string; paymentStatus: string;
+  spaceCode: string; spaceName: string; startAt: number; endAt: number;
+  unitCount: number; attendees: number | null; purpose: string | null;
+  billingUnit: string; billingQuantity: number; rateCents: number;
+  venueTotalCents: number; currency: string; holdExpiresAt: number | null;
+  rejectionReason: string | null; reservationReference: string | null;
+  payment: null | { bookingFeeCents: number; venueTotalCents: number; remainingBalanceCents: number; currency: string; latestAttempt: null | { orderId:string; status:string; paymentId:string|null; method:string|null; statusCode:string|null; updatedAt:number } };
+};
+
 export type ApiError = {
   ok?: false;
   error?: { code?: string; message?: string; details?: Record<string, unknown> };

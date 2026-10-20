@@ -10,6 +10,7 @@ import { businessParts } from './time.js';
 const PREFIX = {
   reservation: 'NG',
   inquiry: 'INQ',
+  booking_request: 'REQ',
 };
 
 /**

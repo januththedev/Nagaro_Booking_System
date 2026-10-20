@@ -32,6 +32,7 @@ import { registerAdminCustomerRoutes } from './routes/adminCustomerRoutes.js';
 import { registerAdminOpsRoutes } from './routes/adminOpsRoutes.js';
 import { registerMediaRoutes } from './routes/mediaRoutes.js';
 import { registerAdminUploadRoutes } from './routes/adminUploadRoutes.js';
+import { registerBookingWorkflowRoutes } from './routes/bookingWorkflowRoutes.js';
 
 const STATIC_PREFIX = '/assets/';
 const FLASH_MAX_AGE_SECONDS = 30;
@@ -163,6 +164,7 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   registerAuthRoutes(router, deps);
   registerMediaRoutes(router, deps);
   registerPublicRoutes(router, deps);
+  registerBookingWorkflowRoutes(router, deps);
   registerAdminSpaceRoutes(router, deps);
   registerAdminBookingRoutes(router, deps);
   registerAdminCustomerRoutes(router, deps);

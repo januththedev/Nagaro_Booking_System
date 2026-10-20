@@ -8,7 +8,7 @@ const BACKEND_FORM_POSTS = new Set([
 ]);
 
 export function middleware(request: NextRequest) {
-  if (request.method === "POST" && BACKEND_FORM_POSTS.has(request.nextUrl.pathname)) {
+  if (request.method === "POST" && (BACKEND_FORM_POSTS.has(request.nextUrl.pathname) || /^\/spaces\/[^/]+\/book$/.test(request.nextUrl.pathname))) {
     const destination = request.nextUrl.clone();
     destination.pathname = "/api/index";
     destination.search = "";
@@ -40,5 +40,6 @@ export const config = {
     "/booking-request",
     "/booking-request/received",
     "/booking-request/withdraw",
+    "/spaces/:path*/book",
   ],
 };

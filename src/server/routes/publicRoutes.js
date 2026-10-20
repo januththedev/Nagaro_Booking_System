@@ -646,53 +646,35 @@ export function registerPublicRoutes(router, deps = {}) {
     }));
   });
 
-  /* --------------------------------------------------- direct guest booking */
+  /* ------------------------------------------- retired: direct guest booking
+   * Immediate self-confirmation is retired: every customer booking now travels
+   * request -> staff approval -> booking-fee payment -> confirmation.
+   * Legacy capability links keep working; only new creation is refused. */
+
+  const retirePublicFlow = (ctx) => {
+    if (ctx.wantsJson) {
+      ctx.json({
+        ok: false,
+        error: {
+          code: 'RETIRED',
+          message: 'Direct guest booking has been retired. Choose a published space and send a booking request instead — staff approve it and any configured booking fee is paid afterwards.',
+          details: { use: '/api/public/booking-requests' },
+        },
+      }, 410);
+      return;
+    }
+    redirect(ctx.res, '/spaces', 303);
+    ctx.responded = true;
+  };
 
   router.get('/book', async (ctx) => {
-    ctx.html(renderSelfBookingPage({
-      spaces: selectPublicSpaces(db, {}).published.map(projectSpace),
-      values: { ...prefillValues(ctx.query), today: businessDateKey(clock()) },
-      formToken: newPublicBookingToken(),
-    }));
+    redirect(ctx.res, '/spaces', 308);
+    ctx.responded = true;
   });
 
   router.post('/book', async (ctx) => {
-    const body = await ctx.readBody();
-    const values = formValues(body);
-    const spaces = selectPublicSpaces(db, {}).published.map(projectSpace);
-    const renderProblems = (error) => {
-      const problems = problemStrings(error?.details);
-      ctx.html(renderSelfBookingPage({
-        spaces,
-        values: { ...values, today: businessDateKey(clock()) },
-        errors: error?.details ?? null,
-        problems: problems.length ? problems : [error?.message ?? 'Please check the booking details.'],
-        formToken: textValue(body.form_token, 120) || newPublicBookingToken(),
-        status: error?.status ?? 422,
-      }), error?.status ?? 422);
-    };
-
-    try {
-      protectCapabilityResponse(ctx);
-      enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
-      const result = createPublicBooking(db, publicBookingInput(db, values, publicBookingFormToken(ctx, body), clock()));
-      const reservation = result.reservation;
-
-      if (ctx.wantsJson) {
-        ctx.json({ ok: true, data: publicBookingResponse(result) }, result.idempotent ? 200 : 201);
-        return;
-      }
-      if (!result.manageToken) {
-        ctx.html(renderPublicBookingConfirmedPage({ reservation, managePath: null }), 200);
-        return;
-      }
-      redirect(ctx.res, `/book/confirmed?ref=${encodeURIComponent(reservation.reference)}&token=${encodeURIComponent(result.manageToken)}`, 303);
-      ctx.responded = true;
-    } catch (error) {
-      if (!(error instanceof AppError)) throw error;
-      if (ctx.wantsJson) throw error;
-      renderProblems(error);
-    }
+    await ctx.readBody();
+    retirePublicFlow(ctx);
   });
 
   router.get('/book/confirmed', async (ctx) => {
@@ -762,84 +744,18 @@ export function registerPublicRoutes(router, deps = {}) {
     }
   });
 
-  /* -------------------------------------------------------- request form */
+  /* ---------------------------------------- retired: concierge inquiry form
+   * The separate concierge channel is retired in favour of the unified
+   * request flow; existing inquiry withdrawal links keep working. */
 
   router.get('/booking-request', async (ctx) => {
-    ctx.html(renderBookingRequestPage({
-      spaces: publishedSpaceOptions(db),
-      values: { ...prefillValues(ctx.query), today: businessDateKey(clock()) },
-    }));
+    redirect(ctx.res, '/spaces', 308);
+    ctx.responded = true;
   });
 
   router.post('/booking-request', async (ctx) => {
-    const body = await ctx.readBody();
-    const values = formValues(body);
-    const ip = clientIp(ctx.req);
-    const spaces = publishedSpaceOptions(db);
-
-    const renderProblems = (status, { errors = null, problems = [], code = ERROR_CODES.VALIDATION } = {}) => {
-      if (ctx.wantsJson) {
-        ctx.json({ ok: false, error: { code, message: problems[0] ?? 'Please check the form.', details: errors ?? { problems } } }, status);
-        return;
-      }
-      ctx.html(renderBookingRequestPage({
-        spaces, values: { ...values, today: businessDateKey(clock()) }, errors, problems, status,
-      }), status);
-    };
-
-    // Throttle first, exactly once: submitInquiry() is told not to repeat it.
-    try {
-      enforcePublicInquiryLimits(db, { ip, email: values.email, now: clock() });
-    } catch (error) {
-      if (error instanceof AppError && error.status === 429) {
-        renderProblems(429, { problems: [error.message], code: ERROR_CODES.RATE_LIMITED });
-        return;
-      }
-      throw error;
-    }
-
-    let result;
-    try {
-      result = await submitInquiry(db, {
-        payload: payloadFromValues(values),
-        ip,
-        mailer,
-        now: clock(),
-        baseUrl,
-        enforceRateLimit: false,
-      });
-    } catch (error) {
-      if (error instanceof AppError && error.status === 422) {
-        renderProblems(422, { errors: error.details, problems: problemStrings(error.details) });
-        return;
-      }
-      throw error;
-    }
-
-    const reference = result.inquiry.reference;
-    const token = result.inquiry.withdrawToken ?? '';
-    const withdrawPath = `/booking-request/withdraw?ref=${encodeURIComponent(reference)}`
-      + (token ? `&token=${encodeURIComponent(token)}` : '');
-
-    if (ctx.wantsJson) {
-      ctx.json({
-        ok: true,
-        data: {
-          requestRef: reference,
-          spaceCode: result.inquiry.spaceCode,
-          startAt: result.inquiry.startAt,
-          endAt: result.inquiry.endAt,
-          deskQuantity: result.inquiry.deskQuantity,
-          status: result.inquiry.status,
-          emailStatus: result.inquiry.emailStatus,
-          withdrawPath,
-        },
-      }, 201);
-      return;
-    }
-    redirect(ctx.res, `/booking-request/received?ref=${encodeURIComponent(reference)}`
-      + (token ? `&token=${encodeURIComponent(token)}` : ''), 303);
-    ctx.responded = true;
+    await ctx.readBody();
+    retirePublicFlow(ctx);
   });
 
   /* ---------------------------------------------------------- acknowledgement */
@@ -986,13 +902,8 @@ export function registerPublicRoutes(router, deps = {}) {
   });
 
   router.post('/api/public/bookings', async (ctx) => {
-    protectCapabilityResponse(ctx);
-    const body = await ctx.readBody();
-    const values = formValues(body);
-    const formToken = publicBookingFormToken(ctx, body);
-    enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
-    const result = createPublicBooking(db, publicBookingInput(db, values, formToken, clock()));
-    ctx.json({ ok: true, data: publicBookingResponse(result) }, result.idempotent ? 200 : 201);
+    await ctx.readBody();
+    retirePublicFlow(ctx);
   });
 
   router.get('/api/public/bookings/:reference', async (ctx) => {
@@ -1013,37 +924,7 @@ export function registerPublicRoutes(router, deps = {}) {
   });
 
   router.post('/api/public/inquiries', async (ctx) => {
-    const body = await ctx.readBody();
-    const values = formValues(body);
-    const ip = clientIp(ctx.req);
-    enforcePublicInquiryLimits(db, { ip, email: values.email, now: clock() });
-    const result = await submitInquiry(db, {
-      payload: payloadFromValues(values),
-      ip,
-      mailer,
-      now: clock(),
-      baseUrl,
-      enforceRateLimit: false,
-    });
-    const reference = result.inquiry.reference;
-    const token = result.inquiry.withdrawToken ?? '';
-    const withdrawPath = `/booking-request/withdraw?ref=${encodeURIComponent(reference)}`
-      + (token ? `&token=${encodeURIComponent(token)}` : '');
-    ctx.json({
-      ok: true,
-      data: {
-        requestRef: reference,
-        reference,
-        spaceCode: result.inquiry.spaceCode,
-        spaceName: result.inquiry.spaceName,
-        startAt: result.inquiry.startAt,
-        endAt: result.inquiry.endAt,
-        deskQuantity: result.inquiry.deskQuantity,
-        status: result.inquiry.status,
-        emailStatus: result.inquiry.emailStatus,
-        withdrawToken: token || null,
-        withdrawPath,
-      },
-    }, 201);
+    await ctx.readBody();
+    retirePublicFlow(ctx);
   });
 }

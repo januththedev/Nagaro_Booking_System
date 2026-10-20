@@ -46,6 +46,11 @@ const ADMIN_NAV = [
       label: 'Inquiries',
       icon: navIcon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'),
     },
+    {
+      href: '/admin/booking-requests',
+      label: 'Booking requests',
+      icon: navIcon('<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>'),
+    },
   ] },
   { group: 'Catalogue', items: [
     {

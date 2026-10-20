@@ -55,15 +55,17 @@ export function findConflicts(db, {
   }
 
   clauses.push(`(
-      (o.source = '${OCCUPANCY_SOURCE.MAINTENANCE}' AND o.start_at < ? AND o.end_at > ?)
-   OR (o.source = '${OCCUPANCY_SOURCE.RESERVATION}' AND o.start_at < ? AND o.end_at > ?)
+      (o.source = '${OCCUPANCY_SOURCE.MAINTENANCE}' AND bh.id IS NULL AND o.start_at < ? AND o.end_at > ?)
+   OR ((o.source = '${OCCUPANCY_SOURCE.RESERVATION}' OR bh.id IS NOT NULL) AND o.start_at < ? AND o.end_at > ?)
   )`);
   params.push(endAt, startAt, window.end, window.start);
 
   return db.prepare(`
-    SELECT o.id, o.resource_unit_id, o.space_id, o.start_at, o.end_at, o.status, o.source,
+    SELECT o.id, o.resource_unit_id, o.space_id, o.start_at, o.end_at, o.status,
+           CASE WHEN bh.id IS NOT NULL THEN 'HOLD' ELSE o.source END AS source,
            o.reservation_id, o.maintenance_block_id,
-           r.reference AS reservation_reference, r.status AS reservation_status,
+           COALESCE(r.reference, br.reference) AS reservation_reference,
+           COALESCE(r.status, br.status) AS reservation_status,
            r.purpose AS reservation_purpose, r.unit_count AS reservation_unit_count,
            c.full_name AS customer_name,
            m.reason AS maintenance_reason,
@@ -72,6 +74,8 @@ export function findConflicts(db, {
       LEFT JOIN reservation r ON r.id = o.reservation_id
       LEFT JOIN customer    c ON c.id = r.customer_id
       LEFT JOIN maintenance_block m ON m.id = o.maintenance_block_id
+      LEFT JOIN booking_hold_claim bh ON bh.occupancy_id = o.id AND bh.status = 'ACTIVE'
+      LEFT JOIN booking_request br ON br.id = bh.booking_request_id
       LEFT JOIN resource_unit u ON u.id = o.resource_unit_id
      WHERE ${clauses.join(' AND ')}
      ORDER BY o.start_at ASC
@@ -95,7 +99,9 @@ export function mapConflictRow(row) {
     customerName: row.customer_name,
     maintenanceBlockId: row.maintenance_block_id,
     maintenanceReason: row.maintenance_reason,
-    label: row.source === OCCUPANCY_SOURCE.MAINTENANCE
+    label: row.source === 'HOLD'
+      ? 'Temporarily held for an approved request'
+      : row.source === OCCUPANCY_SOURCE.MAINTENANCE
       ? `Maintenance block${row.maintenance_reason ? `: ${row.maintenance_reason}` : ''}`
       : `Reservation ${row.reservation_reference ?? ''}${row.customer_name ? ` (${row.customer_name})` : ''}`.trim(),
   };
@@ -127,15 +133,18 @@ export function inspectUnits(db, {
     params.push(excludeReservationId);
   }
   clauses.push(`(
-      (o.source = '${OCCUPANCY_SOURCE.MAINTENANCE}' AND o.start_at < ? AND o.end_at > ?)
-   OR (o.source = '${OCCUPANCY_SOURCE.RESERVATION}' AND o.start_at < ? AND o.end_at > ?)
+      (o.source = '${OCCUPANCY_SOURCE.MAINTENANCE}' AND bh.id IS NULL AND o.start_at < ? AND o.end_at > ?)
+   OR ((o.source = '${OCCUPANCY_SOURCE.RESERVATION}' OR bh.id IS NOT NULL) AND o.start_at < ? AND o.end_at > ?)
   )`);
   params.push(endAt, startAt, window.end, window.start);
 
   const rows = db.prepare(`
-    SELECT o.id, o.resource_unit_id, o.start_at, o.end_at, o.source, o.reservation_id,
+    SELECT o.id, o.resource_unit_id, o.start_at, o.end_at,
+           CASE WHEN bh.id IS NOT NULL THEN 'HOLD' ELSE o.source END AS source,
+           o.reservation_id,
            o.maintenance_block_id,
-           r.reference AS reservation_reference, r.status AS reservation_status,
+           COALESCE(r.reference, br.reference) AS reservation_reference,
+           COALESCE(r.status, br.status) AS reservation_status,
            c.full_name AS customer_name,
            m.reason AS maintenance_reason,
            u.code AS unit_code, u.label AS unit_label
@@ -143,6 +152,8 @@ export function inspectUnits(db, {
       LEFT JOIN reservation r ON r.id = o.reservation_id
       LEFT JOIN customer    c ON c.id = r.customer_id
       LEFT JOIN maintenance_block m ON m.id = o.maintenance_block_id
+      LEFT JOIN booking_hold_claim bh ON bh.occupancy_id = o.id AND bh.status = 'ACTIVE'
+      LEFT JOIN booking_request br ON br.id = bh.booking_request_id
       LEFT JOIN resource_unit u ON u.id = o.resource_unit_id
      WHERE ${clauses.join(' AND ')}
      ORDER BY o.start_at ASC
@@ -182,8 +193,7 @@ export function allocateUnits(db, {
 
   const loadRows = db.prepare(`
     SELECT resource_unit_id, COUNT(*) AS active_count
-      FROM occupancy
-     WHERE space_id = ? AND status = 'ACTIVE'
+      FROM occupancy WHERE space_id = ? AND status = 'ACTIVE'
      GROUP BY resource_unit_id
   `).all(spaceId);
   const load = new Map(loadRows.map((r) => [r.resource_unit_id, r.active_count]));
@@ -331,9 +341,12 @@ export function getSpaceDayGrid(db, { spaceId, dateKey, includeDetails = true })
   const closeMinutes = parseClock(space.close_time);
 
   const rows = units.length === 0 ? [] : db.prepare(`
-    SELECT o.id, o.resource_unit_id, o.start_at, o.end_at, o.source, o.reservation_id,
+    SELECT o.id, o.resource_unit_id, o.start_at, o.end_at,
+           CASE WHEN bh.id IS NOT NULL THEN 'HOLD' ELSE o.source END AS source,
+           o.reservation_id,
            o.maintenance_block_id,
-           r.reference AS reservation_reference, r.status AS reservation_status,
+           COALESCE(r.reference, br.reference) AS reservation_reference,
+           COALESCE(r.status, br.status) AS reservation_status,
            r.attendees, r.purpose, r.unit_count,
            c.full_name AS customer_name,
            m.reason AS maintenance_reason,
@@ -342,6 +355,8 @@ export function getSpaceDayGrid(db, { spaceId, dateKey, includeDetails = true })
       LEFT JOIN reservation r ON r.id = o.reservation_id
       LEFT JOIN customer    c ON c.id = r.customer_id
       LEFT JOIN maintenance_block m ON m.id = o.maintenance_block_id
+      LEFT JOIN booking_hold_claim bh ON bh.occupancy_id=o.id AND bh.status='ACTIVE'
+      LEFT JOIN booking_request br ON br.id=bh.booking_request_id
       LEFT JOIN resource_unit u ON u.id = o.resource_unit_id
      WHERE o.space_id = ?
        AND o.status = '${OCCUPANCY_STATUS.ACTIVE}'
@@ -354,7 +369,7 @@ export function getSpaceDayGrid(db, { spaceId, dateKey, includeDetails = true })
     const slotStart = businessLocalToEpoch(dateKey, minutesToClock(m));
     const slotEnd = Math.min(businessLocalToEpoch(dateKey, minutesToClock(Math.min(m + 60, closeMinutes))), dayEnd);
     const overlapping = rows.filter((r) => r.start_at < slotEnd && r.end_at > slotStart);
-    const busyUnitIds = new Set(overlapping.filter((r) => r.source === OCCUPANCY_SOURCE.RESERVATION || r.source === OCCUPANCY_SOURCE.MAINTENANCE).map((r) => r.resource_unit_id));
+    const busyUnitIds = new Set(overlapping.filter((r) => r.source === OCCUPANCY_SOURCE.RESERVATION || r.source === OCCUPANCY_SOURCE.MAINTENANCE || r.source === 'HOLD').map((r) => r.resource_unit_id));
     slots.push({
       startAt: slotStart,
       endAt: slotEnd,

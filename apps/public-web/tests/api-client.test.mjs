@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { clientApiPath, getBooking, getSpace, getSpaces } from '../lib/api.ts';
+import { clientApiPath, getBooking, getSpace, getSpaces, serverBase } from '../lib/api.ts';
 
 const SPACE = {
   code: 'bay-07',
@@ -133,4 +133,37 @@ test('the browser-side path builder honours an explicit API base and stays relat
 
   if (previous === undefined) delete process.env.NEXT_PUBLIC_API_BASE;
   else process.env.NEXT_PUBLIC_API_BASE = previous;
+});
+
+test('server-side calls prefer the canonical origin over the protected deployment URL', () => {
+  const keys = ['API_ORIGIN', 'NEXT_PUBLIC_API_BASE', 'NAGARO_BASE_URL', 'VERCEL_PROJECT_PRODUCTION_URL', 'VERCEL_URL'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  const restore = () => {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  };
+
+  try {
+    for (const key of keys) delete process.env[key];
+    process.env.VERCEL_URL = 'nagaro-booking-system-git-branch.vercel.app';
+    process.env.VERCEL_PROJECT_PRODUCTION_URL = 'nagarobookingsystem.vercel.app';
+    process.env.NAGARO_BASE_URL = 'https://nagarobookingsystem.vercel.app';
+
+    // The canonical domain wins: deployment URLs sit behind Vercel's
+    // Deployment Protection and cannot be fetched from inside a function.
+    assert.equal(serverBase(), 'https://nagarobookingsystem.vercel.app');
+
+    delete process.env.NAGARO_BASE_URL;
+    assert.equal(serverBase(), 'https://nagarobookingsystem.vercel.app', 'falls back to the production URL');
+
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    assert.equal(serverBase(), 'https://nagaro-booking-system-git-branch.vercel.app', 'and only then to the deployment URL');
+
+    process.env.API_ORIGIN = 'http://127.0.0.1:4173/';
+    assert.equal(serverBase(), 'http://127.0.0.1:4173', 'an explicit origin always wins and loses its trailing slash');
+  } finally {
+    restore();
+  }
 });

@@ -61,8 +61,17 @@ The app safely records inquiries without SMTP, but delivery is marked
    rows. It is safe to rerun.
 3. Put only the transaction-pooler URL (port `6543`, TLS required) in Vercel as
    `DATABASE_URL`. Do not copy `DIRECT_URL` into the Vercel project.
+   If Supabase's connection panel gave you its standard names
+   (`POSTGRES_PRISMA_URL`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, …), the
+   application still reads `DATABASE_URL`: add it and copy the **transaction
+   pooler** value (`POSTGRES_PRISMA_URL`, port 6543, `pgbouncer=true`) into it.
 4. The API verifies `public.space` and the `occupancy_no_overlap` GiST exclusion
    constraint on cold start and refuses to serve against a partial schema.
+5. TLS note: current node-postgres treats `sslmode=require` as `verify-full`, and
+   the Supabase pooler's certificate chain is not in Node's bundled trust store,
+   which fails the handshake before the first query. `src/server/db/pgSsl.js`
+   normalises this: connections are always encrypted, chain verification is only
+   enforced when you ask for `sslmode=verify-full`/`verify-ca`.
 
 Example in PowerShell (values are placeholders):
 

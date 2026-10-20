@@ -6,9 +6,8 @@
  * function instance, then `app.handle(req, res)` exactly like index.js.
  *
  * Database policy (never silent):
- *   - DATABASE_URL set      -> refuse to boot: the PostgreSQL async adapter
- *     is not implemented yet (see PROGRESS.md). Failing loudly here prevents
- *     serving bookings from the wrong database.
+ *   - DATABASE_URL set      -> connect to persistent Supabase PostgreSQL using
+ *     the compatibility adapter and require the migrated schema.
  *   - DATABASE_URL unset    -> refuse to boot UNLESS the operator explicitly
  *     opts into an ephemeral throwaway SQLite file with
  *     NAGARO_ALLOW_EPHEMERAL_SQLITE=1 (preview/demo only: nothing persists).
@@ -36,13 +35,7 @@ async function buildApp() {
   const { loadConfig } = await import('../src/server/config.js');
   const config = loadConfig();
 
-  if (config.databaseUrl) {
-    throw new Error(
-      'DATABASE_URL is set, but the PostgreSQL runtime adapter is not implemented yet. '
-      + 'Unset DATABASE_URL (local SQLite) or see PROGRESS.md for the remaining adapter work.',
-    );
-  }
-  if (config.isVercel && !config.allowEphemeralSqlite) {
+  if (config.isVercel && !config.allowEphemeralSqlite && !config.databaseUrl) {
     throw new Error(
       'No persistent database is configured. Set DATABASE_URL (Supabase PostgreSQL) or '
       + 'explicitly opt into an ephemeral demo database with NAGARO_ALLOW_EPHEMERAL_SQLITE=1.',
@@ -53,11 +46,12 @@ async function buildApp() {
   const { applyMigrations } = await import('../src/server/db/migrate.js');
   const { createApp } = await import('../src/server/app.js');
   const { ensureUploadDir } = await import('../src/server/security/uploads.js');
+  const { blobEnabled } = await import('../src/server/security/blobStorage.js');
   const { purgeExpiredSessions } = await import('../src/server/security/sessions.js');
   const { reconcileCompletedReservations } = await import('../src/server/services/bookingService.js');
   const { ensureFirstAdmin } = await import('../src/server/services/adminUserService.js');
 
-  if (config.isVercel) {
+  if (config.isVercel && !config.databaseUrl) {
     // Serverless filesystems are ephemeral: keep throwaway state in /tmp and
     // say so loudly in the function logs (never a secret, just the mode).
     console.log('[nagaro] ephemeral preview mode: SQLite and uploads live in the instance temp directory and do not persist.');
@@ -66,15 +60,30 @@ async function buildApp() {
   }
 
   const db = getDb();
-  applyMigrations(db);
-  const fkProblems = db.prepare('PRAGMA foreign_key_check').all();
-  if (fkProblems.length > 0) throw new Error(`Refusing to serve: ${fkProblems.length} foreign-key violation(s).`);
-  const triggers = db.prepare(
-    "SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_occupancy_no_overlap%'",
-  ).get().c;
-  if (Number(triggers) < 2) throw new Error('Refusing to serve: occupancy overlap triggers are missing.');
+  if (db.dialect === 'postgres') {
+    const schema = db.prepare("SELECT to_regclass('public.space') AS space_table").get();
+    if (!schema?.space_table) {
+      throw new Error('Supabase is reachable but not migrated. Run npm run migrate:postgres with DIRECT_URL first.');
+    }
+    const guard = db.prepare(`
+      SELECT COUNT(*) AS c
+        FROM pg_constraint
+       WHERE conname = 'occupancy_no_overlap' AND contype = 'x'
+    `).get();
+    if (Number(guard?.c ?? 0) < 1) {
+      throw new Error('Refusing to serve: the PostgreSQL occupancy overlap constraint is missing.');
+    }
+  } else {
+    applyMigrations(db);
+    const fkProblems = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkProblems.length > 0) throw new Error(`Refusing to serve: ${fkProblems.length} foreign-key violation(s).`);
+    const triggers = db.prepare(
+      "SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_occupancy_no_overlap%'",
+    ).get().c;
+    if (Number(triggers) < 2) throw new Error('Refusing to serve: occupancy overlap triggers are missing.');
+  }
 
-  ensureUploadDir();
+  if (!blobEnabled()) ensureUploadDir();
   purgeExpiredSessions(db);
   reconcileCompletedReservations(db);
 
@@ -107,6 +116,10 @@ export default async function handler(req, res) {
     return;
   }
   try {
+    const originalUrl = req.headers?.['x-nagaro-original-url'];
+    if (typeof originalUrl === 'string' && /^\/[A-Za-z0-9_?&=/%+.,:@~-]*$/.test(originalUrl)) {
+      req.url = originalUrl;
+    }
     await app.handle(req, res);
   } catch (error) {
     console.error('[nagaro] request failed:', error?.message ?? error);

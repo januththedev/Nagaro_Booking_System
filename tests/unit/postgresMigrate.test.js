@@ -110,10 +110,10 @@ test('CONTRACT (static): 0001_init.sql carries the full schema and the overlap g
     'space_image', 'customer', 'reservation', 'occupancy', 'maintenance_block', 'inquiry',
     'audit_log', 'rate_limit_counter',
   ]) {
-    assert.ok(new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`).test(sql), `table ${table} present`);
+    assert.ok(new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${table}\\b`).test(sql), `table ${table} present`);
   }
   assert.ok(/EXCLUDE USING gist/.test(sql), 'GiST exclusion constraint present');
-  assert.ok(/tstzrange\(start_at, end_at/.test(sql), 'half-open range on the occupancy interval');
+  assert.ok(/int8range\(start_at, end_at/.test(sql), 'half-open range on the occupancy interval');
   assert.ok(/WHERE \(status = 'ACTIVE'\)/.test(sql), 'overlap guard scoped to ACTIVE rows');
   assert.ok(/REFERENCES reservation/.test(sql), 'occupancy references reservations');
   assert.ok(/idempotency_key/.test(sql), 'idempotency key column present');

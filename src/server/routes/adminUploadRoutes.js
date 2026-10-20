@@ -116,7 +116,10 @@ export function registerAdminUploadRoutes(router, deps = {}) {
       }
     } finally {
       for (const file of accepted) {
-        if (!insertedNames.has(file.storedName)) removeStoredImage(file.storedName);
+        if (!insertedNames.has(file.storedName)) {
+          removeStoredImage(file.storedName);
+          if (file.blobPathname) await deleteBlob(file.blobPathname);
+        }
       }
     }
 
@@ -177,7 +180,7 @@ export function registerAdminUploadRoutes(router, deps = {}) {
     try {
       const { removedStoredName, removedBlobPathname } = deleteImage(db, { actor: ctx.actor, spaceId, imageId });
       removeStoredImage(removedStoredName); // best effort: the row is already gone
-      if (removedBlobPathname) deleteBlob(removedBlobPathname).catch(() => {});
+      if (removedBlobPathname) await deleteBlob(removedBlobPathname);
       flashRedirect(ctx, deps, target, { kind: 'success', message: 'Photograph removed.' });
     } catch (error) {
       if (!(error instanceof AppError)) throw error;

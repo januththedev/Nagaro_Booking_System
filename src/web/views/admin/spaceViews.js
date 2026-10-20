@@ -255,8 +255,9 @@ function inventoryIndicator(space) {
 }
 
 function spaceThumbnail(space) {
-  if (space.coverImage) {
-    return html`<img src="/media/${space.coverImage}" alt="${space.name}" width="48" height="32" loading="lazy" decoding="async">`;
+  if (space.coverImageUrl || space.coverImage) {
+    const source = space.coverImageUrl ?? `/media/${space.coverImage}`;
+    return html`<img src="${source}" alt="${space.name}" width="48" height="32" loading="lazy" decoding="async">`;
   }
   return html`<span class="tag" aria-hidden="true">${space.code}</span>`;
 }

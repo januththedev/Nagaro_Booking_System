@@ -22,6 +22,7 @@ const SPACE_SELECT = `
   SELECT s.*,
          (SELECT COUNT(*) FROM space_image i WHERE i.space_id = s.id) AS image_count,
          (SELECT i.stored_name FROM space_image i WHERE i.space_id = s.id AND i.is_cover = 1) AS cover_image,
+         (SELECT COALESCE(i.blob_url, '/media/' || i.stored_name) FROM space_image i WHERE i.space_id = s.id AND i.is_cover = 1) AS cover_image_url,
          (SELECT COUNT(*) FROM resource_unit u WHERE u.space_id = s.id AND u.is_active = 1) AS unit_count
     FROM space s
 `;
@@ -63,6 +64,7 @@ export function hydrateSpace(db, row) {
     unitCount: row.unit_count ?? units.length,
     imageCount: row.image_count ?? 0,
     coverImage: row.cover_image ?? null,
+    coverImageUrl: row.cover_image_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     publishedAt: row.published_at,

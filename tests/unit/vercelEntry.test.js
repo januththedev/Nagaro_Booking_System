@@ -6,8 +6,8 @@
  *   - on Vercel with no persistent database and no explicit opt-in, the
  *     function refuses with a configuration error (never a silent local
  *     SQLite fallback and never a stack trace or secret);
- *   - with DATABASE_URL set, it refuses loudly (PostgreSQL adapter pending)
- *     and creates no SQLite file;
+ *   - with an unreachable DATABASE_URL, it fails safely and creates no
+ *     fallback SQLite file;
  *   - with the explicit ephemeral opt-in, it boots and serves the real app
  *     (public page 200, unknown route 404, security headers present).
  */
@@ -65,13 +65,13 @@ test('vercel entry refuses without a persistent database and without opt-in', as
   }
 });
 
-test('vercel entry refuses loudly when DATABASE_URL is set (adapter pending)', async (t) => {
+test('vercel entry fails safely when configured PostgreSQL is unreachable', async (t) => {
   t.after(() => { process.env = { ...SAVED_ENV }; });
   const dir = mkdtempSync(join(tmpdir(), 'nagaro-vercel-pg-'));
   try {
     setEnv({
       VERCEL: '1',
-      DATABASE_URL: 'postgres://user:s3cret-pw@db.example.com:5432/postgres',
+      DATABASE_URL: 'postgres://user:s3cret-pw@127.0.0.1:1/postgres',
       NAGARO_DB_PATH: join(dir, 'must-not-exist.db'),
     });
     const handler = await freshHandler();
@@ -82,7 +82,8 @@ test('vercel entry refuses loudly when DATABASE_URL is set (adapter pending)', a
       assert.equal(payload.error.code, 'CONFIGURATION_ERROR');
       const text = JSON.stringify(payload);
       assert.ok(!text.includes('s3cret-pw'), 'connection secret never leaks');
-      assert.ok(!text.includes('db.example.com'), 'connection host never leaks');
+      assert.ok(!text.includes('127.0.0.1'), 'connection host never leaks');
+      assert.match(payload.error.message, /PostgreSQL database/i);
     });
     assert.equal(existsSync(join(dir, 'must-not-exist.db')), false, 'no SQLite fallback file');
   } finally {

@@ -28,7 +28,7 @@ const NARRATIVE_CHAPTERS = [
     verb: "Make",
     headline: "Open-span coworking bays engineered for deep engineering and design residencies.",
     body: "Long timber workbenches under exposed steel trusses give individual builders and visiting squads a permanent-feeling desk for a day, a week or a month.",
-    caption: "Coworking Hall · individual desks Allocated per unit in real time",
+    caption: "Coworking Hall · individual desks · allocated in real time",
     image: OFFICIAL_MEDIA.coworking,
     alt: "Active coworking floor inside the restored brick-and-steel hall at TRACE Expert City",
     filterHref: "/spaces?category=COWORKING",
@@ -177,14 +177,14 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
       {/* FULL-VIEWPORT ARCHITECTURAL ARRIVAL */}
       <section
         aria-label="TRACE Spaces arrival"
-        className="relative min-h-[calc(100dvh-4.5rem)] w-full surface-dark flex flex-col justify-end overflow-hidden"
+        className="relative min-h-[100svh] sm:min-h-[100dvh] w-full surface-dark flex flex-col justify-end overflow-hidden"
       >
         <picture className="absolute inset-0 w-full h-full">
           <img
             src={OFFICIAL_MEDIA.hero}
             alt="Restored red-brick warehouse arches framed by mature trees at TRACE Expert City, Colombo"
             fetchPriority="high"
-            className="w-full h-full object-cover opacity-75"
+            className="w-full h-full object-cover opacity-85 scale-[1.015]"
           />
         </picture>
 
@@ -192,21 +192,27 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
 
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-[#0d110f] via-[#0d110f]/55 to-transparent pointer-events-none"
+          className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,11,9,0.82)_0%,rgba(7,11,9,0.38)_58%,rgba(7,11,9,0.08)_100%),linear-gradient(0deg,rgba(7,11,9,0.9)_0%,rgba(7,11,9,0.12)_65%)] pointer-events-none"
         />
 
-        <div className="relative z-10 mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 pt-10 pb-8 sm:pt-16 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-          <div className="lg:col-span-8 flex flex-col gap-4 sm:gap-5">
+        <div
+          aria-hidden="true"
+          className="hidden sm:block absolute -right-[0.03em] top-[13%] z-[1] font-display text-[clamp(10rem,22vw,22rem)] leading-none tracking-[-0.08em] text-transparent opacity-[0.16] pointer-events-none [-webkit-text-stroke:1px_rgba(244,241,234,0.8)]"
+        >
+          TRACE
+        </div>
+
+        <div className="relative z-10 mx-auto w-full max-w-[96rem] px-4 sm:px-6 lg:px-10 pt-28 pb-7 sm:pt-36 sm:pb-14 grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+          <div className="hero-arrival lg:col-span-9 flex flex-col gap-4 sm:gap-5">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--chartreuse)]">
-              TRACE Expert City · Maradana · Colombo 10
+              TRACE Expert City · Maradana, Colombo
             </p>
-            <h1 className="font-display text-[2rem] sm:text-6xl lg:text-[4.65rem] text-[var(--bone)] leading-[1.03]">
-              Brick bays, timber spans and working halls for teams that build in public.
+            <h1 className="font-display text-[2.7rem] sm:text-[clamp(4.25rem,7vw,7.35rem)] text-[var(--bone)] leading-[0.9] tracking-[-0.045em] max-w-[12ch]">
+              Colombo&apos;s room for bold ideas.
             </h1>
-            <p className="text-base sm:text-lg text-[var(--bone)]/85 max-w-2xl">
-              Reserve boardrooms, training studios, coworking benches and the grand auditorium inside
-              Colombo’s restored nineteenth-century warehouse campus—backed by a live, conflict-proof
-              booking ledger.
+            <p className="text-[0.98rem] sm:text-lg text-[var(--bone)]/82 max-w-xl leading-relaxed">
+              Book restored boardrooms, studios, desks and the grand auditorium inside Colombo&apos;s
+              red-brick innovation campus—with live availability and immediate confirmation.
             </p>
             <div className="hero-actions flex flex-wrap items-center gap-2 sm:gap-3 pt-2">
               <Link href="/spaces" className="btn-chartreuse">
@@ -218,13 +224,14 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
             </div>
           </div>
 
-          <div className="lg:col-span-4 border-t lg:border-t-0 lg:border-l border-[var(--rule-dark)] pt-4 lg:pt-0 lg:pl-6 flex flex-col gap-2 text-xs font-mono text-[var(--bone)]/75">
+          <div className="hidden lg:col-span-3 lg:border-l border-[var(--rule-dark)] lg:pl-6 lg:flex flex-col gap-2 text-xs font-mono text-[var(--bone)]/70">
             <span className="uppercase tracking-[0.14em] text-[var(--chartreuse)]">
-              Campus coordinates
+              Enter TRACE
             </span>
             <span>Trippane Road · Maradana Railway Precinct</span>
-            <span>Time zone: Asia/Colombo (SLST · UTC+05:30)</span>
-            <span>Direct online confirmation &amp; LKR offline settlement</span>
+            <span>Live inventory · Sri Lanka Standard Time</span>
+            <span>One desk to a full hall · confirmed online</span>
+            <span className="mt-5 uppercase tracking-[0.16em] text-[var(--bone)]/50">Scroll to enter ↓</span>
           </div>
         </div>
       </section>

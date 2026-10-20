@@ -210,14 +210,14 @@ For production, the following environment variables switch the runtime:
   Blob; otherwise the local filesystem is used.
 
 Schema for PostgreSQL is in `db/migrations-postgres/0001_init.sql`. It preserves
-the domain model and adds a GiST exclusion constraint on `occupancy`
-(`tstzrange(start_at, end_at, '[)')`) that enforces non-overlap at the
-database level for single-capacity resources, plus explicit `resource_unit`
-rows for the desk pool.
+the epoch-millisecond service contract and adds a GiST exclusion constraint on
+`occupancy` (`int8range(start_at, end_at, '[)')`) that enforces non-overlap at
+the database level for every resource unit, including individual desk units.
 
 See `AUDIT_REPORT.md` §7-§10 for the migration plan and remaining
 configuration steps.
 
-**Status:** migration code and SQL are provided; a live Supabase project and
-Vercel Blob store are required to execute the cutover (no credentials were
-available in this environment).
+**Status:** the runtime adapter, migration runner, Blob integration and Vercel
+routing are implemented. A live Supabase project and Vercel Blob store are still
+required for the hosted cutover because no production credentials are committed.
+See `VERCEL_DEPLOYMENT.md` for the operator checklist.

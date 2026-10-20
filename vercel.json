@@ -1,17 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
+  "framework": "nextjs",
+  "installCommand": "npm install && npm install --prefix apps/public-web",
+  "buildCommand": "npm run build:public",
+  "outputDirectory": "apps/public-web/.next",
   "functions": {
     "api/index.js": {
-      "runtime": "nodejs24.x"
+      "runtime": "nodejs24.x",
+      "maxDuration": 30,
+      "includeFiles": "src/**"
     }
   },
-  "outputFileTracingIncludes": {
-    "api/index.js": [
-      "src/web/public/**/*"
-    ]
-  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/admin/:path*", "destination": "/api/index" },
+    { "source": "/assets/:path*", "destination": "/api/index" },
+    { "source": "/media/:path*", "destination": "/api/index" }
   ]
 }

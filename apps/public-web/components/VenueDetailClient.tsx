@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { clientApiPath } from "../lib/api";
 import { isoDateInColombo } from "../lib/format";
-import { OFFICIAL_MEDIA, coverFor } from "../lib/media";
+import { galleryFor } from "../lib/media";
 import type { Availability, PublicSpace } from "../lib/types";
 
 function formatDurationMinutes(mins: number | null | undefined): string {
@@ -27,31 +27,7 @@ function formatAttributeValue(val: unknown): string {
 }
 
 export function VenueDetailClient({ space }: { space: PublicSpace }) {
-  const primaryCover = coverFor(space);
-  const galleryItems =
-    space.images?.filter((img) => Boolean(img.url)).length > 0
-      ? space.images
-          .filter((img) => Boolean(img.url))
-          .map((img) => ({
-            id: String(img.id),
-            src: img.url as string,
-            alt: img.altText || `${space.name} at TRACE Expert City`,
-            isCover: img.isCover,
-          }))
-      : [
-          {
-            id: "cover",
-            src: primaryCover.src,
-            alt: primaryCover.alt,
-            isCover: true,
-          },
-          {
-            id: "campus",
-            src: OFFICIAL_MEDIA.longExterior,
-            alt: "Restored red-brick warehouse bays at TRACE Expert City",
-            isCover: false,
-          },
-        ];
+  const galleryItems = galleryFor(space);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const activeImage = galleryItems[activeImageIndex] ?? galleryItems[0];

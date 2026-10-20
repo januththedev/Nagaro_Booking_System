@@ -67,7 +67,11 @@ test('the arrival viewport carries the enquiry and booking calls to action', asy
   assert.ok(arrival.length > 0, 'the arrival section must exist');
   assert.match(arrival, /href="\/spaces"/);
   assert.match(arrival, /href="\/book"/);
-  assert.match(arrival, /min-h-\[calc\(100dvh/, 'the arrival block must fill the first viewport');
+  assert.match(
+    arrival,
+    /min-h-\[(?:100svh|100dvh|calc\(100dvh)/,
+    'the arrival block must fill the first viewport',
+  );
 });
 
 test('WebGL is a capped, lazy, recoverable enhancement', async () => {

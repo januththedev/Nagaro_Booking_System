@@ -41,6 +41,7 @@ html {
   background-color: var(--bone);
   color: var(--ink);
   font-family: var(--font-sans);
+  scroll-padding-top: 5.5rem;
 }
 
 body {
@@ -52,6 +53,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  background-image: radial-gradient(circle at 14% 8%, rgba(140, 59, 43, 0.035), transparent 28rem);
 }
 
 h1,
@@ -138,13 +140,14 @@ svg {
   text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease;
 }
 
 .btn-primary:hover {
   background-color: var(--oxidized);
   border-color: var(--oxidized);
   color: var(--bone);
+  transform: translateY(-2px);
 }
 
 .btn-chartreuse {
@@ -163,13 +166,15 @@ svg {
   text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  box-shadow: 0 0 0 0 rgba(212, 242, 72, 0);
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .btn-chartreuse:hover {
-  background-color: #dfga5c;
   background-color: #e2fa64;
   color: var(--ink);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(212, 242, 72, 0.18);
 }
 
 .btn-outline {
@@ -188,11 +193,12 @@ svg {
   text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
 }
 
 .btn-outline:hover {
   background-color: rgba(18, 21, 19, 0.07);
+  transform: translateY(-2px);
 }
 
 .surface-dark .btn-outline:hover {
@@ -222,6 +228,23 @@ svg {
 
 .field-input:focus {
   border-color: var(--oxidized);
+  outline: 3px solid rgba(23, 56, 48, 0.08);
+  outline-offset: 0;
+}
+
+@keyframes arrival-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-arrival {
+  animation: arrival-in 820ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

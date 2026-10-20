@@ -13,10 +13,20 @@ const NAV_ITEMS = [
 export function PublicShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const isHome = pathname === "/";
+  const overlayHeader = isHome && !scrolled && !menuOpen;
 
   useEffect(() => {
     setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 36);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [pathname]);
 
   useEffect(() => {
@@ -40,21 +50,36 @@ export function PublicShell({ children }: { children: ReactNode }) {
         Skip to main content
       </a>
 
-      <header className="sticky top-0 z-40 bg-[var(--bone)]/95 backdrop-blur-md hairline-b">
-        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 min-h-[4.5rem] flex items-center justify-between gap-4">
+      <header
+        className={`${isHome ? "fixed inset-x-0 top-0" : "sticky top-0"} z-40 transition-[background-color,border-color,color] duration-300 ${
+          overlayHeader
+            ? "bg-transparent text-[var(--bone)] border-b border-white/15"
+            : "bg-[var(--bone)]/95 text-[var(--ink)] backdrop-blur-xl hairline-b"
+        }`}
+      >
+        <div className="mx-auto max-w-[96rem] px-4 sm:px-6 lg:px-10 min-h-[4.75rem] flex items-center justify-between gap-4">
           <Link href="/" className="group inline-flex items-center gap-3 no-underline">
             <span
               aria-hidden="true"
-              className="w-9 h-9 bg-[var(--oxidized)] text-[var(--bone)] inline-flex items-center justify-center font-mono text-xs tracking-widest border border-[var(--ink)]/20"
+              className={`h-9 w-px transition-colors ${overlayHeader ? "bg-[var(--chartreuse)]" : "bg-[var(--brick)]"}`}
             >
-              TR
+              &nbsp;
             </span>
-            <span className="flex flex-col">
-              <span className="font-display text-xl leading-none tracking-tight text-[var(--ink)]">
-                TRACE Spaces
+            <span className="flex items-center gap-2.5">
+              <span
+                className={`font-display text-[1.45rem] leading-none tracking-tight ${
+                  overlayHeader ? "text-[var(--bone)]" : "text-[var(--ink)]"
+                }`}
+              >
+                TRACE
               </span>
-              <span className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-[var(--graphite)]">
-                Expert City · Colombo 10
+              <span
+                className={`flex flex-col font-mono text-[0.58rem] uppercase leading-[1.35] tracking-[0.2em] ${
+                  overlayHeader ? "text-[var(--bone)]/72" : "text-[var(--graphite)]"
+                }`}
+              >
+                <span>Spaces</span>
+                <span>Colombo</span>
               </span>
             </span>
           </Link>
@@ -67,10 +92,14 @@ export function PublicShell({ children }: { children: ReactNode }) {
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`font-mono text-xs uppercase tracking-[0.12em] no-underline py-1 border-b-2 transition-colors ${
+                  className={`font-mono text-[0.7rem] uppercase tracking-[0.16em] no-underline py-1 border-b transition-colors ${
                     active
-                      ? "border-[var(--brick)] text-[var(--ink)] font-medium"
-                      : "border-transparent text-[var(--graphite)] hover:text-[var(--ink)]"
+                      ? overlayHeader
+                        ? "border-[var(--chartreuse)] text-[var(--bone)] font-medium"
+                        : "border-[var(--brick)] text-[var(--ink)] font-medium"
+                      : overlayHeader
+                        ? "border-transparent text-[var(--bone)]/78 hover:text-[var(--bone)]"
+                        : "border-transparent text-[var(--graphite)] hover:text-[var(--ink)]"
                   }`}
                 >
                   {item.label}
@@ -82,11 +111,15 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div className="hidden md:flex items-center gap-3">
             <a
               href="/admin"
-              className="font-mono text-xs uppercase tracking-[0.12em] text-[var(--graphite)] hover:text-[var(--ink)] no-underline px-3 py-2"
+              className={`font-mono text-[0.7rem] uppercase tracking-[0.14em] no-underline px-3 py-2 transition-colors ${
+                overlayHeader
+                  ? "text-[var(--bone)]/70 hover:text-[var(--bone)]"
+                  : "text-[var(--graphite)] hover:text-[var(--ink)]"
+              }`}
             >
               Staff console
             </a>
-            <Link href="/book" className="btn-primary py-2.5 px-4">
+            <Link href="/book" className={`${overlayHeader ? "btn-chartreuse" : "btn-primary"} py-2.5 px-4`}>
               Book now
             </Link>
           </div>
@@ -97,7 +130,11 @@ export function PublicShell({ children }: { children: ReactNode }) {
             aria-expanded={menuOpen}
             aria-controls="mobile-primary-nav"
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="md:hidden font-mono text-xs uppercase tracking-[0.14em] px-3 py-2 border border-[var(--ink)] bg-[var(--paper-card)] text-[var(--ink)]"
+            className={`md:hidden font-mono text-xs uppercase tracking-[0.14em] px-3 py-2 border transition-colors ${
+              overlayHeader
+                ? "border-white/55 bg-black/15 text-[var(--bone)] backdrop-blur-md"
+                : "border-[var(--ink)] bg-[var(--paper-card)] text-[var(--ink)]"
+            }`}
           >
             {menuOpen ? "Close" : "Menu"}
           </button>

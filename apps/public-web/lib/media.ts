@@ -10,18 +10,130 @@ export const OFFICIAL_MEDIA = {
   outdoor: "/assets/trace-media/research/outdoor-space.webp",
   studio: "/assets/trace-media/research/idea-studio.webp",
   community: "/assets/trace-media/research/third-place-lobby.jpg",
+  eventProduction: "/assets/trace-media/research/expert-city-spaces.jpg",
+  startupHall: "/assets/trace-media/research/expert-city-startups.webp",
 } as const;
 
-const categoryMedia: Record<string, string> = {
-  COWORKING: OFFICIAL_MEDIA.coworking,
-  MEETING_ROOM: OFFICIAL_MEDIA.studio,
-  EVENT_SPACE: OFFICIAL_MEDIA.bay,
-  AUDITORIUM: OFFICIAL_MEDIA.bay,
-  OFFICE: OFFICIAL_MEDIA.privateOffices,
+type EditorialImage = {
+  src: string;
+  alt: string;
 };
 
+const categoryMedia: Record<string, EditorialImage> = {
+  COWORKING: {
+    src: OFFICIAL_MEDIA.coworking,
+    alt: "The active coworking hall inside TRACE Expert City",
+  },
+  MEETING_ROOM: {
+    src: OFFICIAL_MEDIA.studio,
+    alt: "TRACE Idea Studio arranged for a focused team session",
+  },
+  EVENT_SPACE: {
+    src: OFFICIAL_MEDIA.bay,
+    alt: "A restored TRACE warehouse bay staged for a live event",
+  },
+  AUDITORIUM: {
+    src: OFFICIAL_MEDIA.bay,
+    alt: "A restored TRACE warehouse bay staged for a live event",
+  },
+  OFFICE: {
+    src: OFFICIAL_MEDIA.privateOffices,
+    alt: "A naturally lit shared workspace inside TRACE Expert City",
+  },
+};
+
+const spaceEditorialMedia: Record<string, EditorialImage[]> = {
+  "TRC-MR-02": [
+    {
+      src: OFFICIAL_MEDIA.creator,
+      alt: "Creator Space at TRACE Expert City during an interactive presentation",
+    },
+    {
+      src: OFFICIAL_MEDIA.studio,
+      alt: "TRACE Idea Studio set for a collaborative workshop",
+    },
+    {
+      src: OFFICIAL_MEDIA.privateOffices,
+      alt: "A bright collaborative table inside TRACE Expert City",
+    },
+  ],
+  "TRC-MR-01": [
+    {
+      src: OFFICIAL_MEDIA.studio,
+      alt: "TRACE Idea Studio arranged for a focused team session",
+    },
+    {
+      src: OFFICIAL_MEDIA.privateOffices,
+      alt: "A naturally lit meeting environment inside TRACE Expert City",
+    },
+    {
+      src: OFFICIAL_MEDIA.community,
+      alt: "A small community gathering inside TRACE Expert City",
+    },
+  ],
+  "TRC-CW-01": [
+    {
+      src: OFFICIAL_MEDIA.coworking,
+      alt: "The active coworking hall inside TRACE Expert City",
+    },
+    {
+      src: OFFICIAL_MEDIA.privateOffices,
+      alt: "A bright shared work table inside TRACE Expert City",
+    },
+    {
+      src: OFFICIAL_MEDIA.longExterior,
+      alt: "The restored warehouse bays that house TRACE Expert City's workspaces",
+    },
+  ],
+  "TRC-AUD-01": [
+    {
+      src: OFFICIAL_MEDIA.bay,
+      alt: "A large brick event hall at TRACE staged with conference lighting",
+    },
+    {
+      src: OFFICIAL_MEDIA.eventProduction,
+      alt: "A full-scale event production inside a TRACE warehouse bay",
+    },
+    {
+      src: OFFICIAL_MEDIA.startupHall,
+      alt: "A seminar and launch programme inside TRACE Expert City",
+    },
+  ],
+  "TRC-CW-02": [
+    {
+      src: OFFICIAL_MEDIA.privateOffices,
+      alt: "A calm, naturally lit workspace inside TRACE Expert City",
+    },
+    {
+      src: OFFICIAL_MEDIA.coworking,
+      alt: "The brick-and-steel coworking hall inside TRACE Expert City",
+    },
+    {
+      src: OFFICIAL_MEDIA.longExterior,
+      alt: "TRACE Expert City's shaded red-brick warehouse campus",
+    },
+  ],
+};
+
+function isIllustrativeSeedImage(altText: string | null | undefined): boolean {
+  return /illustrative rendering/i.test(altText ?? "");
+}
+
+function editorialFallback(space: PublicSpace): EditorialImage {
+  return (
+    spaceEditorialMedia[space.code]?.[0] ??
+    categoryMedia[space.category] ?? {
+      src: OFFICIAL_MEDIA.longExterior,
+      alt: `The TRACE Expert City campus, home to ${space.name}`,
+    }
+  );
+}
+
 export function coverFor(space: PublicSpace): { src: string; alt: string; isVenueImage: boolean } {
-  const image = space.images.find((item) => item.isCover && item.url) ?? space.images.find((item) => item.url);
+  const realImages = space.images.filter(
+    (item) => Boolean(item.url) && !isIllustrativeSeedImage(item.altText),
+  );
+  const image = realImages.find((item) => item.isCover) ?? realImages[0];
   if (image?.url) {
     return {
       src: image.url,
@@ -29,11 +141,34 @@ export function coverFor(space: PublicSpace): { src: string; alt: string; isVenu
       isVenueImage: true,
     };
   }
+  const fallback = editorialFallback(space);
   return {
-    src: categoryMedia[space.category] || OFFICIAL_MEDIA.longExterior,
-    alt: `The TRACE Expert City campus, home to ${space.name}`,
+    src: fallback.src,
+    alt: fallback.alt,
     isVenueImage: false,
   };
+}
+
+export function galleryFor(space: PublicSpace): Array<EditorialImage & { id: string; isCover: boolean }> {
+  const realImages = space.images.filter(
+    (item) => Boolean(item.url) && !isIllustrativeSeedImage(item.altText),
+  );
+
+  if (realImages.length > 0) {
+    return realImages.map((image, index) => ({
+      id: String(image.id),
+      src: image.url as string,
+      alt: image.altText || `${space.name} at TRACE Expert City`,
+      isCover: Boolean(image.isCover || index === 0),
+    }));
+  }
+
+  const images = spaceEditorialMedia[space.code] ?? [editorialFallback(space)];
+  return images.map((image, index) => ({
+    ...image,
+    id: `official-${space.code}-${index}`,
+    isCover: index === 0,
+  }));
 }
 
 export const campusGallery = [

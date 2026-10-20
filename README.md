@@ -134,21 +134,23 @@ data/          the SQLite database (created at runtime, not committed)
 | `PRESENTATION.md` | 10-slide presentation outline, speaker script and demo run-sheet |
 | `presentation/slides.html` | Self-contained 10-slide deck (screenshots in `presentation/assets/`) |
 | `PUBLIC_FRONTEND_REPORT.md` | The Next.js public frontend: what changed, how it was verified, rollback, limitations |
+| `VERCEL_DEPLOYMENT.md` | Supabase, Vercel Blob, environment variables and deployment smoke-test checklist |
 
 ## Project status
 
-**Locally demo-ready; not deployed.** The runtime uses a local SQLite file and a
-local uploads folder, and there is no serverless entry point. No production
-deployment and no live email delivery have been performed. The requirement
-documents distinguish *requirements* (intended behaviour), *implementation
-status* (what exists in code), *test evidence* (what has actually been verified)
-and *deployment status* (where it actually runs) — see `USER_STORIES.md` Epics 1–9
-for the demo scope and Epic 10 for the production boundary.
+**Deployment-ready, but not yet connected to live infrastructure.** Local
+development continues to use SQLite and local uploads. Vercel production uses
+the checked-in serverless entry point with Supabase PostgreSQL and Vercel Blob
+when `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` are configured. No live project
+credentials are committed, so the final hosted smoke test must be run after the
+Vercel integrations are connected. See `VERCEL_DEPLOYMENT.md` for the exact
+environment and migration checklist.
 
 ## Configuration
 
 Everything is environment-driven; see `.env.example` for the full annotated list.
-The two that matter most operationally:
+Production deployment values are listed in `VERCEL_DEPLOYMENT.md`. The two that
+matter most in every environment:
 
 - **Email.** Set `SMTP_HOST` (and friends) to deliver booking inquiries by email.
   Without it the system still saves every inquiry and records `email_status` as

@@ -74,6 +74,7 @@ export function CatalogueClient({
   const [availabilityMap, setAvailabilityMap] = useState<Record<string, Availability>>({});
   const [checkingWindow, setCheckingWindow] = useState(false);
   const [windowError, setWindowError] = useState<string | null>(null);
+  const [desktopFiltersOpen, setDesktopFiltersOpen] = useState(false);
 
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const sheetTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -226,22 +227,23 @@ export function CatalogueClient({
   );
 
   return (
-    <div className="mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 py-12 sm:py-16">
-      <header className="pb-10 hairline-b flex flex-col gap-4">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brick)]">
-          TRACE Expert City · Venue Catalogue
-        </p>
-        <h1 className="font-display text-4xl sm:text-6xl text-[var(--ink)]">
-          Architectural rooms, studio bays and coworking halls.
-        </h1>
-        <p className="text-base sm:text-lg text-[var(--graphite)] max-w-2xl">
-          Filter by spatial category, attendee capacity, billing unit or live Sri Lanka Standard Time
-          availability. Every space below links directly to its full specifications and instant
-          reservation checkout.
+    <div className="mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10 pt-10 sm:pt-14 pb-16">
+      <header className="pb-8 hairline-b grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-end">
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--brick)]">
+            TRACE Expert City · Venue Catalogue
+          </p>
+          <h1 className="font-display text-4xl sm:text-6xl text-[var(--ink)] max-w-[13ch]">
+            Find the room that fits the ambition.
+          </h1>
+        </div>
+        <p className="lg:col-span-4 text-base text-[var(--graphite)] max-w-xl lg:pb-1">
+          Browse verified campus spaces, compare practical specifications, then check live SLST
+          availability and reserve directly.
         </p>
 
         {/* WRAPPING CATEGORY CHIPS */}
-        <div className="pt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Venue category filter">
+        <div className="lg:col-span-12 pt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Venue category filter">
           {CATEGORIES.map((item) => {
             const active = category === item.code;
             return (
@@ -264,20 +266,63 @@ export function CatalogueClient({
       </header>
 
       {/* DESKTOP STICKY COMPACT FILTER TOOLBAR */}
-      <div className="sticky top-[4.5rem] z-30 bg-[var(--bone)]/95 backdrop-blur-md hairline-b py-4">
+      <div className="sticky top-[4.75rem] z-30 bg-[var(--bone)]/95 backdrop-blur-md hairline-b py-4">
         <div className="hidden lg:grid lg:grid-cols-12 gap-3 items-end">
-          <div className="lg:col-span-3 flex flex-col gap-1">
-            <label htmlFor="catalogue-q" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Search name, code or facility
+          <div className="lg:col-span-6 flex flex-col gap-1">
+            <label htmlFor="catalogue-q-compact" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
+              Search the campus
             </label>
             <input
-              id="catalogue-q"
+              id="catalogue-q-compact"
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. Baobab, Auditorium, Projector"
+              placeholder="Venue, code or facility"
               className="field-input"
             />
+          </div>
+          <div className="lg:col-span-2 flex flex-col gap-1">
+            <label htmlFor="catalogue-sort-compact" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
+              Arrange by
+            </label>
+            <select
+              id="catalogue-sort-compact"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as "name" | "capacity" | "price")}
+              className="field-input"
+            >
+              <option value="name">Name (A–Z)</option>
+              <option value="capacity">Largest capacity</option>
+              <option value="price">Lowest starting rate</option>
+            </select>
+          </div>
+          <div className="lg:col-span-2 flex items-end">
+            <button
+              type="button"
+              aria-expanded={desktopFiltersOpen}
+              aria-controls="desktop-advanced-filters"
+              onClick={() => setDesktopFiltersOpen((open) => !open)}
+              className="btn-outline w-full min-h-[2.85rem]"
+            >
+              {desktopFiltersOpen ? "Close filters" : "More filters"}
+            </button>
+          </div>
+          <div className="lg:col-span-2 min-h-[2.85rem] flex items-center justify-end border-l border-[var(--rule)] pl-4 font-mono text-xs text-[var(--graphite)]">
+            <span><strong className="text-[var(--ink)]">{filteredSpaces.length}</strong> spaces ready to inspect</span>
+          </div>
+        </div>
+
+        <div
+          id="desktop-advanced-filters"
+          className={`${desktopFiltersOpen ? "lg:grid" : "lg:hidden"} hidden lg:grid-cols-12 gap-3 items-end pt-5 mt-4 border-t border-[var(--rule)]`}
+        >
+          <div className="lg:col-span-3 min-h-[4.35rem] flex flex-col justify-center gap-1 border-l-2 border-[var(--brick)] pl-4">
+            <span className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--brick)]">
+              Refine the shortlist
+            </span>
+            <span className="text-sm text-[var(--graphite)]">
+              Optional capacity, rate and availability controls.
+            </span>
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-1">
@@ -354,25 +399,20 @@ export function CatalogueClient({
             </div>
           </div>
 
-          <div className="lg:col-span-2 flex flex-col gap-1">
-            <label htmlFor="catalogue-sort" className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)]">
-              Sort by
-            </label>
-            <select
-              id="catalogue-sort"
-              value={sort}
-              onChange={(e) => setSort(e.target.value as "name" | "capacity" | "price")}
-              className="field-input"
+          <div className="lg:col-span-2 flex items-end">
+            <button
+              type="button"
+              onClick={() => void verifyAvailabilityWindow()}
+              disabled={checkingWindow}
+              className="btn-primary w-full min-h-[2.85rem]"
             >
-              <option value="name">Name (A–Z)</option>
-              <option value="capacity">Capacity (high to low)</option>
-              <option value="price">Starting rate (low to high)</option>
-            </select>
+              {checkingWindow ? "Checking…" : "Check window"}
+            </button>
           </div>
         </div>
 
         {/* DESKTOP SECONDARY BAR: AMENITIES + WINDOW CHECK + RESET */}
-        <div className="hidden lg:flex flex-wrap items-center justify-between gap-4 pt-3 mt-3 border-t border-[var(--rule)]">
+        <div className={`${desktopFiltersOpen ? "lg:flex" : "lg:hidden"} hidden flex-wrap items-center justify-between gap-4 pt-3 mt-3 border-t border-[var(--rule)]`}>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-[0.7rem] uppercase tracking-wider text-[var(--graphite)] mr-1">
               Amenities:
@@ -398,14 +438,6 @@ export function CatalogueClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => void verifyAvailabilityWindow()}
-              disabled={checkingWindow}
-              className="btn-outline py-1.5 px-3 text-xs"
-            >
-              {checkingWindow ? "Checking SLST window…" : "Check window availability"}
-            </button>
             {Object.keys(availabilityMap).length > 0 ? (
               <label className="inline-flex items-center gap-2 font-mono text-xs cursor-pointer">
                 <input

@@ -9,6 +9,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { PostgresDatabaseSync } from './postgresCompat.js';
 
 const DEFAULT_DB_PATH = resolve(process.cwd(), 'data', 'nagaro.db');
 
@@ -26,8 +27,15 @@ export function databasePath() {
  * application depends on for correctness.
  */
 export function getDb() {
-  const path = databasePath();
+  const connectionString = String(process.env.DATABASE_URL ?? '').trim();
+  const path = connectionString ? `postgres:${connectionString}` : databasePath();
   if (handle && handlePath === path) return handle;
+
+  if (connectionString) {
+    handle = new PostgresDatabaseSync(connectionString);
+    handlePath = path;
+    return handle;
+  }
 
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
 

@@ -18,6 +18,7 @@
     "test:cutover": "node scripts/e2e-public-frontend.js",
     "test:full": "npm run test:all && npm run test:public && npm run test:cutover",
     "migrate": "node src/server/db/migrate.js",
+    "migrate:postgres": "node scripts/migrate-postgres.js",
     "seed": "node src/server/db/seed.js",
     "admin:create": "node scripts/create-admin.js",
     "test": "node --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/**/*.test.js\"",

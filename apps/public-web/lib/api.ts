@@ -1,7 +1,8 @@
 import type { Availability, PublicSpace, Reservation, SpaceListResponse } from "./types";
 
 const serverBase = () => {
-  const raw = process.env.API_ORIGIN || process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:4173";
+  const vercelOrigin = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
+  const raw = process.env.API_ORIGIN || process.env.NEXT_PUBLIC_API_BASE || vercelOrigin || "http://127.0.0.1:4173";
   return /^https?:\/\//.test(raw) ? raw.replace(/\/$/, "") : "http://127.0.0.1:4173";
 };
 

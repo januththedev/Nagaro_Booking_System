@@ -12,6 +12,7 @@ import { loadConfig, describeConfig } from './config.js';
 import { createApp } from './app.js';
 import { createPublicFrontendProxy } from './http/publicFrontendProxy.js';
 import { ensureUploadDir } from './security/uploads.js';
+import { blobEnabled } from './security/blobStorage.js';
 import { purgeExpiredSessions } from './security/sessions.js';
 import { ensureFirstAdmin } from './services/adminUserService.js';
 import { reconcileCompletedReservations } from './services/bookingService.js';
@@ -21,34 +22,41 @@ import { maybeSeedDemoData } from './db/seed.js';
 const config = loadConfig();
 const db = getDb();
 
-const applied = applyMigrations(db);
-if (applied.length > 0) {
-  console.log(`[db] applied migrations: ${applied.join(', ')}`);
+let integrityGuards = 0;
+if (db.dialect === 'postgres') {
+  const schema = db.prepare("SELECT to_regclass('public.space') AS space_table").get();
+  if (!schema?.space_table) {
+    throw new Error('Supabase is reachable but not migrated. Run npm run migrate:postgres with DIRECT_URL first.');
+  }
+  integrityGuards = Number(db.prepare(`
+    SELECT COUNT(*) AS c FROM pg_constraint
+     WHERE conname = 'occupancy_no_overlap' AND contype = 'x'
+  `).get()?.c ?? 0);
+  if (integrityGuards < 1) throw new Error('PostgreSQL occupancy overlap constraint is missing.');
+} else {
+  const applied = applyMigrations(db);
+  if (applied.length > 0) console.log(`[db] applied migrations: ${applied.join(', ')}`);
+
+  const fkProblems = db.prepare('PRAGMA foreign_key_check').all();
+  if (fkProblems.length > 0) {
+    console.error(`[db] FATAL: ${fkProblems.length} foreign-key violations found in ${databasePath()}`);
+    process.exit(1);
+  }
+  const integrity = db.prepare('PRAGMA integrity_check').get();
+  if (integrity && integrity.integrity_check !== 'ok') {
+    console.error(`[db] FATAL: integrity_check returned ${integrity.integrity_check}`);
+    process.exit(1);
+  }
+  integrityGuards = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_occupancy_no_overlap%'",
+  ).all().length;
+  if (integrityGuards < 2) {
+    console.error(`[db] FATAL: expected 2 occupancy overlap triggers, found ${integrityGuards}. Booking integrity cannot be guaranteed.`);
+    process.exit(1);
+  }
 }
 
-// Integrity gate: refuse to serve from a damaged database.
-const fkProblems = db.prepare('PRAGMA foreign_key_check').all();
-if (fkProblems.length > 0) {
-  console.error(`[db] FATAL: ${fkProblems.length} foreign-key violations found in ${databasePath()}`);
-  process.exit(1);
-}
-const integrity = db.prepare('PRAGMA integrity_check').get();
-if (integrity && integrity.integrity_check !== 'ok') {
-  console.error(`[db] FATAL: integrity_check returned ${integrity.integrity_check}`);
-  process.exit(1);
-}
-
-// The anti-overlap triggers are the double-booking guarantee. Fail loudly if
-// they are ever missing rather than silently accepting overlapping bookings.
-const triggers = db.prepare(
-  "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_occupancy_no_overlap%'",
-).all().map((r) => r.name);
-if (triggers.length < 2) {
-  console.error(`[db] FATAL: expected 2 occupancy overlap triggers, found ${triggers.length}. Booking integrity cannot be guaranteed.`);
-  process.exit(1);
-}
-
-ensureUploadDir();
+if (!blobEnabled()) ensureUploadDir();
 purgeExpiredSessions(db);
 const completed = reconcileCompletedReservations(db);
 if (completed > 0) console.log(`[db] marked ${completed} past reservation(s) as completed`);
@@ -101,7 +109,7 @@ server.listen(config.port, config.host, () => {
   console.log('Nagaro Space Booking System');
   console.log(`             ${describeConfig(config)}`);
   console.log(`             email status: ${mail.configured ? 'SMTP configured' : 'NOT configured'}`);
-  console.log(`             booking integrity: ${triggers.length} anti-overlap trigger(s) active`);
+  console.log(`             booking integrity: ${integrityGuards} database overlap guard(s) active`);
   console.log(`             public frontend: ${publicFrontend.config.mode}${
     publicFrontend.config.mode === 'next' ? ` (${publicFrontend.config.origin.origin})` : ''
   }`);

@@ -149,6 +149,10 @@ fixed and covered:
 3. Every rate-limited endpoint failed on PostgreSQL with SQLSTATE 42702 — SQLite accepts
    `ON CONFLICT DO UPDATE SET count = count + 1`, PostgreSQL calls the name ambiguous. Fixed by
    qualifying the column and verified by reproducing against the live database.
+4. The admin dashboard died with `RangeError: Invalid time value` while formatting the activity
+   list: node-postgres returns `int8` timestamps as strings. int8 is now parsed to Number at the
+   driver boundary and `timeTag` coerces defensively. All nine admin pages were then exercised
+   against the live database.
 
 ## 12. Sandbox payment results
 

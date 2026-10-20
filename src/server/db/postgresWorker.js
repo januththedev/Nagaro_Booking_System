@@ -2,6 +2,13 @@ import { workerData } from 'node:worker_threads';
 import pg from 'pg';
 import { pgConnectionConfig } from './pgSsl.js';
 
+// node-postgres returns int8/BIGINT values as strings to protect precision.
+// Every id and epoch-millisecond timestamp in this codebase is a plain number
+// (SQLite semantics), and views format those timestamps directly — so parse
+// int8 back to Number at the driver boundary, where the whole application
+// expects it.
+pg.types.setTypeParser(20, (value) => Number(value));
+
 const port = workerData.port;
 let client = null;
 let lastQueryAt = 0;

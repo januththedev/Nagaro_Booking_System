@@ -135,6 +135,21 @@ surface was exercised in a real browser: catalogue filtering, venue availability
 the request form, the request status page with its PayHere action, the language switcher, and
 the assistant panel (which shows the honest fallback when no provider key is configured).
 
+Deployment verification (https://nagarobookingsystem.vercel.app) additionally exercised the
+journey against the live Supabase backend and surfaced three deployment-only defects, each
+fixed and covered:
+
+1. Every request to `/assets`, `/media`, `/api` and `/admin` returned `CONFIGURATION_ERROR`
+   because the function refuses to boot without `DATABASE_URL` — the Supabase panel provides
+   `POSTGRES_PRISMA_URL` and friends, so the mapping is now documented in
+   `VERCEL_DEPLOYMENT.md`.
+2. The pages rendered their empty states although the API served the catalogue: the server-side
+   self-fetch used `VERCEL_URL`, which sits behind Vercel's Deployment Protection. Covered by a
+   regression test (`api-client.test.mjs`).
+3. Every rate-limited endpoint failed on PostgreSQL with SQLSTATE 42702 — SQLite accepts
+   `ON CONFLICT DO UPDATE SET count = count + 1`, PostgreSQL calls the name ambiguous. Fixed by
+   qualifying the column and verified by reproducing against the live database.
+
 ## 12. Sandbox payment results
 
 **No PayHere sandbox transaction was performed** — no merchant credentials were available to

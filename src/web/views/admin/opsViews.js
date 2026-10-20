@@ -31,9 +31,13 @@ import {
 /** `<time datetime="…">` for an instant. `datetime` is ISO-8601 UTC, the
  *  visible text is the Sri Lanka Standard Time label. */
 export function timeTag(epochMs, label = null) {
-  if (!epochMs) return html`—`;
-  const text = label ?? businessDateTimeLabel(epochMs);
-  return html`<time datetime="${new Date(Number(epochMs)).toISOString()}">${text}</time>`;
+  // Coerced defensively: PostgreSQL drivers may hand back int8 timestamps as
+  // strings, and an unparseable value must render as a dash rather than throw
+  // while a page is being assembled.
+  const ms = Number(epochMs);
+  if (!Number.isFinite(ms) || ms === 0) return html`—`;
+  const text = label ?? businessDateTimeLabel(ms);
+  return html`<time datetime="${new Date(ms).toISOString()}">${text}</time>`;
 }
 
 /** Dead-obvious helper so a quantity of records reads correctly. */

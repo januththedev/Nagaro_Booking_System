@@ -13,6 +13,7 @@ const INSERT_ID_TABLES = new Set([
   'space_image', 'resource_unit', 'customer', 'reservation', 'occupancy',
   'maintenance_block', 'inquiry', 'booking_request', 'booking_hold_claim',
   'payment_obligation', 'payment_attempt', 'payment_event', 'ai_booking_draft',
+  'assistant_knowledge',
 ]);
 
 function replacePlaceholders(sql) {

@@ -63,6 +63,12 @@ const ADMIN_NAV = [
       label: 'Maintenance',
       icon: navIcon('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
     },
+    {
+      href: '/admin/guider-knowledge',
+      label: 'Guider knowledge',
+      adminOnly: true,
+      icon: navIcon('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/>'),
+    },
   ] },
   { group: 'Records', items: [
     {
@@ -198,7 +204,7 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
       ${ADMIN_NAV.map((section) => html`<div class="nav-group admin-nav__section">
         <h2 class="admin-nav__heading">${section.group}</h2>
         <ul class="admin-nav__list">
-          ${section.items.map((item) => html`<li>
+          ${section.items.filter((item) => !item.adminOnly || actor?.role === 'ADMIN').map((item) => html`<li>
             <a href="${item.href}"
                class="nav-link admin-nav__link ${isActiveNav(activePath, item.href) ? 'is-active' : ''}"
                ${isActiveNav(activePath, item.href) ? raw('aria-current="page"') : ''}>

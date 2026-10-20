@@ -21,6 +21,7 @@ import {
   createBookingRequest,
   createPayHereCheckout,
   expireBookingHolds,
+  getBookingRequest,
   processPayHereNotification,
   updateBookingFeePolicy,
 } from '../../src/server/services/bookingRequestService.js';
@@ -63,14 +64,14 @@ function requestInput(spaceId, key, date = '2030-08-14') {
 }
 
 /** Request -> approve with a fixed fee -> checkout, in one go. */
-function approvedWithCheckout(db, { feeCents = 100000, now = T0 } = {}) {
+function approvedWithCheckout(db, { feeCents = 100000, advanceCents = 0, now = T0 } = {}) {
   const actor = createTestActor(db);
   const spaceId = seedSpace(db);
   updateBookingFeePolicy(db, { actor, mode: feeCents ? 'FIXED' : 'DISABLED', fixedCents: feeCents, paymentWindowMinutes: 120, now });
   const created = createBookingRequest(db, requestInput(spaceId, 'pay:one'));
   const id = Number(db.prepare('SELECT id FROM booking_request').get().id);
   approveBookingRequest(db, { actor, requestId: id, now });
-  const checkout = createPayHereCheckout(db, { reference: created.request.reference, token: created.manageToken, config: CFG, now: now + 1000 });
+  const checkout = createPayHereCheckout(db, { reference: created.request.reference, token: created.manageToken, config: CFG, advanceCents, now: now + 1000 });
   return { actor, spaceId, created, id, checkout };
 }
 
@@ -102,6 +103,123 @@ test('each payment attempt gets a fresh order id and an immutable amount snapsho
   assert.equal(attempts.length, 2);
   assert.equal(attempts[0].amount_cents, attempts[1].amount_cents);
   assert.equal(attempts[0].status, 'CREATED');
+  db.close();
+});
+
+test('an optional advance is added to the signed total and snapshotted on its payment attempt', () => {
+  const db = createTestDb();
+  const { checkout } = approvedWithCheckout(db, { advanceCents: 125000 });
+  const attempt = db.prepare('SELECT * FROM payment_attempt').get();
+
+  assert.equal(checkout.fields.amount, '2250.00', 'LKR 1,000 registration plus LKR 1,250 advance');
+  assert.equal(attempt.amount_cents, 225000);
+  assert.equal(attempt.advance_cents, 125000);
+  assert.match(checkout.fields.items, /advance/i);
+  assert.equal(checkout.fields.hash, md5(`${checkout.fields.merchant_id}${checkout.fields.order_id}${checkout.fields.amount}${checkout.fields.currency}${md5(CFG.merchantSecret)}`));
+  db.close();
+});
+
+test('optional advances reject invalid values and amounts above the remaining venue balance', () => {
+  const db = createTestDb();
+  const actor = createTestActor(db);
+  const spaceId = seedSpace(db);
+  updateBookingFeePolicy(db, { actor, mode: 'FIXED', fixedCents: 100000, paymentWindowMinutes: 120, now: T0 });
+  const created = createBookingRequest(db, requestInput(spaceId, 'pay:advance-limits'));
+  const id = Number(db.prepare('SELECT id FROM booking_request').get().id);
+  approveBookingRequest(db, { actor, requestId: id, now: T0 });
+  const checkout = (advanceCents) => createPayHereCheckout(db, {
+    reference: created.request.reference,
+    token: created.manageToken,
+    config: CFG,
+    advanceCents,
+    now: T0 + 1000,
+  });
+
+  for (const invalid of [-1, 1.5, Number.NaN, 400001]) {
+    assert.throws(() => checkout(invalid), (error) => error?.status === 422);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM payment_attempt').get().c, 0, 'invalid amounts never create a provider attempt');
+  assert.equal(checkout(400000).fields.amount, '5000.00', 'the complete remaining balance is allowed');
+  db.close();
+});
+
+test('a verified advance is credited once and reduces the remaining venue balance', () => {
+  const db = createTestDb();
+  const { checkout, created } = approvedWithCheckout(db, { advanceCents: 125000 });
+  const f = checkout.fields;
+  const signature = payHereSig({
+    merchantId: f.merchant_id,
+    orderId: f.order_id,
+    amount: f.amount,
+    currency: f.currency,
+    statusCode: '2',
+    secret: CFG.merchantSecret,
+  });
+  const payload = {
+    merchant_id: f.merchant_id,
+    order_id: f.order_id,
+    payment_id: 'PAY-WITH-ADVANCE',
+    payhere_amount: f.amount,
+    payhere_currency: f.currency,
+    status_code: '2',
+    method: 'VISA',
+    status_message: 'Success',
+    md5sig: signature,
+  };
+
+  const first = processPayHereNotification(db, payload, CFG, T0 + 2000);
+  assert.equal(first.confirmed, true);
+  const obligation = db.prepare('SELECT * FROM payment_obligation').get();
+  assert.equal(obligation.advance_paid_cents, 125000);
+  assert.equal(obligation.remaining_balance_cents, 275000);
+  const projection = getBookingRequest(db, { reference: created.request.reference, token: created.manageToken });
+  assert.equal(projection.payment.advancePaidCents, 125000);
+  assert.equal(projection.payment.remainingBalanceCents, 275000);
+  assert.equal(projection.payment.latestAttempt.advanceCents, 125000);
+
+  const duplicate = processPayHereNotification(db, payload, CFG, T0 + 3000);
+  assert.equal(duplicate.idempotent, true);
+  const afterDuplicate = db.prepare('SELECT * FROM payment_obligation').get();
+  assert.equal(afterDuplicate.advance_paid_cents, 125000, 'a duplicate callback never credits twice');
+  assert.equal(afterDuplicate.remaining_balance_cents, 275000);
+  db.close();
+});
+
+test('a second verified checkout is escalated and never credits an advance twice', () => {
+  const db = createTestDb();
+  const { created, checkout: firstCheckout } = approvedWithCheckout(db, { advanceCents: 50000 });
+  const secondCheckout = createPayHereCheckout(db, {
+    reference: created.request.reference,
+    token: created.manageToken,
+    config: CFG,
+    advanceCents: 200000,
+    now: T0 + 1500,
+  });
+  const notify = (fields, paymentId, at) => processPayHereNotification(db, {
+    merchant_id: fields.merchant_id,
+    order_id: fields.order_id,
+    payment_id: paymentId,
+    payhere_amount: fields.amount,
+    payhere_currency: fields.currency,
+    status_code: '2',
+    method: 'VISA',
+    md5sig: payHereSig({
+      merchantId: fields.merchant_id,
+      orderId: fields.order_id,
+      amount: fields.amount,
+      currency: fields.currency,
+      statusCode: '2',
+      secret: CFG.merchantSecret,
+    }),
+  }, CFG, at);
+
+  assert.equal(notify(firstCheckout.fields, 'PAY-FIRST', T0 + 2000).confirmed, true);
+  assert.equal(notify(secondCheckout.fields, 'PAY-SECOND', T0 + 2500).reviewRequired, true);
+  const obligation = db.prepare('SELECT * FROM payment_obligation').get();
+  assert.equal(obligation.advance_paid_cents, 50000, 'only the payment that confirmed the booking is credited');
+  assert.equal(obligation.remaining_balance_cents, 350000);
+  assert.equal(db.prepare("SELECT status FROM payment_attempt WHERE order_id=?").get(secondCheckout.fields.order_id).status, 'REVIEW_REQUIRED');
+  assert.equal(db.prepare('SELECT payment_status FROM booking_request').get().payment_status, 'REVIEW_REQUIRED');
   db.close();
 });
 

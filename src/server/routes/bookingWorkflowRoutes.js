@@ -61,7 +61,16 @@ export function registerBookingWorkflowRoutes(router, deps = {}) {
     ctx.json({ ok: true, request: cancelBookingRequest(db, { reference: ctx.params.reference, token: token(ctx, body), reason: body.reason ?? null }) });
   });
 
-  router.post('/api/public/booking-requests/:reference/payment', async ctx => { protect(ctx); ctx.json({ ok: true, checkout: createPayHereCheckout(db, { reference: ctx.params.reference, token: token(ctx), config: config.payHere }) }); });
+  router.post('/api/public/booking-requests/:reference/payment', async ctx => {
+    const body = await ctx.readBody();
+    protect(ctx);
+    ctx.json({ ok: true, checkout: createPayHereCheckout(db, {
+      reference: ctx.params.reference,
+      token: token(ctx, body),
+      config: config.payHere,
+      advanceCents: first(body.advanceCents ?? body.advance_cents) ?? 0,
+    }) });
+  });
 
   // PayHere server-to-server notification: form-encoded, signature verified
   // inside the service. The browser return URL is never treated as proof.
@@ -98,8 +107,8 @@ export function registerBookingWorkflowRoutes(router, deps = {}) {
     updateBookingFeePolicy(db, {
       actor,
       mode: first(body.mode),
-      fixedCents: first(body.fixed_cents),
-      percentageBps: first(body.percentage_bps),
+      fixedCents: body.fixed_lkr !== undefined ? Math.round(Number(first(body.fixed_lkr)) * 100) : first(body.fixed_cents),
+      percentageBps: body.percentage !== undefined ? Math.round(Number(first(body.percentage)) * 100) : first(body.percentage_bps),
       paymentWindowMinutes: first(body.payment_window_minutes),
     });
     redirect(ctx.res, '/admin/booking-requests');
@@ -116,7 +125,7 @@ export function registerBookingWorkflowRoutes(router, deps = {}) {
         <td><strong>${item.reference}</strong><br><small>${new Date(item.startAt).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })} – ${new Date(item.endAt).toLocaleTimeString('en-LK', { timeZone: 'Asia/Colombo' })}</small></td>
         <td>${item.spaceName}<br><small>${item.unitCount} unit(s) · ${item.attendees ?? '—'} attending</small></td>
         <td>${item.customer.fullName}<br><small>${item.customer.email}</small></td>
-        <td><small>Total ${lkr(item.venueTotalCents)}</small><br><small>Fee ${payment ? lkr(payment.bookingFeeCents) : '—'}</small><br><small>Balance ${payment ? lkr(payment.remainingBalanceCents) : '—'}</small></td>
+        <td><small>Total ${lkr(item.venueTotalCents)}</small><br><small>Registration ${payment ? lkr(payment.bookingFeeCents) : '—'}</small><br><small>Advance paid ${payment ? lkr(payment.advancePaidCents) : '—'}</small><br><small>Balance ${payment ? lkr(payment.remainingBalanceCents) : '—'}</small></td>
         <td><span class="status-badge">${item.paymentStatus}</span>${payment?.latestAttempt ? html`<br><small>${payment.latestAttempt.orderId} · ${payment.latestAttempt.status}</small>${payment.latestAttempt.paymentId ? html`<br><small>PayHere ${payment.latestAttempt.paymentId}</small>` : ''}` : ''}</td>
         <td><span class="status-badge">${item.status}</span>${item.holdExpiresAt ? html`<br><small>Hold until ${new Date(item.holdExpiresAt).toLocaleTimeString('en-LK', { timeZone: 'Asia/Colombo' })}</small>` : ''}${item.rejectionReason ? html`<br><small>${item.rejectionReason}</small>` : ''}</td>
         <td>${item.status === 'REQUESTED' ? html`
@@ -134,23 +143,23 @@ export function registerBookingWorkflowRoutes(router, deps = {}) {
       <div class="page-header"><div>
         <p class="eyebrow">Approval queue</p>
         <h1 class="page-title">Booking requests</h1>
-        <p class="hint">Approve only after reviewing the schedule. Approval creates a database-enforced temporary hold and a payment obligation. Nothing is confirmed until the booking fee, when configured, has been verified by PayHere.</p>
+        <p class="hint">Approve only after reviewing the schedule. Approval creates a database-enforced temporary hold and payment obligation. Nothing is confirmed until the registration fee, when configured, has been verified by PayHere. Visitors may add an optional advance toward the venue balance.</p>
       </div></div>
 
       ${actor.role === 'ADMIN' ? html`<form method="post" action="/admin/booking-requests/fee-policy" class="stack" style="border:1px solid var(--rule);padding:1rem;margin-bottom:1.5rem">
         <input type="hidden" name="_csrf" value="${ctx.csrfToken}">
-        <h2 class="page-title" style="font-size:1.1rem;margin:0">Booking fee policy</h2>
-        <p class="hint">Disabled by default. Set a fee only when the business has decided one. The amount is snapshotted on every approval.</p>
+        <h2 class="page-title" style="font-size:1.1rem;margin:0">Registration fee policy</h2>
+        <p class="hint">Disabled by default. Set the registration fee in ordinary LKR or as a percentage. The amount is snapshotted on every approval and credited toward the venue total.</p>
         <div class="cluster">
           <label>Mode <select name="mode">
-            <option value="DISABLED" ${policy?.mode === 'DISABLED' ? 'selected' : ''}>Disabled (no fee)</option>
+            <option value="DISABLED" ${policy?.mode === 'DISABLED' ? 'selected' : ''}>Disabled (no registration fee)</option>
             <option value="FIXED" ${policy?.mode === 'FIXED' ? 'selected' : ''}>Fixed amount (LKR)</option>
             <option value="PERCENTAGE" ${policy?.mode === 'PERCENTAGE' ? 'selected' : ''}>Percentage of venue total</option>
           </select></label>
-          <label>Fixed fee (LKR cents) <input name="fixed_cents" type="number" min="0" value="${policy?.fixedCents ?? 0}"></label>
-          <label>Percentage (basis points) <input name="percentage_bps" type="number" min="0" max="10000" value="${policy?.percentageBps ?? 0}"></label>
+          <label>Fixed fee (LKR) <input name="fixed_lkr" type="number" min="0" step="0.01" value="${((policy?.fixedCents ?? 0) / 100).toFixed(2)}"></label>
+          <label>Percentage <input name="percentage" type="number" min="0" max="100" step="0.01" value="${((policy?.percentageBps ?? 0) / 100).toFixed(2)}">%</label>
           <label>Payment window (minutes) <input name="payment_window_minutes" type="number" min="5" max="10080" value="${policy?.paymentWindowMinutes ?? 120}"></label>
-          <button class="button button--primary">Save fee policy</button>
+          <button class="button button--primary">Save registration fee</button>
         </div>
       </form>` : ''}
 

@@ -657,7 +657,7 @@ export function registerPublicRoutes(router, deps = {}) {
         ok: false,
         error: {
           code: 'RETIRED',
-          message: 'Direct guest booking has been retired. Choose a published space and send a booking request instead — staff approve it and any configured booking fee is paid afterwards.',
+          message: 'Direct guest booking has been retired. Choose a published space and send a booking request instead — staff approve it and any configured registration fee is paid afterwards.',
           details: { use: '/api/public/booking-requests' },
         },
       }, 410);

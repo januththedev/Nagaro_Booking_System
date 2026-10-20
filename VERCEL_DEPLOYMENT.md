@@ -50,6 +50,26 @@ The app safely records inquiries without SMTP, but delivery is marked
 - `SMTP_FROM`
 - `NAGARO_ADMIN_NOTIFICATION_EMAIL`
 
+## Optional Guider and payment variables
+
+Guider remains available as a factual catalogue fallback without an AI key.
+To enable grounded conversational answers, set these server-side variables and
+add public Markdown from **Admin â†’ Guider knowledge**:
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL` (for example `openai/gpt-4.1-mini`)
+
+To collect a configured registration fee and let visitors add an optional
+advance toward the remaining venue balance, set:
+
+- `PAYHERE_MERCHANT_ID`
+- `PAYHERE_MERCHANT_SECRET`
+- `PAYHERE_MODE` (`sandbox` until PayHere approves the production domain, then `live`)
+
+The registration-fee policy is managed in **Admin â†’ Booking requests**.
+Venue prices remain editable per hour, half-day, day, week or month in
+**Admin â†’ Spaces â†’ Edit rates**.
+
 ## Supabase setup
 
 1. Create the Supabase project and copy both connection strings from **Connect**.
@@ -129,6 +149,9 @@ values.
 
 ## Release smoke test
 
-After deployment, verify `/`, `/spaces`, one venue detail page, a direct booking,
-the private management link, cancellation, `/admin`, a staff login, an image
-upload, and an inquiry. Confirm that a second overlapping booking is rejected.
+After deployment, verify `/`, `/spaces`, one venue detail page, a booking request,
+approval, registration-fee checkout with and without an optional advance, the
+private management link, cancellation, `/admin`, a staff login, a venue-rate
+edit, an image upload, a Guider Markdown upload and an inquiry. Ask Guider one
+question answered by that Markdown. Confirm that a second overlapping booking
+is rejected and that the paid advance is deducted from the remaining balance.

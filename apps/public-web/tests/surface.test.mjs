@@ -7,7 +7,7 @@
  * unified request flow (no retired dual channel), a navigation-free header
  * whose single call to action is labelled exactly "Book a Space", and copy
  * that never promises a reservation is confirmed before staff approval and any
- * configured booking fee.
+ * configured registration fee.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,6 +99,22 @@ test('the English call to action is labelled exactly "Book a Space" in every lan
   assert.equal(dictionaries.en.chrome.bookCta, 'Book a Space');
   assert.equal(dictionaries.en.hero.bookCta, 'Book a Space');
   assert.equal(dictionaries.en.closing.bookCta, 'Book a Space');
+});
+
+test('the assistant is consistently branded Guider and the header uses the polished floating chrome', async () => {
+  const shell = await readApp('components/PublicShell.tsx');
+  const assistant = await readApp('components/VenueAssistant.tsx');
+  const styles = await readApp('app/globals.css');
+
+  assert.match(shell, /premium-nav/);
+  assert.match(styles, /\.premium-nav\s*\{/);
+  assert.match(styles, /\.guider-panel\s*\{/);
+  assert.match(assistant, /guider-panel/);
+  for (const locale of ['en', 'si', 'ta']) {
+    assert.equal(dictionaries[locale].assistant.title, 'Guider');
+    assert.match(dictionaries[locale].assistant.launcherOpen, /Guider/);
+    assert.match(dictionaries[locale].assistant.ariaLabel, /Guider/);
+  }
 });
 
 test('WebGL is a capped, lazy, recoverable enhancement', async () => {

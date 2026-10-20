@@ -132,11 +132,50 @@ test('tool execution is whitelisted, schema-checked, and returns public-safe pro
 
   const spaceResult = toolResults[0];
   assert.equal(spaceResult.code, 'AI-ROOM-01');
-  const allowedKeys = new Set(['code', 'name', 'category', 'capacity', 'location', 'openTime', 'closeTime', 'minDurationMinutes', 'description']);
+  const allowedKeys = new Set([
+    'code', 'name', 'category', 'capacity', 'location', 'openTime', 'closeTime',
+    'minDurationMinutes', 'description', 'currency', 'pricingUnit', 'rates',
+  ]);
   assert.deepEqual(Object.keys(spaceResult).filter((k) => !allowedKeys.has(k)), [], 'projection must stay public-safe');
+  assert.deepEqual(spaceResult.rates, [{ unit: 'HOUR', amountCents: 250000, isDefault: true }]);
 
   assert.deepEqual(toolResults[1], { error: 'Tool not allowed.' });
   assert.match(JSON.stringify(toolResults[2]), /error/i, 'malformed tool arguments are refused');
+  assert.deepEqual(toolResults[3], { error: 'Those tool arguments were not valid.' }, 'unknown properties are refused');
+  db.close();
+});
+
+test('Guider grounds organisation-specific answers in active admin knowledge', async (t) => {
+  t.after(restoreFetch);
+  const db = createTestDb();
+  const now = Date.now();
+  db.prepare(`INSERT INTO assistant_knowledge
+    (title,slug,markdown,is_active,created_at,updated_at)
+    VALUES (?,?,?,?,?,?)`).run(
+    'Visitor parking', 'visitor-parking', '# Parking\nVisitors may park at the east gate for free.', 1, now, now,
+  );
+  db.prepare(`INSERT INTO assistant_knowledge
+    (title,slug,markdown,is_active,created_at,updated_at)
+    VALUES (?,?,?,?,?,?)`).run(
+    'Private operations', 'private-operations', 'The alarm code is 1234.', 0, now, now,
+  );
+  const calls = stubFetch([
+    { choices: [{ message: { content: null, tool_calls: [toolCall('search_knowledge', { query: 'visitor parking east gate' })] } }] },
+    { choices: [{ message: { content: 'Visitor parking is available at the east gate.' } }] },
+  ]);
+
+  const result = await chatWithVenueAssistant(db, {
+    messages: [{ role: 'user', content: 'Where can visitors park?' }],
+    config: { apiKey: 'sk-test', model: 'vendor/model-x', baseUrl: 'https://openrouter.test/api/v1' },
+  });
+
+  assert.match(result.message, /east gate/i);
+  const sent = JSON.parse(calls[1].init.body);
+  assert.match(sent.messages[0].content, /Guider/);
+  assert.match(sent.messages[0].content, /untrusted reference material/i);
+  const resultText = sent.messages.find((message) => message.role === 'tool').content;
+  assert.match(resultText, /Visitors may park at the east gate for free/);
+  assert.ok(!resultText.includes('alarm code'), 'inactive knowledge must never reach the provider');
   db.close();
 });
 

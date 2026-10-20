@@ -4,7 +4,7 @@ A centralized space-booking and rental-management system for Nagaro at **Trace E
 
 Two experiences:
 
-- **Public** — visitors browse published spaces, check live availability, and send a booking request for the space they chose. Staff approve it, approval places a temporary hold, and any configured booking fee is paid through PayHere before the reservation is confirmed. No account is required; every request and reservation gets a private management link. The public experience is served in English, සිංහල and தமிழ், with an optional AI venue guide that can prepare an editable request draft.
+- **Public** — visitors browse published spaces, check live availability, and send a booking request for the space they chose. Staff approve it, approval places a temporary hold, and any configured registration fee is paid through PayHere before the reservation is confirmed. Visitors may add an optional advance toward the remaining venue balance. No account is required; every request and reservation gets a private management link. The public experience is served in English, සිංහල and தமிழ், with **Guider**, an optional AI assistant grounded in live venue data and administrator-published Markdown.
 - **Administrative** — staff manage spaces, photographs, customers, reservations, cancellations, maintenance and inquiries from one place.
 
 Three space categories are supported: **meeting/training rooms**, the **auditorium**, and **co-working desks** (individually bookable).

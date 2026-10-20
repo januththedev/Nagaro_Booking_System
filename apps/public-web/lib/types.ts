@@ -86,7 +86,23 @@ export type BookingRequest = {
   billingUnit: string; billingQuantity: number; rateCents: number;
   venueTotalCents: number; currency: string; holdExpiresAt: number | null;
   rejectionReason: string | null; reservationReference: string | null;
-  payment: null | { bookingFeeCents: number; venueTotalCents: number; remainingBalanceCents: number; currency: string; latestAttempt: null | { orderId:string; status:string; paymentId:string|null; method:string|null; statusCode:string|null; updatedAt:number } };
+  payment: null | {
+    bookingFeeCents: number;
+    advancePaidCents: number;
+    venueTotalCents: number;
+    remainingBalanceCents: number;
+    currency: string;
+    latestAttempt: null | {
+      orderId: string;
+      amountCents: number;
+      advanceCents: number;
+      status: string;
+      paymentId: string | null;
+      method: string | null;
+      statusCode: string | null;
+      updatedAt: number;
+    };
+  };
 };
 
 export type ApiError = {

@@ -4,11 +4,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useT } from "./I18nProvider";
 import { LOCALES, LOCALE_COOKIE, LOCALE_LABELS, type Locale } from "../lib/i18n";
 
-/**
- * Discreet language control for the minimal header. Choosing a language sets a
- * year-long cookie and re-renders the current route in that language; no
- * navigation, no URL change, no layout shift.
- */
+/** A compact, grouped language control that keeps the floating header calm. */
 export function LanguageSwitcher() {
   const router = useRouter();
   const locale = useLocale();
@@ -21,20 +17,19 @@ export function LanguageSwitcher() {
   };
 
   return (
-    <div role="group" aria-label={t.chrome.languageLabel} className="flex items-center gap-1">
+    <div role="group" aria-label={t.chrome.languageLabel} className="language-switcher">
       {LOCALES.map((code) => (
         <button
           key={code}
           type="button"
           lang={code}
           onClick={() => choose(code)}
+          aria-label={LOCALE_LABELS[code]}
           aria-pressed={locale === code}
           title={LOCALE_LABELS[code]}
-          className={`font-mono text-[0.62rem] uppercase tracking-[0.12em] px-2 py-2 border cursor-pointer transition-colors ${
-            locale === code ? "bg-white text-black border-white" : "bg-transparent text-inherit border-current hover:bg-white hover:text-black"
-          }`}
+          className={`language-switcher__option ${locale === code ? "is-active" : ""}`}
         >
-          {LOCALE_LABELS[code]}
+          {code.toUpperCase()}
         </button>
       ))}
     </div>

@@ -20,7 +20,7 @@ export function UnifiedRequestForm({space,formToken}:{space:PublicSpace;formToke
     </aside>
     <section className="lg:col-span-7 px-4 sm:px-10 xl:px-20 py-12 lg:py-20 bg-[var(--bone)]">
       <div className="max-w-2xl"><p className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--brick)]">{t.request.formEyebrow}</p><h2 className="font-display text-4xl sm:text-6xl leading-none">{t.request.formTitle}</h2>{draftLoaded?<div className="my-6 border-l-2 border-[var(--oxidized)] pl-4 text-sm">{t.request.aiDraftLoaded}</div>:null}
-      <form method="post" action={`/spaces/${encodeURIComponent(space.code)}/book`} onSubmit={submit} className="mt-10 grid sm:grid-cols-2 gap-x-5 gap-y-6">
+      <form method="post" action={`/spaces/${encodeURIComponent(space.code)}/book`} onSubmit={submit} className="booking-form mt-10 grid sm:grid-cols-2 gap-x-5 gap-y-6">
         <input type="hidden" name="form_token" value={formToken}/>
         <label className="sm:col-span-2">{t.request.dateLabel}<input name="date" type="date" required value={values.date} onChange={set('date')}/></label>
         <label>{t.request.startTimeLabel}<input name="start_time" type="time" required value={values.startTime} onChange={set('startTime')}/></label><label>{t.request.endTimeLabel}<input name="end_time" type="time" required value={values.endTime} onChange={set('endTime')}/></label>
@@ -28,7 +28,7 @@ export function UnifiedRequestForm({space,formToken}:{space:PublicSpace;formToke
         <label className="sm:col-span-2">{t.request.purposeLabel}<textarea name="purpose" rows={4} value={values.purpose} onChange={set('purpose')} placeholder={t.request.purposePlaceholder}/></label>
         <div className="sm:col-span-2 border-t border-[var(--rule)] pt-7 mt-2"><h3 className="font-display text-3xl m-0">{t.request.detailsTitle}</h3></div>
         <label>{t.request.fullNameLabel}<input name="full_name" required maxLength={160} value={values.fullName} onChange={set('fullName')}/></label><label>{t.request.emailLabel}<input name="email" type="email" required maxLength={254} value={values.email} onChange={set('email')}/></label><label>{t.request.phoneLabel}<input name="phone" value={values.phone} onChange={set('phone')}/></label><label>{t.request.organizationLabel}<input name="organization" value={values.organization} onChange={set('organization')}/></label>
-        <div className="sm:col-span-2 mt-4 border border-[var(--ink)] p-5 flex flex-col sm:flex-row gap-5 justify-between sm:items-center"><div><p className="font-mono text-xs uppercase tracking-wider m-0">{t.request.noticeTitle}</p><p className="text-sm text-[var(--graphite)] m-0 mt-2">{t.request.noticeBody}</p></div><button disabled={busy} className="btn-primary shrink-0">{busy?t.request.submitting:t.request.submit}</button></div>
+        <div className="soft-box sm:col-span-2 mt-4 p-5 sm:p-6 flex flex-col sm:flex-row gap-5 justify-between sm:items-center"><div><p className="font-mono text-xs uppercase tracking-wider m-0 text-[var(--ink)]">{t.request.noticeTitle}</p><p className="text-sm text-[var(--graphite)] normal-case tracking-normal font-sans m-0 mt-2">{t.request.noticeBody}</p></div><button disabled={busy} className="btn-primary shrink-0">{busy?t.request.submitting:t.request.submit}</button></div>
         {error?<p role="alert" className="sm:col-span-2 text-[var(--brick)]">{error}</p>:null}
       </form></div>
     </section>

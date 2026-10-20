@@ -97,6 +97,14 @@ test('pgMigrationsDir defaults to the shipped directory and honours the override
   void readFileSync;
 });
 
+test('CONTRACT (static): optional advances are stored as immutable attempt snapshots and obligation credits', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join: joinPath } = await import('node:path');
+  const sql = readFileSync(joinPath(pgMigrationsDir(), '0004_optional_advances.sql'), 'utf8');
+  assert.match(sql, /ALTER TABLE payment_obligation[\s\S]+advance_paid_cents BIGINT NOT NULL DEFAULT 0/i);
+  assert.match(sql, /ALTER TABLE payment_attempt[\s\S]+advance_cents BIGINT NOT NULL DEFAULT 0/i);
+});
+
 test('CONTRACT (static): 0001_init.sql carries the full schema and the overlap guard', async () => {
   const { readFileSync } = await import('node:fs');
   const { join: joinPath, dirname } = await import('node:path');

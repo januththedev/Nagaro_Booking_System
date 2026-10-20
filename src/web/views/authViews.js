@@ -59,8 +59,8 @@ export function renderLoginPage({
             <dd>Real-time desk pool allocation and maintenance blocking across Sri Lanka Standard Time (UTC+5:30) operating windows.</dd>
           </div>
           <div class="auth-highlights__item">
-            <dt>Public checkout, visible instantly</dt>
-            <dd>Self-service bookings arrive confirmed with their source clearly marked; concierge inquiries remain available for tailored events.</dd>
+            <dt>Public requests, visible instantly</dt>
+            <dd>Online booking requests arrive with their source clearly marked; approval, holds and payments remain visible to the operations team.</dd>
           </div>
         </dl>
       </aside>
@@ -99,7 +99,7 @@ export function renderLoginPage({
             ${emailConfigured ? '' : html`<p class="hint">Email delivery is not configured in this environment. Direct bookings still confirm on screen, and concierge inquiries remain visible in the operations queue.</p>`}
           </div>
         </div>
-        <p class="hint auth-panel__footnote">Visitors do not need an account. <a href="/spaces">Browse spaces</a>, <a href="/book">book instantly</a> or <a href="/booking-request">ask the concierge</a>.</p>
+        <p class="hint auth-panel__footnote">Visitors do not need an account. <a href="/spaces">Browse spaces</a>, <a href="/book">send a booking request</a> or <a href="/booking-request">ask the concierge</a>.</p>
       </div>
     </div>
   </section>
@@ -108,7 +108,7 @@ export function renderLoginPage({
   <div class="site-footer__inner footer__grid">
     <div class="footer__brand">
       <p><strong>TRACE Spaces</strong> · Trace Expert City, Colombo</p>
-      <p class="site-footer__note">Direct checkout confirms immediately against live inventory. Concierge inquiries remain provisional until staff review.</p>
+      <p class="site-footer__note">Online requests are reviewed by the operations team; approved times are held while any configured registration fee is completed.</p>
     </div>
     <nav class="footer__nav" aria-label="Public site">
       <h2 class="site-footer__heading">Public site</h2>

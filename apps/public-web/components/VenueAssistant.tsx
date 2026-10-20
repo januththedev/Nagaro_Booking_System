@@ -9,7 +9,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type Candidate = Record<string, string | number | null>;
 
 /**
- * Floating AI venue guide.
+ * Floating Guider assistant.
  *
  * The assistant is advisory only: it reads live venue data through whitelisted
  * server tools and can prepare an *editable* booking draft. It can never
@@ -94,15 +94,18 @@ export function VenueAssistant() {
       {open ? (
         <section
           ref={panelRef}
-          className="mb-3 w-[min(25rem,calc(100vw-2rem))] h-[min(38rem,calc(100dvh-7rem))] bg-[var(--paper-card)] border border-[var(--ink)] shadow-2xl flex flex-col"
+          className="guider-panel mb-3 flex h-[min(38rem,calc(100dvh-7rem))] w-[min(25rem,calc(100vw-2rem))] flex-col overflow-hidden"
           aria-label={t.assistant.ariaLabel}
         >
-          <header className="p-4 border-b border-[var(--rule)] flex justify-between gap-4">
-            <div>
-              <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] m-0 text-[var(--brick)]">{t.assistant.title}</p>
-              <p className="text-xs text-[var(--graphite)] m-0 mt-1">{t.assistant.subtitle}</p>
+          <header className="flex justify-between gap-4 border-b border-[var(--rule)] p-4 sm:p-5">
+            <div className="flex gap-3">
+              <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--chartreuse)] shadow-[0_0_0_5px_rgba(212,242,72,0.18)]" />
+              <div>
+                <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] m-0 text-[var(--brick)]">{t.assistant.title}</p>
+                <p className="text-xs text-[var(--graphite)] m-0 mt-1">{t.assistant.subtitle}</p>
+              </div>
             </div>
-            <button onClick={() => setOpen(false)} aria-label={t.assistant.launcherClose} className="text-xl leading-none px-1">
+            <button onClick={() => setOpen(false)} aria-label={t.assistant.launcherClose} className="guider-close">
               ×
             </button>
           </header>
@@ -115,8 +118,8 @@ export function VenueAssistant() {
             {messages.map((m, i) => (
               <p
                 key={i}
-                className={`text-sm p-3 m-0 max-w-[90%] ${
-                  m.role === "user" ? "ml-auto bg-[var(--ink)] text-[var(--bone)]" : "bg-[var(--concrete)] text-[var(--ink)]"
+                className={`guider-message text-sm p-3 m-0 max-w-[90%] ${
+                  m.role === "user" ? "guider-message--user ml-auto bg-[var(--ink)] text-[var(--bone)]" : "bg-[var(--concrete)] text-[var(--ink)]"
                 }`}
               >
                 {m.content}
@@ -139,7 +142,7 @@ export function VenueAssistant() {
                       setInput(starter);
                       composerRef.current?.focus();
                     }}
-                    className="text-[0.68rem] text-left border border-[var(--rule)] bg-[var(--concrete)]/50 px-2 py-1.5 cursor-pointer hover:border-[var(--ink)]"
+                    className="guider-starter text-left text-[0.68rem]"
                   >
                     {starter}
                   </button>
@@ -168,7 +171,7 @@ export function VenueAssistant() {
               onChange={(e) => setInput(e.target.value)}
               maxLength={1200}
               placeholder={t.assistant.placeholder}
-              className="min-w-0 flex-1"
+              className="field-input min-w-0 flex-1"
             />
             <button className="btn-primary px-4" disabled={busy}>
               {t.assistant.send}
@@ -186,7 +189,7 @@ export function VenueAssistant() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="bg-[var(--chartreuse)] text-[var(--ink)] border border-[var(--ink)] px-5 py-3 font-mono text-xs uppercase tracking-[0.13em] shadow-xl"
+        className="guider-launcher"
       >
         {open ? t.assistant.launcherClose : t.assistant.launcherOpen}
       </button>

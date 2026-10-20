@@ -33,6 +33,7 @@ import { registerAdminOpsRoutes } from './routes/adminOpsRoutes.js';
 import { registerMediaRoutes } from './routes/mediaRoutes.js';
 import { registerAdminUploadRoutes } from './routes/adminUploadRoutes.js';
 import { registerBookingWorkflowRoutes } from './routes/bookingWorkflowRoutes.js';
+import { registerAdminAssistantKnowledgeRoutes } from './routes/adminAssistantKnowledgeRoutes.js';
 
 const STATIC_PREFIX = '/assets/';
 const FLASH_MAX_AGE_SECONDS = 30;
@@ -170,6 +171,7 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   registerAdminCustomerRoutes(router, deps);
   registerAdminOpsRoutes(router, deps);
   registerAdminUploadRoutes(router, deps);
+  registerAdminAssistantKnowledgeRoutes(router, deps);
 
   /* 5. error boundary */
   router.onError(async (ctx, error) => {

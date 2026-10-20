@@ -35,7 +35,7 @@ function publicSystemActor(db) {
 function hydrate(db, row, { includePrivate = false } = {}) {
   if (!row) return null;
   const obligation = db.prepare('SELECT * FROM payment_obligation WHERE booking_request_id = ?').get(row.id);
-  const latestAttempt = db.prepare('SELECT order_id,status,provider_payment_id,provider_method,provider_status_code,updated_at FROM payment_attempt WHERE booking_request_id = ? ORDER BY id DESC LIMIT 1').get(row.id);
+  const latestAttempt = db.prepare('SELECT order_id,amount_cents,advance_cents,status,provider_payment_id,provider_method,provider_status_code,updated_at FROM payment_attempt WHERE booking_request_id = ? ORDER BY id DESC LIMIT 1').get(row.id);
   const value = {
     reference: row.reference,
     status: row.status,
@@ -52,11 +52,13 @@ function hydrate(db, row, { includePrivate = false } = {}) {
     reservationReference: row.reservation_reference ?? null,
     payment: obligation ? {
       bookingFeeCents: Number(obligation.booking_fee_cents),
+      advancePaidCents: Number(obligation.advance_paid_cents ?? 0),
       venueTotalCents: Number(obligation.venue_total_cents),
       remainingBalanceCents: Number(obligation.remaining_balance_cents),
       currency: obligation.currency,
       latestAttempt: latestAttempt ? {
-        orderId: latestAttempt.order_id, status: latestAttempt.status,
+        orderId: latestAttempt.order_id, amountCents: Number(latestAttempt.amount_cents),
+        advanceCents: Number(latestAttempt.advance_cents ?? 0), status: latestAttempt.status,
         paymentId: latestAttempt.provider_payment_id, method: latestAttempt.provider_method,
         statusCode: latestAttempt.provider_status_code, updatedAt: Number(latestAttempt.updated_at),
       } : null,
@@ -224,24 +226,32 @@ export function updateBookingFeePolicy(db,{actor,mode,fixedCents=0,percentageBps
   if(!actor?.id||actor.role!=='ADMIN')throw validationError('An administrator is required.');
   const selected=String(mode??'');if(!['DISABLED','FIXED','PERCENTAGE'].includes(selected))throw validationError('Choose a valid fee mode.');
   const fixed=Number(fixedCents),bps=Number(percentageBps),window=Number(paymentWindowMinutes);
-  if(!Number.isInteger(fixed)||fixed<0||!Number.isInteger(bps)||bps<0||bps>10000||!Number.isInteger(window)||window<5||window>10080)throw validationError('Fee policy values are outside the supported range.');
-  return withWriteTransaction(db,()=>{db.prepare('UPDATE booking_fee_policy SET mode=?,fixed_cents=?,percentage_bps=?,payment_window_minutes=?,updated_by=?,updated_at=? WHERE id=1').run(selected,fixed,bps,window,actor.id,now);recordAudit(db,{actorAdminUserId:actor.id,actorLabel:actor.label,action:'booking_fee_policy.updated',entityType:'booking_fee_policy',entityId:1,summary:`Booking fee policy set to ${selected}`,details:{fixedCents:fixed,percentageBps:bps,paymentWindowMinutes:window}});return getBookingFeePolicy(db);});
+  if(!Number.isInteger(fixed)||fixed<0||!Number.isInteger(bps)||bps<0||bps>10000||!Number.isInteger(window)||window<5||window>10080)throw validationError('Registration fee policy values are outside the supported range.');
+  return withWriteTransaction(db,()=>{db.prepare('UPDATE booking_fee_policy SET mode=?,fixed_cents=?,percentage_bps=?,payment_window_minutes=?,updated_by=?,updated_at=? WHERE id=1').run(selected,fixed,bps,window,actor.id,now);recordAudit(db,{actorAdminUserId:actor.id,actorLabel:actor.label,action:'booking_fee_policy.updated',entityType:'booking_fee_policy',entityId:1,summary:`Registration fee policy set to ${selected}`,details:{fixedCents:fixed,percentageBps:bps,paymentWindowMinutes:window}});return getBookingFeePolicy(db);});
 }
 
-export function createPayHereCheckout(db,{reference,token,config,now=Date.now()}={}) {
+export function createPayHereCheckout(db,{reference,token,config,advanceCents=0,now=Date.now()}={}) {
   expireBookingHolds(db,now);
-  const row=loadForCapability(db,reference,token);
-  if(row.status!==BOOKING_REQUEST_STATUS.APPROVED_AWAITING_PAYMENT) throw conflict('This request is not awaiting payment.');
-  const obligation=db.prepare('SELECT * FROM payment_obligation WHERE booking_request_id=?').get(row.id);
-  if(!obligation||Number(obligation.booking_fee_cents)<=0) throw conflict('No booking fee is due.');
-  const merchantId=String(config?.merchantId??'').trim(); const merchantSecret=String(config?.merchantSecret??'').trim();
-  if(!merchantId||!merchantSecret) throw conflict('Online payment is not configured yet.');
-  const attemptNo=Number(db.prepare('SELECT COUNT(*) AS c FROM payment_attempt WHERE booking_request_id=?').get(row.id)?.c??0)+1;
-  const orderId=`${row.reference}-${attemptNo}`; const amount=(Number(obligation.booking_fee_cents)/100).toFixed(2); const currency=obligation.currency;
-  const attempt=db.prepare(`INSERT INTO payment_attempt (booking_request_id,obligation_id,order_id,amount_cents,currency,status,created_at,updated_at) VALUES (?,?,?,?,?,'CREATED',?,?)`).run(row.id,obligation.id,orderId,obligation.booking_fee_cents,currency,now,now);
-  const base=String(config.baseUrl??'').replace(/\/$/,'');
-  const manageUrl=`${base}/book/manage?ref=${encodeURIComponent(row.reference)}&token=${encodeURIComponent(token)}`;
-  return {action:config.sandbox===false?'https://www.payhere.lk/pay/checkout':'https://sandbox.payhere.lk/pay/checkout',fields:{merchant_id:merchantId,return_url:manageUrl,cancel_url:manageUrl,notify_url:`${base}/api/public/payments/payhere/notify`,first_name:row.customer_name.split(/\s+/)[0]||row.customer_name,last_name:row.customer_name.split(/\s+/).slice(1).join(' ')||'-',email:row.email,phone:row.phone||'0000000000',address:'Not supplied',city:'Colombo',country:'Sri Lanka',order_id:orderId,items:`Booking fee for ${row.space_name}`,currency,amount,custom_1:row.reference,hash:md5Upper(`${merchantId}${orderId}${amount}${currency}${md5Upper(merchantSecret)}`)},attemptId:Number(attempt.lastInsertRowid)};
+  return withWriteTransaction(db,()=>{
+    const row=loadForCapability(db,reference,token);
+    if(row.status!==BOOKING_REQUEST_STATUS.APPROVED_AWAITING_PAYMENT) throw conflict('This request is not awaiting payment.');
+    const obligation=db.prepare('SELECT * FROM payment_obligation WHERE booking_request_id=?').get(row.id);
+    if(!obligation||Number(obligation.booking_fee_cents)<=0) throw conflict('No registration fee is due.');
+    const advance=Number(advanceCents??0);
+    const availableBalance=Number(obligation.remaining_balance_cents);
+    if(!Number.isSafeInteger(advance)||advance<0) throw validationError('Choose a valid optional advance.',{advanceCents:'Enter an advance amount in whole cents.'});
+    if(advance>availableBalance) throw validationError('The optional advance cannot exceed the remaining venue balance.',{advanceCents:'Reduce the advance to the remaining venue balance or less.'});
+    const merchantId=String(config?.merchantId??'').trim(); const merchantSecret=String(config?.merchantSecret??'').trim();
+    if(!merchantId||!merchantSecret) throw conflict('Online payment is not configured yet.');
+    const attemptNo=Number(db.prepare('SELECT COUNT(*) AS c FROM payment_attempt WHERE booking_request_id=?').get(row.id)?.c??0)+1;
+    const amountCents=Number(obligation.booking_fee_cents)+advance;
+    const orderId=`${row.reference}-${attemptNo}`; const amount=(amountCents/100).toFixed(2); const currency=obligation.currency;
+    const attempt=db.prepare(`INSERT INTO payment_attempt (booking_request_id,obligation_id,order_id,amount_cents,advance_cents,currency,status,created_at,updated_at) VALUES (?,?,?,?,?,?,'CREATED',?,?)`).run(row.id,obligation.id,orderId,amountCents,advance,currency,now,now);
+    const base=String(config.baseUrl??'').replace(/\/$/,'');
+    const manageUrl=`${base}/book/manage?ref=${encodeURIComponent(row.reference)}&token=${encodeURIComponent(token)}`;
+    const items=advance>0?`Registration fee and advance for ${row.space_name}`:`Registration fee for ${row.space_name}`;
+    return {action:config.sandbox===false?'https://www.payhere.lk/pay/checkout':'https://sandbox.payhere.lk/pay/checkout',fields:{merchant_id:merchantId,return_url:manageUrl,cancel_url:manageUrl,notify_url:`${base}/api/public/payments/payhere/notify`,first_name:row.customer_name.split(/\s+/)[0]||row.customer_name,last_name:row.customer_name.split(/\s+/).slice(1).join(' ')||'-',email:row.email,phone:row.phone||'0000000000',address:'Not supplied',city:'Colombo',country:'Sri Lanka',order_id:orderId,items,currency,amount,custom_1:row.reference,hash:md5Upper(`${merchantId}${orderId}${amount}${currency}${md5Upper(merchantSecret)}`)},attemptId:Number(attempt.lastInsertRowid)};
+  });
 }
 
 /** Release every active hold this request owns. */
@@ -308,10 +318,15 @@ export function processPayHereNotification(db,payload={},config={},now=Date.now(
     if(!attempt||!signatureValid) return {accepted:false,idempotent:false};
     const expectedAmount=(Number(attempt.amount_cents)/100).toFixed(2);
     const exact=amount===expectedAmount&&currency===attempt.currency;
-    const row=db.prepare(`SELECT br.*,po.booking_fee_cents FROM booking_request br JOIN payment_obligation po ON po.booking_request_id=br.id WHERE br.id=?`).get(attempt.booking_request_id);
+    const row=db.prepare(`SELECT br.*,po.booking_fee_cents,po.advance_paid_cents,po.remaining_balance_cents FROM booking_request br JOIN payment_obligation po ON po.booking_request_id=br.id WHERE br.id=?`).get(attempt.booking_request_id);
     if(statusCode==='2'&&exact){
       const claims=db.prepare("SELECT COUNT(*) AS c FROM booking_hold_claim h JOIN occupancy o ON o.id=h.occupancy_id WHERE h.booking_request_id=? AND h.status='ACTIVE' AND o.status='ACTIVE' AND h.expires_at>?").get(row.id,now);
-      if(row.status===BOOKING_REQUEST_STATUS.CONFIRMED){db.prepare("UPDATE payment_attempt SET status='SUCCEEDED',provider_payment_id=?,provider_method=?,provider_status_code=?,provider_message=?,updated_at=? WHERE id=?").run(payload.payment_id||null,payload.method||null,statusCode,payload.status_message||null,now,attempt.id);return {accepted:true,idempotent:true};}
+      if(row.status===BOOKING_REQUEST_STATUS.CONFIRMED){
+        if(attempt.status==='SUCCEEDED') return {accepted:true,idempotent:true};
+        db.prepare("UPDATE payment_attempt SET status='REVIEW_REQUIRED',provider_payment_id=?,provider_method=?,provider_status_code=?,provider_message=?,updated_at=? WHERE id=?").run(payload.payment_id||null,payload.method||null,statusCode,'A second verified payment arrived after the booking was already confirmed.',now,attempt.id);
+        db.prepare('UPDATE booking_request SET payment_status=?,updated_at=? WHERE id=?').run(PAYMENT_STATUS.REVIEW_REQUIRED,now,row.id);
+        return {accepted:true,reviewRequired:true};
+      }
       if(row.status!==BOOKING_REQUEST_STATUS.APPROVED_AWAITING_PAYMENT||Number(claims.c)!==Number(row.unit_count)){
         db.prepare(`UPDATE occupancy SET status='RELEASED',released_at=? WHERE id IN (SELECT occupancy_id FROM booking_hold_claim WHERE booking_request_id=? AND status='ACTIVE') AND status='ACTIVE'`).run(now,row.id);
         db.prepare("UPDATE booking_hold_claim SET status='RELEASED',released_at=? WHERE booking_request_id=? AND status='ACTIVE'").run(now,row.id);
@@ -319,8 +334,16 @@ export function processPayHereNotification(db,payload={},config={},now=Date.now(
         db.prepare('UPDATE booking_request SET status=?,payment_status=?,updated_at=? WHERE id=?').run(BOOKING_REQUEST_STATUS.PAYMENT_REVIEW_REQUIRED,PAYMENT_STATUS.REVIEW_REQUIRED,now,row.id);
         return {accepted:true,reviewRequired:true};
       }
+      const advance=Number(attempt.advance_cents??0);
+      if(advance>Number(row.remaining_balance_cents)){
+        db.prepare("UPDATE payment_attempt SET status='REVIEW_REQUIRED',provider_payment_id=?,provider_method=?,provider_status_code=?,provider_message=?,updated_at=? WHERE id=?").run(payload.payment_id||null,payload.method||null,statusCode,'Verified advance exceeded the remaining venue balance.',now,attempt.id);
+        db.prepare('UPDATE booking_request SET status=?,payment_status=?,updated_at=? WHERE id=?').run(BOOKING_REQUEST_STATUS.PAYMENT_REVIEW_REQUIRED,PAYMENT_STATUS.REVIEW_REQUIRED,now,row.id);
+        return {accepted:true,reviewRequired:true};
+      }
+      if(advance>0) db.prepare('UPDATE payment_obligation SET advance_paid_cents=advance_paid_cents+?,remaining_balance_cents=remaining_balance_cents-? WHERE booking_request_id=?').run(advance,advance,row.id);
       confirmFromHold(db,row,now);
       db.prepare("UPDATE payment_attempt SET status='SUCCEEDED',provider_payment_id=?,provider_method=?,provider_status_code=?,provider_message=?,updated_at=? WHERE id=?").run(payload.payment_id||null,payload.method||null,statusCode,payload.status_message||null,now,attempt.id);
+      recordAudit(db,{actorLabel:'PayHere verified callback',action:'booking_request.payment_verified',entityType:'booking_request',entityId:row.id,summary:`Verified payment for ${row.reference}`,details:{amountCents:Number(attempt.amount_cents),registrationFeeCents:Number(row.booking_fee_cents),advanceCents:advance}});
       return {accepted:true,confirmed:true};
     }
     if(statusCode==='2'&&!exact){

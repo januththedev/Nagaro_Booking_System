@@ -16,8 +16,11 @@ export function hit(db, bucketKey, { windowMs = 60_000, now = Date.now() } = {})
   const windowStart = Math.floor(now / windowMs) * windowMs;
   db.exec('BEGIN IMMEDIATE');
   try {
+    // The target column is qualified deliberately: PostgreSQL rejects an
+    // unqualified `count = count + 1` here (42702, ambiguous between the
+    // existing row and the `excluded` proposal), while SQLite accepts both.
     db.prepare(`INSERT INTO rate_limit_counter (bucket_key, window_start, count) VALUES (?,?,1)
-                ON CONFLICT(bucket_key, window_start) DO UPDATE SET count = count + 1`)
+                ON CONFLICT(bucket_key, window_start) DO UPDATE SET count = rate_limit_counter.count + 1`)
       .run(bucketKey, windowStart);
     const row = db.prepare('SELECT count FROM rate_limit_counter WHERE bucket_key = ? AND window_start = ?')
       .get(bucketKey, windowStart);

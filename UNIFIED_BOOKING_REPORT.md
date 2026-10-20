@@ -143,7 +143,8 @@ signature rules (unit + HTTP suites). Treat payment as **LOCALLY VERIFIED only**
 
 ## 13. Deployed Preview URL
 
-None. No Vercel/Supabase credentials were available to this run; deployment was not exercised.
+**https://nagarobookingsystem.vercel.app** — the Vercel production deployment, wired to the
+Supabase PostgreSQL project and the Vercel Blob store described below.
 
 ## 14. Missing credentials / merchant approvals
 
@@ -152,7 +153,10 @@ None. No Vercel/Supabase credentials were available to this run; deployment was 
   against the real gateway.
 - PayHere **domain approval** for the canonical application URL (sandbox and live) is an
   owner-side step; the merchant secret may be domain-specific.
-- Supabase/Postgres and Vercel Blob credentials — deployment path unverified.
+- Supabase and Vercel Blob credentials **were provided and are wired**: the database is
+  provisioned (migrations, exclusion constraint, catalogue, first administrator) and the Blob
+  token is set on the Vercel project. The corresponding secrets were shared in a chat channel
+  and should be rotated after the demonstration.
 
 ## 15. Known limitations
 
@@ -184,6 +188,9 @@ None. No Vercel/Supabase credentials were available to this run; deployment was 
 | Assistant cannot book/charge/administer | **IMPLEMENTED + LOCALLY VERIFIED** (tool whitelist + tests) |
 | English / සිංහල / தமிழ் support | **IMPLEMENTED + LOCALLY VERIFIED** (dictionary parity + rendered pages) |
 | Booking integrity in the database | **IMPLEMENTED + LOCALLY VERIFIED** (trigger + concurrency suites) |
-| Production deployment + live gateway | **BLOCKED** (no Supabase/Vercel/PayHere/OpenRouter credentials) |
+| Supabase PostgreSQL deployment | **DEPLOYED + VERIFIED** (migrations, exclusion constraint, catalogue, administrator) |
+| Vercel production deployment | **PREVIEW VERIFIED** at https://nagarobookingsystem.vercel.app |
+| PayHere sandbox transaction end-to-end | **BLOCKED** (no merchant credentials) |
+| Production hardening sign-off | **BLOCKED** (rotate the shared secrets; complete PayHere domain approval) |
 
 Nothing in this report is claimed as production-verified.

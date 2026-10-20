@@ -5,7 +5,7 @@
   "description": "Nagaro space booking and rental management system for Trace Expert City",
   "type": "module",
   "engines": {
-    "node": ">=22.5.0"
+    "node": "24.x"
   },
   "scripts": {
     "start": "node src/server/index.js",

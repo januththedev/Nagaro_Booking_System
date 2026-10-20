@@ -19,6 +19,14 @@ test('vercel.json uses supported project keys and keeps Next tracing in next.con
   assert.equal(config.framework, 'nextjs');
   assert.equal(config.outputDirectory, 'apps/public-web/.next');
   assert.equal(config.functions?.['api/index.js']?.includeFiles, 'src/**');
+  assert.equal(
+    Object.hasOwn(config.functions?.['api/index.js'] ?? {}, 'runtime'),
+    false,
+    'official Node.js functions must use the project Node engine, not a community-runtime identifier',
+  );
+
+  const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+  assert.equal(packageJson.engines?.node, '24.x');
 
   const nextConfig = readFileSync(resolve(root, 'apps/public-web/next.config.mjs'), 'utf8');
   assert.match(nextConfig, /outputFileTracingRoot/);

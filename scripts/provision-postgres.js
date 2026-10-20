@@ -6,6 +6,7 @@
  * concurrent builds. DIRECT_URL is preferred; DATABASE_URL is the fallback.
  */
 import pg from 'pg';
+import { pgConnectionConfig } from '../src/server/db/pgSsl.js';
 import { applyPgMigrations, pgConnectionString } from './migrate-postgres.js';
 
 const connectionString = pgConnectionString();
@@ -15,7 +16,7 @@ if (!connectionString) {
 }
 
 const client = new pg.Client({
-  connectionString,
+  ...pgConnectionConfig(connectionString),
   connectionTimeoutMillis: 15_000,
   application_name: 'nagaro-provision',
 });

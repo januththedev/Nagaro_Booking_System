@@ -1,5 +1,6 @@
 import { workerData } from 'node:worker_threads';
 import pg from 'pg';
+import { pgConnectionConfig } from './pgSsl.js';
 
 const port = workerData.port;
 let client = null;
@@ -8,7 +9,7 @@ let inTransaction = false;
 
 function createClient() {
   const next = new pg.Client({
-    connectionString: workerData.connectionString,
+    ...pgConnectionConfig(workerData.connectionString),
     connectionTimeoutMillis: 10_000,
     query_timeout: 15_000,
     keepAlive: true,

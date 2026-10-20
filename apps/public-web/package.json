@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node copy-media.mjs",
     "dev": "next dev -p 4174",
+    "prebuild": "node copy-media.mjs",
     "build": "next build",
     "start": "next start -p 4174",
     "test": "node --experimental-strip-types --test tests/*.test.mjs"

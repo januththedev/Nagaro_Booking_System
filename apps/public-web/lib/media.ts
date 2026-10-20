@@ -1,17 +1,17 @@
 import type { PublicSpace } from "./types";
 
 export const OFFICIAL_MEDIA = {
-  hero: "/assets/trace-media/research/trace-spaces-hero.webp",
-  longExterior: "/assets/trace-media/research/expert-city-industry-visits.webp",
-  coworking: "/assets/trace-media/research/expert-city-coworking.webp",
-  privateOffices: "/assets/trace-media/research/expert-city-private-offices.webp",
-  creator: "/assets/trace-media/research/creator-space.jpg",
-  bay: "/assets/trace-media/research/bay-07.jpg",
-  outdoor: "/assets/trace-media/research/outdoor-space.webp",
-  studio: "/assets/trace-media/research/idea-studio.webp",
-  community: "/assets/trace-media/research/third-place-lobby.jpg",
-  eventProduction: "/assets/trace-media/research/expert-city-spaces.jpg",
-  startupHall: "/assets/trace-media/research/expert-city-startups.webp",
+  hero: "/trace-media/research/trace-spaces-hero.webp",
+  longExterior: "/trace-media/research/expert-city-industry-visits.webp",
+  coworking: "/trace-media/research/expert-city-coworking.webp",
+  privateOffices: "/trace-media/research/expert-city-private-offices.webp",
+  creator: "/trace-media/research/creator-space.jpg",
+  bay: "/trace-media/research/bay-07.jpg",
+  outdoor: "/trace-media/research/outdoor-space.webp",
+  studio: "/trace-media/research/idea-studio.webp",
+  community: "/trace-media/research/third-place-lobby.jpg",
+  eventProduction: "/trace-media/research/expert-city-spaces.jpg",
+  startupHall: "/trace-media/research/expert-city-startups.webp",
 } as const;
 
 type EditorialImage = {

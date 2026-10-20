@@ -3,3 +3,5 @@ node_modules/
 out/
 .env*.local
 *.tsbuildinfo
+# Build-time copy of src/web/public/trace-media (see copy-media.mjs).
+public/trace-media/

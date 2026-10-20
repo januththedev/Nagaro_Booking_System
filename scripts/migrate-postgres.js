@@ -95,7 +95,8 @@ async function main() {
     return;
   }
   const { Client } = await import('pg');
-  const client = new Client({ connectionString });
+  const { pgConnectionConfig } = await import('../src/server/db/pgSsl.js');
+  const client = new Client(pgConnectionConfig(connectionString));
   try {
     await client.connect();
   } catch (error) {

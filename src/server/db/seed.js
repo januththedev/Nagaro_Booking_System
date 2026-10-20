@@ -1410,15 +1410,15 @@ const SPACES = [
   },
 ];
 
-export function seedCatalogue(db, { actor, withImages = true } = {}) {
+export function seedCatalogue(db, { actor, withImages = true, publish = true } = {}) {
   const created = [];
   for (const definition of SPACES) {
     const existing = getSpaceByCode(db, definition.code);
     if (existing) { created.push({ space: existing, existed: true }); continue; }
     const space = createSpace(db, { actor, payload: definition });
     if (withImages) seedImages(db, actor, space, 2);
-    const published = publishSpace(db, { actor, spaceId: space.id });
-    created.push({ space: published, existed: false });
+    const finalSpace = publish ? publishSpace(db, { actor, spaceId: space.id }) : space;
+    created.push({ space: finalSpace, existed: false });
   }
   return created;
 }

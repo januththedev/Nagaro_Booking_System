@@ -4,21 +4,27 @@
   "private": true,
   "description": "Nagaro space booking and rental management system for Trace Expert City",
   "type": "module",
+  "workspaces": [
+    "apps/public-web"
+  ],
   "engines": {
     "node": "24.x"
   },
   "scripts": {
     "start": "node src/server/index.js",
     "dev": "node --watch src/server/index.js",
-    "dev:public": "npm run dev --prefix apps/public-web",
+    "build": "npm run build --workspace=trace-spaces-public-web",
+    "dev:public": "npm run dev --workspace=trace-spaces-public-web",
     "dev:full": "node scripts/run-public-stack.js",
-    "build:public": "npm run build --prefix apps/public-web",
+    "build:public": "npm run build --workspace=trace-spaces-public-web",
     "start:full": "node scripts/run-public-stack.js --production",
-    "test:public": "npm run test --prefix apps/public-web",
+    "test:public": "npm run test --workspace=trace-spaces-public-web",
     "test:cutover": "node scripts/e2e-public-frontend.js",
     "test:full": "npm run test:all && npm run test:public && npm run test:cutover",
     "migrate": "node src/server/db/migrate.js",
     "migrate:postgres": "node scripts/migrate-postgres.js",
+    "provision:postgres": "node scripts/provision-postgres.js",
+    "verify:vercel": "node scripts/verify-vercel-readiness.js",
     "seed": "node src/server/db/seed.js",
     "admin:create": "node scripts/create-admin.js",
     "test": "node --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/**/*.test.js\"",

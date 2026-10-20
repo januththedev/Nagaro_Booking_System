@@ -1,8 +1,15 @@
 # Vercel deployment checklist
 
-This repository deploys as one Vercel project from the repository root. Next.js
-owns public pages and `api/index.js` owns the booking engine, staff console,
-assets and media routes.
+This repository deploys as **one Vercel project from the repository root**.
+Next.js owns public pages and `api/index.js` owns the booking engine, staff
+console, assets and media routes.
+
+> **Root Directory is non-negotiable:** leave it blank (repository root) or set
+> it to `.`. Do not select `apps/public-web`. The backend function, migrations,
+> verified TRACE media, and root dependency workspace all live above that
+> folder. A build path containing `apps/public-web/apps/public-web` proves that
+> the Vercel project Root Directory is wrong or that an old dashboard command
+> override is still active.
 
 ## Required Vercel environment variables
 
@@ -13,13 +20,18 @@ persistent data:
 |---|---|
 | `DATABASE_URL` | Supabase **transaction pooler** connection string (port `6543`) with `sslmode=require`. |
 | `BLOB_READ_WRITE_TOKEN` | Token created when a Vercel Blob store is connected to this Vercel project. |
-| `NAGARO_BASE_URL` | Canonical deployed URL, for example `https://spaces.example.com`. |
+| `NAGARO_BASE_URL` | Canonical deployed URL, for example `https://spaces.example.com`. Required so private booking and inquiry links use the correct public origin. |
 | `NAGARO_IP_SALT` | A long random secret used to hash IP addresses. Generate once and keep it stable. |
 | `NAGARO_TRUST_PROXY` | `1` on Vercel so rate limiting uses Vercel's forwarded client address. |
 | `NAGARO_FORCE_SECURE_COOKIES` | `1` so staff session and CSRF cookies are always Secure. |
-| `NAGARO_BOOTSTRAP_ADMIN_EMAIL` | First staff administrator email. Used only while no human administrator exists. |
-| `NAGARO_BOOTSTRAP_ADMIN_PASSWORD` | Strong first administrator password. Remove from Vercel after the account is created. |
-| `NAGARO_BOOTSTRAP_ADMIN_NAME` | Display name for the first administrator. |
+
+The first administrator is created by the provisioning command below. Set
+these variables on the trusted machine for that one command; they do not need
+to remain in Vercel after the account exists:
+
+- `NAGARO_BOOTSTRAP_ADMIN_EMAIL`
+- `NAGARO_BOOTSTRAP_ADMIN_PASSWORD`
+- `NAGARO_BOOTSTRAP_ADMIN_NAME`
 
 `VERCEL`, `VERCEL_URL`, `NODE_ENV` and the deployment hostname variables are
 provided by Vercel automatically. Do not add `DIRECT_URL` to Vercel unless a
@@ -41,13 +53,26 @@ The app safely records inquiries without SMTP, but delivery is marked
 ## Supabase setup
 
 1. Create the Supabase project and copy both connection strings from **Connect**.
-2. On a trusted local machine, set `DIRECT_URL` to the direct/session-pooler URL
-   and run `npm run migrate:postgres` once. The command records applied files in
-   `schema_migrations` and is safe to rerun.
-3. Put only the transaction-pooler URL in Vercel as `DATABASE_URL`.
-4. Verify that `public.space` exists and that the `occupancy_no_overlap` GiST
-   exclusion constraint exists before accepting bookings. The API refuses to
-   boot if either guard is missing.
+2. On a trusted local machine, set `DIRECT_URL` to the direct or session-pooler
+   URL, plus the three `NAGARO_BOOTSTRAP_ADMIN_*` values, and run
+   `npm run provision:postgres`. This applies the versioned migrations, creates
+   the first administrator only when none exists, and idempotently creates the
+   five production catalogue spaces without demo bookings or placeholder image
+   rows. It is safe to rerun.
+3. Put only the transaction-pooler URL (port `6543`, TLS required) in Vercel as
+   `DATABASE_URL`. Do not copy `DIRECT_URL` into the Vercel project.
+4. The API verifies `public.space` and the `occupancy_no_overlap` GiST exclusion
+   constraint on cold start and refuses to serve against a partial schema.
+
+Example in PowerShell (values are placeholders):
+
+```powershell
+$env:DIRECT_URL='postgresql://...:5432/postgres?sslmode=require'
+$env:NAGARO_BOOTSTRAP_ADMIN_EMAIL='ops@example.com'
+$env:NAGARO_BOOTSTRAP_ADMIN_PASSWORD='use-a-long-unique-password'
+$env:NAGARO_BOOTSTRAP_ADMIN_NAME='TRACE Operations'
+npm run provision:postgres
+```
 
 Do not enable `NAGARO_ALLOW_EPHEMERAL_SQLITE` for production. It exists only for
 throwaway preview demonstrations and loses data whenever the function instance
@@ -63,17 +88,35 @@ an image removes both the row and Blob object.
 
 ## Vercel project settings
 
-- Import the GitHub repository and keep **Root Directory** at the repository root.
+- Import the GitHub repository and keep **Root Directory** blank / `.` (the
+  repository root), never `apps/public-web`.
 - Framework Preset: **Next.js**.
-- Build and output settings come from `vercel.json`; do not override them in the
-  dashboard unless deliberately replacing the checked-in configuration.
-- Node.js: `24.x` (the repository engine range is compatible).
+- Clear dashboard overrides for **Install Command**, **Build Command**, and
+  **Output Directory**. The repository config uses Vercel's automatic npm
+  workspace install, `npm run build`, and `apps/public-web/.next` respectively.
+- Node.js: `24.x` (also pinned by the root `package.json`).
 - Deploy after the Supabase migration has completed.
+
+The npm warning about Vercel's internal `cache-dir` setting is non-fatal and is
+not produced by this repository. The actual install must run once at
+`/vercel/path0`; it must not run from `/vercel/path0/apps/public-web`.
 
 `outputFileTracingIncludes` intentionally does not appear in `vercel.json`; it
 is a Next.js option, not a valid top-level Vercel project key. The API function's
 own files are included with its supported `functions.api/index.js.includeFiles`
 configuration, while the Next app sets its tracing root in `next.config.mjs`.
+
+Before deploying, run:
+
+```bash
+npm ci
+npm run verify:vercel
+npm run build
+```
+
+After `vercel env pull`, `npm run verify:vercel -- --require-env` checks the
+required variable names and production security flags without printing secret
+values.
 
 ## Release smoke test
 

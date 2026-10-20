@@ -41,7 +41,7 @@ The public pages can be rendered by the Next.js app in `apps/public-web` while t
 keeps the public port. One origin, two owners — see `ARCHITECTURE.md` §12.
 
 ```bash
-npm install --prefix apps/public-web   # frontend dependencies (separate lockfile)
+npm install                            # installs backend + the public-web workspace
 npm run build:public                   # production build of the public app
 npm run dev:full                       # Node on :4173 + `next dev` on :4174, one public origin
 # or, against the production build:
@@ -79,6 +79,8 @@ The password is read from the prompt, `--password`, or `NAGARO_NEW_ADMIN_PASSWOR
 | `npm run dev` | Run with `--watch` |
 | `npm run migrate` | Apply pending migrations |
 | `npm run seed` | Seed the catalogue (`-- --demo` adds demo bookings and inquiries) |
+| `npm run provision:postgres` | Migrate Supabase, create the first admin if needed, and seed the production catalogue |
+| `npm run verify:vercel` | Validate the checked-in Vercel layout (`-- --require-env` also checks connected environment names) |
 | `npm run admin:create` | Provision a staff account |
 | `npm test` | Unit + integration tests |
 | `npm run test:concurrency` | Multi-process booking-integrity tests (slower) |

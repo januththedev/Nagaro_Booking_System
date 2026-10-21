@@ -6,6 +6,7 @@ import { clientApiPath } from "../lib/api";
 import { formatDateTime, formatMoney } from "../lib/format";
 import { format } from "../lib/i18n";
 import type { Reservation } from "../lib/types";
+import { useLiveRefresh } from "../lib/useLiveRefresh";
 import { useT } from "./I18nProvider";
 
 export function ManageBookingClient({
@@ -26,6 +27,34 @@ export function ManageBookingClient({
   const [justCancelled, setJustCancelled] = useState(initiallyCancelled);
 
   const isCancelled = reservation.status === "CANCELLED";
+
+  useLiveRefresh(
+    async (signal) => {
+      const res = await fetch(
+        clientApiPath(`/api/public/bookings/${encodeURIComponent(reference)}`),
+        {
+          cache: "no-store",
+          signal,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const body = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        data?: { reservation: Reservation };
+      } | null;
+      if (!res.ok || !body?.ok || !body.data?.reservation) return;
+
+      const next = body.data.reservation;
+      if (reservation.status !== "CANCELLED" && next.status === "CANCELLED") {
+        setJustCancelled(true);
+      }
+      setReservation(next);
+    },
+    { enabled: !cancelling, intervalMs: 8_000, runOnMount: true },
+  );
 
   async function handleCancel(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,6 +121,10 @@ export function ManageBookingClient({
         <article className="hairline-box bg-[var(--paper-card)] p-6 sm:p-10 flex flex-col gap-7">
           <header className="hairline-b pb-5 flex flex-wrap items-start justify-between gap-4">
             <div className="flex flex-col gap-2">
+              <span className="inline-flex items-center gap-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-[var(--oxidized)]" aria-live="polite">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--chartreuse)] shadow-[0_0_0_3px_rgba(202,239,54,.18)]" aria-hidden="true" />
+                {t.status.liveUpdates}
+              </span>
               <span
                 className={`inline-flex w-fit font-mono text-xs uppercase tracking-[0.16em] px-2.5 py-1 ${
                   isCancelled

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { BookingRequest } from "../lib/types";
 import { clientApiPath } from "../lib/api";
 import { format } from "../lib/i18n";
+import { useLiveRefresh } from "../lib/useLiveRefresh";
 import { useLocale, useT } from "./I18nProvider";
 
 export function RequestStatusClient({
@@ -39,6 +40,28 @@ export function RequestStatusClient({
     ? Math.round(parsedAdvance * 100)
     : -1;
   const paymentTotal = fee + Math.max(0, advanceCents);
+
+  useLiveRefresh(
+    async (signal) => {
+      const res = await fetch(
+        clientApiPath(`/api/public/booking-requests/${encodeURIComponent(reference)}`),
+        {
+          cache: "no-store",
+          signal,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const body = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        request?: BookingRequest;
+      } | null;
+      if (res.ok && body?.ok && body.request) setCurrent(body.request);
+    },
+    { enabled: !busy, intervalMs: 8_000, runOnMount: true },
+  );
 
   const money = (cents: number) => `${current.currency} ${(cents / 100).toLocaleString(locale, {
     minimumFractionDigits: 2,
@@ -109,6 +132,10 @@ export function RequestStatusClient({
         <section className="lg:col-span-7">
           <p className="font-mono text-xs uppercase tracking-[.18em] text-[var(--brick)]">
             {format(t.status.eyebrow, { ref: reference })}
+          </p>
+          <p className="inline-flex items-center gap-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-[var(--oxidized)]" aria-live="polite">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--chartreuse)] shadow-[0_0_0_3px_rgba(202,239,54,.18)]" aria-hidden="true" />
+            {t.status.liveUpdates}
           </p>
           <h1 className="font-display text-5xl leading-[.92] sm:text-7xl">{stateLabel[current.status] || current.status}</h1>
           <p className="mt-6 text-lg text-[var(--graphite)]">

@@ -225,6 +225,27 @@ test('Guider keeps each new turn visible and restores keyboard focus', async () 
   assert.match(styles, /overscroll-behavior:\s*contain/);
 });
 
+test('booking and availability state revalidate live without weakening checkout', async () => {
+  const hook = await readApp('lib/useLiveRefresh.ts');
+  const manage = await readApp('components/ManageBookingClient.tsx');
+  const requestStatus = await readApp('components/RequestStatusClient.tsx');
+  const bookingForm = await readApp('components/UnifiedRequestForm.tsx');
+
+  assert.match(hook, /visibilitychange/);
+  assert.match(hook, /addEventListener\("focus"/);
+  assert.match(hook, /addEventListener\("online"/);
+  assert.match(hook, /AbortController/);
+  assert.match(hook, /if \(disposed \|\| running\) return/, 'polls must never overlap');
+
+  assert.match(manage, /useLiveRefresh/);
+  assert.match(manage, /api\/public\/bookings\/\$\{encodeURIComponent\(reference\)\}/);
+  assert.match(requestStatus, /useLiveRefresh/);
+  assert.match(requestStatus, /api\/public\/booking-requests\/\$\{encodeURIComponent\(reference\)\}/);
+  assert.match(bookingForm, /api\/public\/availability/);
+  assert.match(bookingForm, /liveAvailability\.state==="busy"/);
+  assert.match(bookingForm, /api\/public\/bookings/, 'the atomic booking endpoint remains the final write');
+});
+
 test('every photograph carries alternative text', async () => {
   for (const file of await sourceFiles()) {
     const content = await readFile(file, 'utf8');

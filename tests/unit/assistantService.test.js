@@ -76,6 +76,49 @@ test('without a provider key the assistant degrades gracefully and keeps booking
   db.close();
 });
 
+test('without a provider key Guider still answers price questions from live rates', async (t) => {
+  t.after(restoreFetch);
+  const db = createTestDb();
+  seedSpace(db);
+  const calls = stubFetch([{ choices: [{ message: { content: 'should not be used' } }] }]);
+
+  const result = await chatWithVenueAssistant(db, {
+    messages: [{ role: 'user', content: 'How much does the Assistant Room cost?' }],
+    config: {},
+  });
+
+  assert.equal(result.providerAvailable, false);
+  assert.equal(calls.length, 0);
+  assert.match(result.message, /Assistant Room: LKR 2,500\.00 per hour/i);
+  assert.match(result.message, /live catalogue/i);
+  db.close();
+});
+
+test('without a provider key Guider uses active knowledge and never leaks inactive notes', async (t) => {
+  t.after(restoreFetch);
+  const db = createTestDb();
+  const now = Date.now();
+  db.prepare(`INSERT INTO assistant_knowledge
+    (title,slug,markdown,is_active,created_at,updated_at)
+    VALUES (?,?,?,?,?,?)`).run(
+    'Visitor parking', 'visitor-parking', '# Parking\nVisitors may park at the east gate for free.', 1, now, now,
+  );
+  db.prepare(`INSERT INTO assistant_knowledge
+    (title,slug,markdown,is_active,created_at,updated_at)
+    VALUES (?,?,?,?,?,?)`).run(
+    'Internal parking', 'internal-parking', 'The staff gate code is 1234.', 0, now, now,
+  );
+
+  const result = await chatWithVenueAssistant(db, {
+    messages: [{ role: 'user', content: 'Where can visitors park?' }],
+    config: {},
+  });
+
+  assert.match(result.message, /east gate for free/i);
+  assert.ok(!result.message.includes('1234'));
+  db.close();
+});
+
 test('contact details are redacted before conversation text reaches the provider', async (t) => {
   t.after(restoreFetch);
   const db = createTestDb();

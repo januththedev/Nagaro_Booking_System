@@ -236,17 +236,89 @@ function executeTool(db, name, args = {}) {
   return { error: 'Tool not allowed.' };
 }
 
-function localFallback(db) {
+const RATE_UNIT_LABELS = Object.freeze({
+  HOUR: 'hour',
+  HALF_DAY: 'half day',
+  DAY: 'day',
+  WEEK: 'week',
+  MONTH: 'month',
+});
+
+function localRateLabel(rate, currency = 'LKR') {
+  const amount = (Number(rate.amountCents) / 100).toLocaleString('en-LK', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const unit = RATE_UNIT_LABELS[rate.unit] ?? String(rate.unit).toLocaleLowerCase('en').replaceAll('_', ' ');
+  return `${currency} ${amount} per ${unit}`;
+}
+
+function localFallback(db, messages = []) {
+  const query = String(messages.at(-1)?.content ?? '').trim();
+  const queryLower = query.toLocaleLowerCase('en');
   const spaces = db
     .prepare(`SELECT id,code,name,category,capacity,location,open_time,close_time,min_duration_minutes,
       short_description,currency,pricing_unit
-      FROM space WHERE status='PUBLISHED' ORDER BY name LIMIT 4`)
+      FROM space WHERE status='PUBLISHED' ORDER BY name LIMIT 30`)
     .all()
     .map((space) => safeSpace(db, space));
+
+  let knowledge = [];
+  if (query.length >= 2) {
+    try {
+      knowledge = searchAssistantKnowledge(db, query, { limit: 2 });
+    } catch {
+      // A stale deployment may not have run the knowledge migration yet. The
+      // live venue catalogue remains a safe and useful fallback in that case.
+      knowledge = [];
+    }
+  }
+
+  const namedSpaces = spaces.filter((space) => {
+    const name = space.name.toLocaleLowerCase('en');
+    const code = space.code.toLocaleLowerCase('en');
+    return queryLower.includes(name) || queryLower.includes(code);
+  });
+  const relevantSpaces = namedSpaces.length > 0 ? namedSpaces : spaces;
+  const wantsRates = /\b(price|prices|pricing|cost|costs|rate|rates|fee|fees|lkr)\b|how much/i.test(query);
+  const wantsCapacity = /\b(capacity|people|persons|pax|attendees|guests|seat|seats)\b/i.test(query);
+  const needsPublishedGuidance = /\b(park|parking|access|entrance|cater|catering|food|contact|policy|policies|wifi|internet|wheelchair|accessible|equipment|security)\b/i.test(query);
+  const sections = [];
+
+  if (wantsRates && relevantSpaces.length > 0) {
+    const rateLines = relevantSpaces.map((space) => {
+      const rates = space.rates.map((rate) => localRateLabel(rate, space.currency)).join(', ');
+      return rates ? `${space.name}: ${rates}` : `${space.name}: ask TRACE for a current quote`;
+    });
+    sections.push(`Current published rates:\n${rateLines.join('\n')}`);
+  }
+
+  if (wantsCapacity && relevantSpaces.length > 0) {
+    sections.push(`Published capacities:\n${relevantSpaces.map((space) => `${space.name}: up to ${space.capacity} people`).join('\n')}`);
+  }
+
+  if (knowledge.length > 0) {
+    sections.push(knowledge.map((item) => `${item.title}: ${item.excerpt}`).join('\n\n'));
+  } else if (needsPublishedGuidance) {
+    sections.push('I do not have an administrator-published answer for that detail yet. Please confirm it with the TRACE team before relying on it.');
+  }
+
+  if (sections.length === 0 && namedSpaces.length > 0) {
+    sections.push(namedSpaces.map((space) => {
+      const location = space.location ? ` at ${space.location}` : '';
+      return `${space.name}${location} accommodates up to ${space.capacity} people. ${space.description ?? ''}`.trim();
+    }).join('\n\n'));
+  }
+
+  if (sections.length === 0 && spaces.length > 0) {
+    sections.push(`I can help with live rates, capacities and published visitor information. Available spaces include ${spaces.slice(0, 5).map((space) => space.name).join(', ')}.`);
+  }
+
+  const answer = sections.length > 0
+    ? `${sections.join('\n\n')}\n\nAnswered from the live catalogue and TRACE’s published notes while Guider’s conversational service is unavailable.`
+    : 'Guider is temporarily unavailable. The space catalogue and request form still work.';
   return {
-    message: spaces.length
-      ? `I’m having trouble reaching Guider right now. You can still explore ${spaces.map((s) => s.name).join(', ')} — every page shows live availability and a request form.`
-      : 'Guider is temporarily unavailable. The space catalogue and request form still work.',
+    message: answer.slice(0, 3000),
     providerAvailable: false,
   };
 }
@@ -322,7 +394,7 @@ export function validateDraftInput(input = {}) {
 export async function chatWithVenueAssistant(db, { messages, config, signal } = {}) {
   const safe = normalizeMessages(messages);
   const candidate = extractDraftCandidate(messages);
-  if (!config?.apiKey) return { ...localFallback(db), draftCandidate: candidate };
+  if (!config?.apiKey) return { ...localFallback(db, safe), draftCandidate: candidate };
 
   const conversation = [{ role: 'system', content: SYSTEM_PROMPT }, ...safe];
   const controller = new AbortController();
@@ -377,7 +449,7 @@ export async function chatWithVenueAssistant(db, { messages, config, signal } = 
           draftCandidate: candidate,
         };
       }
-      if (!allowTools) return { ...localFallback(db), draftCandidate: candidate };
+      if (!allowTools) return { ...localFallback(db, safe), draftCandidate: candidate };
       conversation.push(msg);
       for (const call of msg.tool_calls.slice(0, Math.max(0, MAX_TOOLS - toolCallsUsed))) {
         let args = {};
@@ -397,9 +469,9 @@ export async function chatWithVenueAssistant(db, { messages, config, signal } = 
       }
       conversation.push({ role: 'system', content: 'Answer now from the tool results already provided. Do not call more tools.' });
     }
-    return { ...localFallback(db), draftCandidate: candidate };
+    return { ...localFallback(db, safe), draftCandidate: candidate };
   } catch {
-    return { ...localFallback(db), draftCandidate: candidate };
+    return { ...localFallback(db, safe), draftCandidate: candidate };
   } finally {
     clearTimeout(timer);
   }

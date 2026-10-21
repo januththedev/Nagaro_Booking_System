@@ -52,7 +52,7 @@ const en = {
   },
   hero: {
     eyebrow: "TRACE Expert City · Maradana, Colombo",
-    headline: "Colombo’s room for bold ideas.",
+    headline: "Colombo Spaces.",
     body: "Book restored boardrooms, studios, desks and the grand auditorium inside Colombo’s red-brick innovation campus—with live availability and instant inventory protection.",
     bookCta: "Book a Space",
     exploreCta: "Explore spaces",

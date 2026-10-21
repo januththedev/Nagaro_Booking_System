@@ -104,6 +104,7 @@ test('the English call to action is labelled exactly "Book a Space" in every lan
   assert.equal(dictionaries.en.chrome.bookCta, 'Book a Space');
   assert.equal(dictionaries.en.hero.bookCta, 'Book a Space');
   assert.equal(dictionaries.en.closing.bookCta, 'Book a Space');
+  assert.equal(dictionaries.en.hero.headline, 'Colombo Spaces.');
 });
 
 test('the assistant is consistently branded Guider and the header uses the polished floating chrome', async () => {

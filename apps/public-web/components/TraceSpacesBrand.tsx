@@ -3,7 +3,7 @@ type TraceSpacesBrandProps = {
   size?: "header" | "footer";
 };
 
-/** The official user-supplied TRACE artwork, paired only with a SPACES label. */
+/** The official user-supplied TRACE artwork, cleaned to transparency and paired with SPACES. */
 export function TraceSpacesBrand({
   className = "",
   size = "header",
@@ -15,10 +15,10 @@ export function TraceSpacesBrand({
     >
       <img
         className="trace-spaces-brand__art"
-        src="/trace-media/brand/trace-logo-original.jpg"
+        src="/trace-media/brand/trace-logo-transparent.png"
         alt=""
-        width="200"
-        height="200"
+        width="184"
+        height="113"
       />
       <span className="trace-spaces-brand__descriptor">SPACES</span>
     </span>

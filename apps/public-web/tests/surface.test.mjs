@@ -81,6 +81,7 @@ test('the arrival viewport carries the Book a Space call to action', async () =>
 test('the header is a brand mark with one action — no navigation menu', async () => {
   const shell = await readApp('components/PublicShell.tsx');
   const brand = await readApp('components/TraceSpacesBrand.tsx');
+  const styles = await readApp('app/globals.css');
   assert.doesNotMatch(shell, /<nav/, 'the public header must not carry a navigation menu');
   assert.doesNotMatch(shell, /menuOpen|hamburger|nav-toggle/i, 'no mobile hamburger menu');
   for (const retired of ['/book', '/booking-request', '/admin']) {
@@ -89,9 +90,10 @@ test('the header is a brand mark with one action — no navigation menu', async 
   assert.match(shell, /href="\/spaces"/, 'the single call to action leads to the catalogue');
   assert.match(shell, /LanguageSwitcher/, 'the language control is part of the minimal header');
   assert.match(shell, /<TraceSpacesBrand\s*\/>/, 'the supplied TRACE identity is used in the header');
-  assert.match(brand, /trace-media\/brand\/trace-logo-original\.jpg/, 'the user-supplied artwork is used without redrawing it');
+  assert.match(brand, /trace-media\/brand\/trace-logo-transparent\.png/, 'the transparent cutout of the user-supplied artwork is used');
   assert.match(brand, />SPACES</);
   assert.doesNotMatch(brand, /<svg|<path/, 'the supplied TRACE mark must not be reconstructed');
+  assert.doesNotMatch(styles, /\.trace-spaces-brand\s*\{[^}]*background:\s*#fff/s, 'the logo must not be pasted into a white rectangle');
   assert.match(shell, /id="main-content"/);
   assert.match(shell, /useT\(\)/, 'shell copy comes from the dictionary');
 });

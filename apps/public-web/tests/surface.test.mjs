@@ -80,6 +80,7 @@ test('the arrival viewport carries the Book a Space call to action', async () =>
 
 test('the header is a brand mark with one action — no navigation menu', async () => {
   const shell = await readApp('components/PublicShell.tsx');
+  const brand = await readApp('components/TraceSpacesBrand.tsx');
   assert.doesNotMatch(shell, /<nav/, 'the public header must not carry a navigation menu');
   assert.doesNotMatch(shell, /menuOpen|hamburger|nav-toggle/i, 'no mobile hamburger menu');
   for (const retired of ['/book', '/booking-request', '/admin']) {
@@ -87,6 +88,10 @@ test('the header is a brand mark with one action — no navigation menu', async 
   }
   assert.match(shell, /href="\/spaces"/, 'the single call to action leads to the catalogue');
   assert.match(shell, /LanguageSwitcher/, 'the language control is part of the minimal header');
+  assert.match(shell, /<TraceSpacesBrand\s*\/>/, 'the supplied TRACE identity is used in the header');
+  assert.match(brand, />TRACE</);
+  assert.match(brand, />SPACES</);
+  assert.match(brand, /trace-spaces-brand__orbit/, 'the angular TRACE orbit is part of the lockup');
   assert.match(shell, /id="main-content"/);
   assert.match(shell, /useT\(\)/, 'shell copy comes from the dictionary');
 });

@@ -187,11 +187,23 @@ export function VenueAssistant() {
         </section>
       ) : null}
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-label={open ? t.assistant.launcherClose : t.assistant.launcherOpen}
+        title={open ? t.assistant.launcherClose : t.assistant.launcherOpen}
         className="guider-launcher"
       >
-        {open ? t.assistant.launcherClose : t.assistant.launcherOpen}
+        {open ? (
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="guider-launcher__icon">
+            <path d="M6.75 6.75 17.25 17.25M17.25 6.75 6.75 17.25" />
+          </svg>
+        ) : (
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="guider-launcher__icon">
+            <path d="M5.25 17.25 3.75 20.5l4.35-1.3c1.16.52 2.49.8 3.9.8 4.97 0 9-3.58 9-8s-4.03-8-9-8-9 3.58-9 8c0 1.98.81 3.8 2.25 5.25Z" />
+            <path d="M8.25 12h.01M12 12h.01M15.75 12h.01" className="guider-launcher__dots" />
+          </svg>
+        )}
       </button>
     </div>
   );

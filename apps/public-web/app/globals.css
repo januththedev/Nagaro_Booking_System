@@ -408,22 +408,32 @@ svg {
 
 .guider-launcher {
   display: inline-flex;
-  min-height: 3rem;
+  width: 3.5rem;
+  height: 3.5rem;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.15rem;
+  padding: 0;
   border: 1px solid rgba(18, 21, 19, 0.65);
-  border-radius: 0.85rem;
+  border-radius: 50%;
   background: var(--chartreuse);
   color: var(--ink);
   box-shadow: 0 14px 36px rgba(6, 9, 7, 0.22);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
   cursor: pointer;
   transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.guider-launcher__icon {
+  width: 1.55rem;
+  height: 1.55rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.guider-launcher__dots {
+  stroke-width: 2.5;
 }
 
 .guider-launcher:hover {

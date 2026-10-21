@@ -110,6 +110,9 @@ test('the assistant is consistently branded Guider and the header uses the polis
   assert.match(styles, /\.premium-nav\s*\{/);
   assert.match(styles, /\.guider-panel\s*\{/);
   assert.match(assistant, /guider-panel/);
+  assert.match(assistant, /guider-launcher__icon/);
+  assert.match(assistant, /aria-label=\{open \? t\.assistant\.launcherClose : t\.assistant\.launcherOpen\}/);
+  assert.doesNotMatch(assistant, />\s*\{open \? t\.assistant\.launcherClose : t\.assistant\.launcherOpen\}\s*</, 'the launcher label must not be visibly rendered');
   for (const locale of ['en', 'si', 'ta']) {
     assert.equal(dictionaries[locale].assistant.title, 'Guider');
     assert.match(dictionaries[locale].assistant.launcherOpen, /Guider/);

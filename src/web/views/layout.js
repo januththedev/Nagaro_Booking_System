@@ -104,7 +104,7 @@ function documentHead({ title, description }) {
 <title>${title}</title>
 ${description ? html`<meta name="description" content="${description}">` : ''}
 <link rel="stylesheet" href="/assets/styles.css">
-<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">`;
+<link rel="icon" href="/assets/trace-media/brand/trace-logo-original.jpg" type="image/jpeg">`;
 }
 
 export function publicShell({

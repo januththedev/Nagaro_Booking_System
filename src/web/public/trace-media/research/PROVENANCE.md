@@ -1,5 +1,11 @@
 # TRACE official media inventory
 
+## Brand identity
+
+| Local file | Source | Usage |
+|---|---|---|
+| `../brand/trace-logo-original.jpg` | Supplied directly by the TRACE Spaces project owner on 2026-10-21. | Exact, unredrawn TRACE logo used by the public header, footer and application icon; `SPACES` is added separately as live text. |
+
 Retrieved 2026-10-19 from pages and media endpoints on `tracesrilanka.lk`. The website does not publish a general reuse license, so these files should be treated as TRACE-owned/TRACE-authorized project assets, not public-domain or stock photography.
 
 ## TRACE Spaces

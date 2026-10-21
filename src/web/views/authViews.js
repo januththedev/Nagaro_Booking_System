@@ -15,7 +15,7 @@ export function renderLoginPage({
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Operations sign in · TRACE Spaces</title>
   <link rel="stylesheet" href="/assets/styles.css">
-  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/trace-media/brand/trace-logo-original.jpg" type="image/jpeg">
 </head>
 <body class="page page--public page--auth">
 <a class="skip-link" href="#main">Skip to main content</a>

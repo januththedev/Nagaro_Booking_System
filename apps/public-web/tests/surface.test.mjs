@@ -89,9 +89,9 @@ test('the header is a brand mark with one action — no navigation menu', async 
   assert.match(shell, /href="\/spaces"/, 'the single call to action leads to the catalogue');
   assert.match(shell, /LanguageSwitcher/, 'the language control is part of the minimal header');
   assert.match(shell, /<TraceSpacesBrand\s*\/>/, 'the supplied TRACE identity is used in the header');
-  assert.match(brand, />TRACE</);
+  assert.match(brand, /trace-media\/brand\/trace-logo-original\.jpg/, 'the user-supplied artwork is used without redrawing it');
   assert.match(brand, />SPACES</);
-  assert.match(brand, /trace-spaces-brand__orbit/, 'the angular TRACE orbit is part of the lockup');
+  assert.doesNotMatch(brand, /<svg|<path/, 'the supplied TRACE mark must not be reconstructed');
   assert.match(shell, /id="main-content"/);
   assert.match(shell, /useT\(\)/, 'shell copy comes from the dictionary');
 });

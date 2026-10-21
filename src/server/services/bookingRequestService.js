@@ -198,6 +198,55 @@ export function approveBookingRequest(db,{actor,requestId,now=Date.now()}={}) {
   });
 }
 
+/**
+ * Customer-facing checkout with no staff approval step.
+ *
+ * A disabled fee policy confirms the reservation immediately. When a
+ * registration fee is enabled, the same transaction creates an inventory
+ * hold and moves checkout straight to payment. In both cases allocation runs
+ * under the canonical write transaction and database overlap constraint.
+ */
+export function createSelfServiceBooking(db, input = {}) {
+  const created = createBookingRequest(db, input);
+  if (created.request.status !== BOOKING_REQUEST_STATUS.REQUESTED) return created;
+
+  const row = db.prepare('SELECT id FROM booking_request WHERE reference=?').get(created.request.reference);
+  try {
+    approveBookingRequest(db, {
+      actor: publicSystemActor(db),
+      requestId: row?.id,
+      now: Number(input.now ?? Date.now()),
+    });
+  } catch (error) {
+    // A simultaneous checkout may win the allocation between the public
+    // availability preview and this final write. Keep the losing attempt out
+    // of the staff approval queue and return the canonical conflict instead.
+    if (!created.idempotent && row?.id) {
+      withWriteTransaction(db, () => {
+        const now = Number(input.now ?? Date.now());
+        db.prepare(`UPDATE booking_request
+          SET status=?,rejected_at=?,rejection_reason=?,updated_at=?
+          WHERE id=? AND status=?`).run(
+          BOOKING_REQUEST_STATUS.REJECTED,
+          now,
+          'The selected time became unavailable during checkout.',
+          now,
+          row.id,
+          BOOKING_REQUEST_STATUS.REQUESTED,
+        );
+      });
+    }
+    throw error;
+  }
+
+  const checkout = db.prepare(`${SELECT} WHERE br.id=?`).get(row.id);
+  return {
+    request: hydrate(db, checkout),
+    manageToken: created.manageToken,
+    idempotent: created.idempotent,
+  };
+}
+
 export function rejectBookingRequest(db,{actor,requestId,reason,now=Date.now()}={}) {
   const why=requiredString(reason,{field:'reason',max:1000});
   if(!actor?.id) throw validationError('An authenticated staff actor is required.');

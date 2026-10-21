@@ -31,6 +31,38 @@
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Libre Caslon and IBM Plex are intentionally Latin-first. Native-script
+   pages use platform Sinhala/Tamil faces so curves, spacing and conjuncts
+   remain legible instead of inheriting mismatched fallback metrics. */
+:root:lang(si) {
+  --font-display: "Noto Serif Sinhala", "Nirmala UI", serif;
+  --font-sans: "Noto Sans Sinhala", "Nirmala UI", sans-serif;
+  --font-mono: "Noto Sans Sinhala", "Nirmala UI", sans-serif;
+}
+
+:root:lang(ta) {
+  --font-display: "Noto Serif Tamil", "Nirmala UI", "Latha", serif;
+  --font-sans: "Noto Sans Tamil", "Nirmala UI", "Latha", sans-serif;
+  --font-mono: "Noto Sans Tamil", "Nirmala UI", "Latha", sans-serif;
+}
+
+:root:lang(si) h1,
+:root:lang(si) h2,
+:root:lang(si) h3,
+:root:lang(si) .font-display,
+:root:lang(ta) h1,
+:root:lang(ta) h2,
+:root:lang(ta) h3,
+:root:lang(ta) .font-display {
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+:root:lang(si) .font-mono,
+:root:lang(ta) .font-mono {
+  letter-spacing: 0.04em !important;
+}
+
 *,
 *::before,
 *::after {
@@ -389,6 +421,39 @@ svg {
 
 .guider-message--user {
   border-radius: 0.9rem 0.9rem 0.25rem 0.9rem;
+}
+
+.guider-messages {
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-color: rgba(18, 21, 19, 0.28) transparent;
+  scrollbar-width: thin;
+}
+
+.guider-typing {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.9rem 0.9rem 0.9rem 0.25rem;
+  background: var(--concrete);
+}
+
+.guider-typing > span:not(.sr-only) {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--graphite);
+  animation: guider-pulse 1s ease-in-out infinite;
+}
+
+.guider-typing > span:nth-child(3) { animation-delay: 120ms; }
+.guider-typing > span:nth-child(4) { animation-delay: 240ms; }
+
+@keyframes guider-pulse {
+  0%, 70%, 100% { opacity: 0.28; transform: translateY(0); }
+  35% { opacity: 1; transform: translateY(-0.15rem); }
 }
 
 .guider-starter {

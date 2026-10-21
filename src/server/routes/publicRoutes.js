@@ -39,8 +39,9 @@ import {
   getInquiryByReference, submitInquiry, withdrawInquiry,
 } from '../services/inquiryService.js';
 import {
-  cancelPublicBooking, createPublicBooking, getPublicBooking,
+  cancelPublicBooking, getPublicBooking,
 } from '../services/publicBookingService.js';
+import { createSelfServiceBooking } from '../services/bookingRequestService.js';
 import {
   publicErrorPage, publicSpaceProjection, renderBookingReceivedPage, renderBookingRequestPage,
   renderHomePage, renderPublicBookingConfirmedPage, renderPublicBookingManagePage,
@@ -54,8 +55,8 @@ const DIRECTORY_PAGE_SIZE_MAX = 48;
 const DIRECTORY_FETCH_LIMIT = 500;
 const PUBLIC_SORTS = ['name', 'capacity', 'price'];
 const FEATURED_LIMIT = 6;
-const CAVEAT = 'Provisional only — this check does not hold the space. '
-  + 'A booking is confirmed only once Nagaro staff confirm it.';
+const CAVEAT = 'Availability is live but not held until checkout. '
+  + 'The final booking transaction checks the inventory again before confirming.';
 
 /* ------------------------------------------------------------------- parsing */
 
@@ -327,7 +328,7 @@ function requestHrefFor(space, values) {
 function formValues(body) {
   const source = body ?? {};
   return {
-    customer_name: textValue(source.customer_name ?? source.customerName ?? source.name, 160),
+    customer_name: textValue(source.customer_name ?? source.customerName ?? source.full_name ?? source.fullName ?? source.name, 160),
     email: textValue(source.email, 254),
     phone: textValue(source.phone, 40),
     organization: textValue(source.organization, 160),
@@ -337,7 +338,7 @@ function formValues(body) {
     end_time: clockValue(source.end_time ?? source.endTime ?? source.end),
     start_at: textValue(source.requested_start_at ?? source.start_at ?? source.requestedStartAt ?? source.startAt, 40),
     end_at: textValue(source.requested_end_at ?? source.end_at ?? source.requestedEndAt ?? source.endAt, 40),
-    desks: textValue(source.desks ?? source.desk_quantity ?? source.deskQuantity, 6),
+    desks: textValue(source.desks ?? source.desk_quantity ?? source.deskQuantity ?? source.unit_count ?? source.unitCount, 6),
     attendees: textValue(source.attendees, 8),
     message: textValue(source.message ?? source.purpose, 2000),
   };
@@ -459,16 +460,38 @@ function protectCapabilityResponse(ctx) {
   ctx.setHeader('Cache-Control', 'no-store, private');
 }
 
-function publicBookingResponse(result) {
+function selfServiceBookingResponse(result) {
+  const request = result.request;
+  const confirmed = request.status === 'CONFIRMED' && request.reservationReference;
+  const reference = confirmed ? request.reservationReference : request.reference;
+  const destination = confirmed ? '/book/confirmed' : '/book/manage';
   const managePath = result.manageToken
-    ? `/book/manage?ref=${encodeURIComponent(result.reservation.reference)}`
-      + `&token=${encodeURIComponent(result.manageToken)}`
+    ? `${destination}?ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(result.manageToken)}`
     : null;
   return {
-    reservation: result.reservation,
+    request,
     manageToken: result.manageToken,
     managePath,
+    outcome: confirmed ? 'CONFIRMED' : 'PAYMENT_REQUIRED',
     idempotent: result.idempotent,
+  };
+}
+
+function reservationFromCheckout(request) {
+  return {
+    reference: request.reservationReference ?? request.reference,
+    status: request.status,
+    spaceCode: request.spaceCode,
+    spaceName: request.spaceName,
+    startAt: request.startAt,
+    endAt: request.endAt,
+    unitCount: request.unitCount,
+    attendees: request.attendees,
+    billingUnit: request.billingUnit,
+    billingQuantity: request.billingQuantity,
+    rateCents: request.rateCents,
+    totalCents: request.venueTotalCents,
+    currency: request.currency,
   };
 }
 
@@ -646,10 +669,10 @@ export function registerPublicRoutes(router, deps = {}) {
     }));
   });
 
-  /* ------------------------------------------- retired: direct guest booking
-   * Immediate self-confirmation is retired: every customer booking now travels
-   * request -> staff approval -> booking-fee payment -> confirmation.
-   * Legacy capability links keep working; only new creation is refused. */
+  /* ------------------------------------------------ direct guest booking
+   * Checkout allocates inventory immediately under the canonical transaction.
+   * A configured registration fee creates a guarded payment hold; otherwise
+   * the reservation is confirmed in the same checkout response. */
 
   const retirePublicFlow = (ctx) => {
     if (ctx.wantsJson) {
@@ -657,8 +680,8 @@ export function registerPublicRoutes(router, deps = {}) {
         ok: false,
         error: {
           code: 'RETIRED',
-          message: 'Direct guest booking has been retired. Choose a published space and send a booking request instead — staff approve it and any configured registration fee is paid afterwards.',
-          details: { use: '/api/public/booking-requests' },
+          message: 'This legacy form has been retired. Choose a published space and use the secure booking checkout instead.',
+          details: { use: '/spaces' },
         },
       }, 410);
       return;
@@ -673,8 +696,57 @@ export function registerPublicRoutes(router, deps = {}) {
   });
 
   router.post('/book', async (ctx) => {
-    await ctx.readBody();
-    retirePublicFlow(ctx);
+    const body = await ctx.readBody();
+    const values = formValues(body);
+    const spaces = selectPublicSpaces(db, {}).published.map(projectSpace);
+    const renderProblems = (error) => {
+      const problems = problemStrings(error?.details);
+      ctx.html(renderSelfBookingPage({
+        spaces,
+        values: { ...values, today: businessDateKey(clock()) },
+        errors: error?.details ?? null,
+        problems: problems.length ? problems : [error?.message ?? 'Please check the booking details.'],
+        formToken: textValue(body.form_token, 120) || newPublicBookingToken(),
+        status: error?.status ?? 422,
+      }), error?.status ?? 422);
+    };
+
+    try {
+      protectCapabilityResponse(ctx);
+      enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
+      const result = createSelfServiceBooking(
+        db,
+        publicBookingInput(db, values, publicBookingFormToken(ctx, body), clock()),
+      );
+      const response = selfServiceBookingResponse(result);
+
+      if (ctx.wantsJson) {
+        ctx.json({ ok: true, data: response }, result.idempotent ? 200 : 201);
+        return;
+      }
+      if (response.managePath) {
+        redirect(ctx.res, response.managePath, 303);
+        ctx.responded = true;
+        return;
+      }
+      if (response.outcome === 'CONFIRMED') {
+        ctx.html(renderPublicBookingConfirmedPage({
+          reservation: reservationFromCheckout(result.request),
+          managePath: null,
+        }), 200);
+        return;
+      }
+      ctx.html(publicErrorPage({
+        status: 409,
+        title: 'The booking is awaiting payment',
+        message: `Booking ${result.request.reference} is holding the selected time, but this retry cannot reopen its private payment link.`,
+        hint: 'Use the original private link or contact the TRACE operations desk with the booking reference.',
+      }), 409);
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      if (ctx.wantsJson) throw error;
+      renderProblems(error);
+    }
   });
 
   router.get('/book/confirmed', async (ctx) => {
@@ -902,8 +974,13 @@ export function registerPublicRoutes(router, deps = {}) {
   });
 
   router.post('/api/public/bookings', async (ctx) => {
-    await ctx.readBody();
-    retirePublicFlow(ctx);
+    protectCapabilityResponse(ctx);
+    const body = await ctx.readBody();
+    const values = formValues(body);
+    const formToken = publicBookingFormToken(ctx, body);
+    enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
+    const result = createSelfServiceBooking(db, publicBookingInput(db, values, formToken, clock()));
+    ctx.json({ ok: true, data: selfServiceBookingResponse(result) }, result.idempotent ? 200 : 201);
   });
 
   router.get('/api/public/bookings/:reference', async (ctx) => {

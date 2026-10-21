@@ -5,7 +5,7 @@ import { createTestActor, createTestDb } from '../helpers/testDb.js';
 import { parseBookingWindow } from '../../src/server/domain/validation.js';
 import {
   approveBookingRequest, createBookingRequest, createPayHereCheckout,
-  expireBookingHolds, getBookingRequest, processPayHereNotification,
+  createSelfServiceBooking, expireBookingHolds, getBookingRequest, processPayHereNotification,
   rejectBookingRequest,
 } from '../../src/server/services/bookingRequestService.js';
 import { createPublicBooking } from '../../src/server/services/publicBookingService.js';
@@ -34,6 +34,44 @@ test('request is idempotent, consumes no inventory, and rejection remains termin
   const rejected=rejectBookingRequest(db,{actor,requestId:db.prepare('SELECT id FROM booking_request').get().id,reason:'Schedule unsuitable'});
   assert.equal(rejected.status,'REJECTED');
   assert.throws(()=>approveBookingRequest(db,{actor,requestId:db.prepare('SELECT id FROM booking_request').get().id}),e=>e?.status===409);
+  db.close();
+});
+
+test('self-service checkout confirms immediately and rejects an overlapping checkout',()=>{
+  const db=createTestDb();const spaceId=seedSpace(db);
+  const first=createSelfServiceBooking(db,input(spaceId,'direct:first'));
+  assert.equal(first.request.status,'CONFIRMED');
+  assert.match(first.request.reservationReference,/^NG-/);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM reservation WHERE status='CONFIRMED'").get().c,1);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM occupancy WHERE status='ACTIVE'").get().c,1);
+
+  const retry=createSelfServiceBooking(db,input(spaceId,'direct:first'));
+  assert.equal(retry.idempotent,true);
+  assert.equal(retry.request.reservationReference,first.request.reservationReference);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM reservation WHERE status='CONFIRMED'").get().c,1);
+
+  assert.throws(
+    ()=>createSelfServiceBooking(db,{...input(spaceId,'direct:second'),customer:{fullName:'Second Guest',email:'second@example.com'}}),
+    (error)=>error?.code==='DOUBLE_BOOKING_CONFLICT',
+  );
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM reservation WHERE status='CONFIRMED'").get().c,1);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM occupancy WHERE status='ACTIVE'").get().c,1);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM booking_request WHERE status='REJECTED'").get().c,1);
+  db.close();
+});
+
+test('self-service checkout skips staff approval and holds inventory when a fee is enabled',()=>{
+  const db=createTestDb();const spaceId=seedSpace(db);
+  db.prepare("UPDATE booking_fee_policy SET mode='FIXED',fixed_cents=100000,payment_window_minutes=15 WHERE id=1").run();
+  const checkout=createSelfServiceBooking(db,input(spaceId,'direct:fee'));
+  assert.equal(checkout.request.status,'APPROVED_AWAITING_PAYMENT');
+  assert.equal(checkout.request.payment.bookingFeeCents,100000);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM occupancy WHERE status='ACTIVE'").get().c,1);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM booking_request WHERE status='REQUESTED'").get().c,0);
+  assert.throws(
+    ()=>createSelfServiceBooking(db,{...input(spaceId,'direct:fee-conflict'),customer:{fullName:'Second Guest',email:'second@example.com'}}),
+    (error)=>error?.code==='DOUBLE_BOOKING_CONFLICT',
+  );
   db.close();
 });
 

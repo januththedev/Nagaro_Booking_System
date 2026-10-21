@@ -174,7 +174,7 @@ console.log('\n[1] one origin, two owners');
   const requestHtml = await text(requestPage);
   check(`GET /spaces/${venue.code}/book -> 200 from Next.js`, requestPage.ok && isNextPage(requestHtml), `got ${requestPage.status}`);
   check('the unified request form is server-rendered', requestHtml.includes('name="form_token"') && requestHtml.includes('name="email"'));
-  check('the request form keeps a no-JavaScript fallback', /action="\/spaces\/[^"]+\/book"/.test(requestHtml));
+  check('the booking form keeps a no-JavaScript fallback', requestHtml.includes('action="/book"') && requestHtml.includes('name="space_code"'));
 
   const missing = await fetch(`${base}/a-page-that-does-not-exist`);
   const missingHtml = await text(missing);
@@ -195,8 +195,8 @@ console.log('\n[1b] every page is complete before any JavaScript runs');
 
   const requestHtml = await text(await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`));
   check('request fields are server-rendered', ['name="date"', 'name="start_time"', 'name="end_time"', 'name="full_name"', 'name="email"'].every((field) => requestHtml.includes(field)));
-  check('the request form states approval happens before confirmation', /approv/i.test(requestHtml));
-  check('no page promises immediate confirmation', !/confirm(s)? your reservation immediately|confirmed instantly/i.test(requestHtml));
+  check('the booking form explains the final inventory recheck', /rechecks availability|locks the selected inventory atomically/i.test(requestHtml));
+  check('the booking form does not require staff approval', !/staff approval|awaiting staff review/i.test(requestHtml));
 }
 
 /* ------------------------------------- 2. node-owned surfaces survive */
@@ -243,7 +243,7 @@ console.log('\n[3] capability links are unshareable through the gateway');
 
 /* --------------------------------- 4. no-JavaScript form fallbacks */
 
-console.log('\n[4] the no-JavaScript request form reaches the booking runtime');
+console.log('\n[4] the no-JavaScript booking form reaches the booking runtime');
 {
   const requestHtml = await text(await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`));
   const formToken = formTokenOf(requestHtml);
@@ -255,6 +255,7 @@ console.log('\n[4] the no-JavaScript request form reaches the booking runtime');
 
   const form = new URLSearchParams({
     form_token: formToken,
+    space_code: venue.code,
     date: day,
     start_time: '10:00',
     end_time: '12:00',
@@ -267,78 +268,90 @@ console.log('\n[4] the no-JavaScript request form reaches the booking runtime');
     purpose: 'no-JavaScript fallback',
   });
 
-  const posted = await fetch(`${base}/spaces/${encodeURIComponent(venue.code)}/book`, {
+  const posted = await fetch(`${base}/book`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form,
     redirect: 'manual',
   });
   const managePath = locationOf(posted);
-  check('POST /spaces/:code/book -> 303 handled by node', posted.status === 303, `got ${posted.status} ${managePath}`);
-  check('the request redirects to its private status page', /^\/book\/manage\?ref=REQ-\d{4}-\d{5}&token=/.test(managePath), managePath);
+  check('POST /book -> 303 handled by node', posted.status === 303, `got ${posted.status} ${managePath}`);
+  check('the booking redirects to its private receipt', /^\/book\/confirmed\?ref=NG-\d{4}-\d{5}&token=/.test(managePath), managePath);
 
   const status = await fetch(base + managePath);
   const statusHtml = await text(status);
-  check('the request status page renders in Next.js', status.ok && isNextPage(statusHtml), `got ${status.status}`);
-  check('the status page is honest about staff review', /Awaiting staff review/i.test(statusHtml));
-  check('the status page is no-store', (status.headers.get('cache-control') || '').includes('no-store'));
+  check('the confirmed booking page renders in Next.js', status.ok && isNextPage(statusHtml), `got ${status.status}`);
+  check('the receipt confirms the booking', /confirmed/i.test(statusHtml));
+  check('the receipt is no-store', (status.headers.get('cache-control') || '').includes('no-store'));
+
+  const privateUrl = new URL(managePath, base);
+  const reference = privateUrl.searchParams.get('ref');
+  const token = privateUrl.searchParams.get('token');
+  const cancel = await fetch(`${base}/api/public/bookings/${encodeURIComponent(reference)}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason: 'cutover no-JavaScript cleanup' }),
+  });
+  check('the no-JavaScript test booking can be cancelled -> 200', cancel.status === 200, `got ${cancel.status}`);
 }
 
-/* --------------------------------- 5. unified request contract through the gateway */
+/* --------------------------------- 5. atomic self-service booking through the gateway */
 
-console.log('\n[5] the unified request contract crosses the gateway');
+console.log('\n[5] atomic self-service booking crosses the gateway');
 {
   const day = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date(Date.now() + 42 * 86_400_000));
 
-  const create = await fetch(`${base}/api/public/booking-requests`, {
+  const bookingInput = {
+    formToken: `cutover-e2e-${Date.now()}`,
+    spaceCode: venue.code,
+    date: day,
+    startTime: '10:00',
+    endTime: '12:00',
+    unitCount: '1',
+    attendees: '3',
+    fullName: 'Gateway Guest',
+    email: `gateway-${Date.now()}@public.test`,
+    phone: '+94 77 555 6666',
+    organization: 'Gateway Labs',
+    purpose: 'direct booking through the gateway',
+  };
+  const create = await fetch(`${base}/api/public/bookings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      formToken: `cutover-e2e-${Date.now()}`,
-      spaceCode: venue.code,
-      date: day,
-      startTime: '10:00',
-      endTime: '12:00',
-      unitCount: '1',
-      attendees: '3',
-      fullName: 'Gateway Guest',
-      email: `gateway-${Date.now()}@public.test`,
-      phone: '+94 77 555 6666',
-      organization: 'Gateway Labs',
-      purpose: 'request through the gateway',
-    }),
+    body: JSON.stringify(bookingInput),
   });
   const created = await create.json().catch(() => null);
-  const jsonReference = created?.request?.reference ?? null;
-  const jsonToken = created?.manageToken ?? null;
+  const jsonReference = created?.data?.request?.reservationReference ?? null;
+  const jsonToken = created?.data?.manageToken ?? null;
 
-  check('POST /api/public/booking-requests -> 201', create.status === 201, `got ${create.status} ${JSON.stringify(created)?.slice(0, 200)}`);
-  check('the request returns a reference and capability', Boolean(jsonReference && jsonToken), JSON.stringify(created)?.slice(0, 200));
-  check('the request is no-store', (create.headers.get('cache-control') || '').includes('no-store'));
-  check('the request never leaks customer PII', !Object.hasOwn(created?.request ?? {}, 'customer'));
+  check('POST /api/public/bookings -> 201', create.status === 201, `got ${create.status} ${JSON.stringify(created)?.slice(0, 200)}`);
+  check('checkout confirms without staff approval', created?.data?.outcome === 'CONFIRMED', JSON.stringify(created)?.slice(0, 200));
+  check('the booking returns a reference and capability', Boolean(jsonReference && jsonToken), JSON.stringify(created)?.slice(0, 200));
+  check('the booking is no-store', (create.headers.get('cache-control') || '').includes('no-store'));
+  check('the booking never leaks customer PII', !Object.hasOwn(created?.data?.request ?? {}, 'customer'));
 
-  const manage = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(jsonReference)}`, {
+  const manage = await fetch(`${base}/api/public/bookings/${encodeURIComponent(jsonReference)}`, {
     headers: { Authorization: `Bearer ${jsonToken}`, Accept: 'application/json' },
   });
   check('the capability lookup crosses the gateway -> 200', manage.status === 200, `got ${manage.status}`);
 
-  const retired = await fetch(`${base}/api/public/bookings`, {
+  const overlap = await fetch(`${base}/api/public/bookings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ form_token: 'retired-through-gateway' }),
+    body: JSON.stringify({ ...bookingInput, formToken: `cutover-overlap-${Date.now()}`, email: `overlap-${Date.now()}@public.test` }),
   });
-  check('the retired direct-checkout API -> 410 through the gateway', retired.status === 410, `got ${retired.status}`);
+  check('an overlapping checkout is rejected -> 409', overlap.status === 409, `got ${overlap.status}`);
 
-  const cancel = await fetch(`${base}/api/public/booking-requests/${encodeURIComponent(jsonReference)}/cancel`, {
+  const cancel = await fetch(`${base}/api/public/bookings/${encodeURIComponent(jsonReference)}/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${jsonToken}` },
     body: JSON.stringify({ reason: 'changed plans' }),
   });
   const cancelled = await cancel.json().catch(() => null);
   check('cancelling through the gateway -> 200', cancel.status === 200, `got ${cancel.status}`);
-  check('the cancelled request is marked CANCELLED', cancelled?.request?.status === 'CANCELLED');
+  check('the cancelled booking is marked CANCELLED', cancelled?.data?.reservation?.status === 'CANCELLED');
 }
 
 /* ------------------------------------------------- 6. instant rollback */

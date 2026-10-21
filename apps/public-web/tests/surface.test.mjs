@@ -4,10 +4,10 @@
  * These are the rules review would otherwise re-check by hand on every change:
  * no horizontal rails or numbered markers, a hero that paints before WebGL is
  * ready and gives up on weak devices, motion that never fights the user, one
- * unified request flow (no retired dual channel), a navigation-free header
+ * unified direct-booking flow (no retired dual channel), a navigation-free header
  * whose single call to action is labelled exactly "Book a Space", and copy
- * that never promises a reservation is confirmed before staff approval and any
- * configured registration fee.
+ * that explains checkout's final atomic inventory check and any configured
+ * registration fee.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -156,40 +156,65 @@ test('smooth scrolling is opt-in and GSAP only animates compositor properties', 
   assert.doesNotMatch(motion, /scroll-behavior:\s*smooth/, 'native smooth scrolling stays with CSS, not JS');
 });
 
-test('the unified request form reaches the booking engine with and without JavaScript', async () => {
+test('the unified form reaches direct booking with and without JavaScript', async () => {
   const form = await readApp('components/UnifiedRequestForm.tsx');
 
-  assert.match(form, /fetch\(clientApiPath\(['"]\/api\/public\/booking-requests['"]\)/);
+  assert.match(form, /fetch\(clientApiPath\(['"]\/api\/public\/bookings['"]\)/);
   assert.match(form, /["']Content-Type["']:\s*["']application\/json["']/);
   assert.match(form, /formToken/, 'submissions are idempotent');
   assert.match(form, /method="post"/);
-  assert.match(form, /action=\{`\/spaces\//, 'without JavaScript the form posts back to the Node runtime');
+  assert.match(form, /action="\/book"/, 'without JavaScript the form posts to the direct booking route');
   assert.match(form, /name="form_token"/);
+  assert.match(form, /name="space_code"/);
   assert.match(form, /role="alert"/);
   assert.match(form, /name="email"/);
   assert.match(form, /name="date"/);
 });
 
-test('no surface promises a reservation is confirmed before approval and payment', async () => {
+test('public checkout copy promises booking, not staff approval', async () => {
+  const form = await readApp('components/UnifiedRequestForm.tsx');
+  assert.equal(dictionaries.en.request.submit, 'Confirm booking');
+  assert.equal(dictionaries.en.venue.requestCta, 'Book this space');
+  assert.match(dictionaries.en.request.noticeBody, /locks the selected inventory atomically/i);
+  assert.doesNotMatch(JSON.stringify(dictionaries.en.request), /request only|staff approval|send request/i);
+  assert.doesNotMatch(form, /api\/public\/booking-requests/);
+});
+
+test('no surface promises confirmation before checkout verifies inventory and any required payment', async () => {
   const promise = /(confirm(s|ed)? (your )?reservation immediately|immediate(ly)? confirm|book(ed)? instantly|confirmed instantly|pay later,? confirm now)/i;
   const contradiction = /(staff|team|our office|front desk)[^.]{0,40}(will|must) (now )?confirm( your)? reservation immediately/i;
   for (const file of await sourceFiles()) {
     const content = await readFile(file, 'utf8');
     const label = file.slice(appRoot.length + 1);
     assert.doesNotMatch(content, promise, `${label} over-promises confirmation`);
-    assert.doesNotMatch(content, contradiction, `${label} contradicts the approval flow`);
+    assert.doesNotMatch(content, contradiction, `${label} invents a staff confirmation step`);
     assert.doesNotMatch(content, /concierge/i, `${label} must not resurrect the retired concierge channel`);
-    assert.doesNotMatch(content, /Direct booking console/i, `${label} must not describe request-only flow as direct booking`);
+    assert.doesNotMatch(content, /Direct booking console/i, `${label} uses retired implementation language`);
   }
 });
 
-test('the request form states that staff review happens before anything is booked', async () => {
+test('the booking form explains the atomic checkout boundary', async () => {
   const en = dictionaries.en;
-  assert.match(en.request.noticeBody, /approval|staff/i);
-  assert.match(en.request.formEyebrow, /No payment yet/i);
-  assert.match(en.status.bodyRequested, /approves/i);
+  assert.match(en.request.noticeBody, /rechecks availability|atomically/i);
+  assert.match(en.request.formEyebrow, /Direct booking/i);
+  assert.match(en.venue.consoleNote, /confirms immediately|held securely/i);
   assert.match(en.assistant.intro, /prepare your booking details/i);
   assert.doesNotMatch(en.assistant.intro, /confirmed|reserved/i, 'the assistant intro must not claim a booking');
+});
+
+test('Guider keeps each new turn visible and restores keyboard focus', async () => {
+  const assistant = await readApp('components/VenueAssistant.tsx');
+  const styles = await readApp('app/globals.css');
+
+  assert.match(assistant, /messageListRef/);
+  assert.match(assistant, /list\.scrollTo\(\{ top: list\.scrollHeight/);
+  assert.match(assistant, /prefers-reduced-motion: reduce/);
+  assert.match(assistant, /role="log"/);
+  assert.match(assistant, /aria-busy=\{busy\}/);
+  assert.match(assistant, /launcherRef\.current\?\.focus\(\)/);
+  assert.match(assistant, /sendMessage\(starter\)/, 'starter prompts should send instead of only filling the composer');
+  assert.match(styles, /\.guider-typing/);
+  assert.match(styles, /overscroll-behavior:\s*contain/);
 });
 
 test('every photograph carries alternative text', async () => {

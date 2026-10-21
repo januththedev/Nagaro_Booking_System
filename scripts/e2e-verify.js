@@ -438,24 +438,64 @@ console.log('\n[16] media serving is inert');
   }
 }
 
-// 17. unified request -> approval -> booking-fee payment contract
-console.log('\n[17] unified request -> approval -> payment contract');
+// 17. self-service booking plus legacy/admin payment workflow contract
+console.log('\n[17] self-service booking and payment contract');
 {
   const jsonHeaders = { 'Content-Type': 'application/json', Accept: 'application/json' };
 
-  // 17a. the retired dual channel is closed: only the unified request remains.
-  const retiredDirect = await fetch(base + '/api/public/bookings', {
+  // 17a. direct checkout confirms immediately and the database rejects overlap.
+  const directWindow = slstWindow(31, 14, 2);
+  const directDate = new Date(directWindow.start + SLST_OFFSET_MS).toISOString().slice(0, 10);
+  const directInput = {
+    formToken: `e2e-direct-${Date.now()}`,
+    spaceCode,
+    date: directDate,
+    startTime: '14:00',
+    endTime: '16:00',
+    unitCount: '1',
+    attendees: '4',
+    purpose: 'Atomic direct booking E2E',
+    fullName: 'Direct Guest',
+    email: `direct-guest-${Date.now()}@e2e.test`,
+    phone: '+94 77 000 0010',
+    organization: 'Direct Labs',
+  };
+  const direct = await fetch(base + '/api/public/bookings', {
     method: 'POST', headers: jsonHeaders,
-    body: JSON.stringify({ form_token: 'retired', space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' }),
+    body: JSON.stringify(directInput),
   });
-  check('POST /api/public/bookings -> 410 (direct confirmation retired)', retiredDirect.status === 410, `got ${retiredDirect.status}`);
+  const directBody = await direct.json().catch(() => null);
+  const directRef = directBody?.data?.request?.reservationReference;
+  const directToken = directBody?.data?.manageToken;
+  check('POST /api/public/bookings -> 201', direct.status === 201, `got ${direct.status}`);
+  check('direct checkout confirms without staff approval', directBody?.data?.outcome === 'CONFIRMED', JSON.stringify(directBody).slice(0, 200));
+  check('direct checkout returns a reservation reference', /^NG-\d{4}-\d{5}$/.test(directRef || ''), JSON.stringify(directBody).slice(0, 200));
+  check('direct checkout response is no-store', (direct.headers.get('cache-control') || '').includes('no-store'));
+
+  const overlap = await fetch(base + '/api/public/bookings', {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ ...directInput, formToken: `e2e-overlap-${Date.now()}`, email: `overlap-${Date.now()}@e2e.test` }),
+  });
+  check('overlapping direct checkout -> 409', overlap.status === 409, `got ${overlap.status}`);
+
+  const directLookup = await fetch(`${base}/api/public/bookings/${encodeURIComponent(directRef)}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${directToken}` },
+  });
+  check('private direct booking lookup -> 200', directLookup.status === 200, `got ${directLookup.status}`);
+
+  const directCancel = await fetch(`${base}/api/public/bookings/${encodeURIComponent(directRef)}/cancel`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, Authorization: `Bearer ${directToken}` },
+    body: JSON.stringify({ reason: 'E2E cleanup' }),
+  });
+  check('direct booking cancellation -> 200', directCancel.status === 200, `got ${directCancel.status}`);
+
+  // The superseded concierge channel stays retired.
   const retiredConcierge = await fetch(base + '/api/public/inquiries', {
     method: 'POST', headers: jsonHeaders,
     body: JSON.stringify({ space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' }),
   });
   check('POST /api/public/inquiries -> 410 (concierge channel retired)', retiredConcierge.status === 410, `got ${retiredConcierge.status}`);
-  const retiredForm = await req('POST', '/book', { form: { form_token: 'retired', space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' } });
-  check('POST /book form -> catalogue redirect', retiredForm.status === 303 && locPath(retiredForm) === '/spaces', `${retiredForm.status} ${locPath(retiredForm)}`);
   const retiredInquiryForm = await req('POST', '/booking-request', { form: { space_code: spaceCode, date: '2030-01-01', start_time: '10:00', end_time: '11:00', customer_name: 'Retired Guest', email: 'retired@e2e.test' } });
   check('POST /booking-request form -> catalogue redirect', retiredInquiryForm.status === 303 && locPath(retiredInquiryForm) === '/spaces', `${retiredInquiryForm.status} ${locPath(retiredInquiryForm)}`);
 

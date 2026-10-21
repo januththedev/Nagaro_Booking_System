@@ -4,7 +4,7 @@ A centralized space-booking and rental-management system for Nagaro at **Trace E
 
 Two experiences:
 
-- **Public** — visitors browse published spaces, check live availability, and send a booking request for the space they chose. Staff approve it, approval places a temporary hold, and any configured registration fee is paid through PayHere before the reservation is confirmed. Visitors may add an optional advance toward the remaining venue balance. No account is required; every request and reservation gets a private management link. The public experience is served in English, සිංහල and தமிழ், with **Guider**, an optional AI assistant grounded in live venue data and administrator-published Markdown.
+- **Public** — visitors browse published spaces, check live availability, and book the space they chose without waiting for staff approval. The checkout re-checks and locks inventory in one database transaction. With registration fees disabled, the reservation confirms immediately; when a fee is configured, the selected time is held while the visitor pays securely through PayHere. Visitors may add an optional advance toward the remaining venue balance. No account is required; every booking gets a private management link. The public experience is served in English, සිංහල and தமிழ், with **Guider**, an optional AI assistant grounded in live venue data and administrator-published Markdown.
 - **Administrative** — staff manage spaces, photographs, customers, reservations, cancellations, maintenance and inquiries from one place.
 
 Three space categories are supported: **meeting/training rooms**, the **auditorium**, and **co-working desks** (individually bookable).
@@ -108,7 +108,7 @@ reservation exists for that period and exits non-zero if the guarantee is violat
 ```
 src/server/    HTTP layer, domain rules, business services, security, routes, migrations
 src/web/       server-rendered views (legacy renderer and admin console), static CSS/JS
-apps/public-web/ Next.js public frontend (landing, catalogue, venue pages, unified request form, request/payment status, AI guide)
+apps/public-web/ Next.js public frontend (landing, catalogue, venue pages, direct booking, booking/payment status, AI guide)
 tests/         unit, integration and concurrency suites
 scripts/       database provisioning, inspection, the demo and the acceptance harnesses
 storage/       uploaded space photographs (created at runtime, not committed)

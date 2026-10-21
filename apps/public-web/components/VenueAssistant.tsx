@@ -27,14 +27,20 @@ export function VenueAssistant() {
   const [messages, setMessages] = useState<Message[]>([{ role: "assistant", content: t.assistant.intro }]);
   const panelRef = useRef<HTMLElement | null>(null);
   const composerRef = useRef<HTMLInputElement | null>(null);
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
+
+  function closePanel() {
+    setOpen(false);
+    requestAnimationFrame(() => launcherRef.current?.focus());
+  }
 
   // Escape closes the panel and returns focus to the launcher.
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
-        composerRef.current?.blur();
+        closePanel();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -42,12 +48,25 @@ export function VenueAssistant() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    const value = input.trim();
+  // Keep the newest turn and the typing state in view. Reduced-motion visitors
+  // get the same positioning without animated scrolling.
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      const list = messageListRef.current;
+      if (!list) return;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      list.scrollTo({ top: list.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, messages, busy, candidate]);
+
+  async function sendMessage(rawValue: string) {
+    const value = rawValue.trim();
     if (!value || busy) return;
     const next = [...messages, { role: "user" as const, content: value }];
     setMessages(next);
+    setCandidate(null);
     setInput("");
     setBusy(true);
     try {
@@ -56,14 +75,20 @@ export function VenueAssistant() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error("Assistant request failed");
       setMessages([...next, { role: "assistant", content: body.message || t.assistant.error }]);
-      if (body.draftCandidate) setCandidate(body.draftCandidate);
+      setCandidate(body.draftCandidate || null);
     } catch {
       setMessages([...next, { role: "assistant", content: t.assistant.unavailable }]);
     } finally {
       setBusy(false);
     }
+  }
+
+  function send(e: React.FormEvent) {
+    e.preventDefault();
+    void sendMessage(input);
   }
 
   async function reviewDraft() {
@@ -95,6 +120,8 @@ export function VenueAssistant() {
         <section
           ref={panelRef}
           className="guider-panel mb-3 flex h-[min(38rem,calc(100dvh-7rem))] w-[min(25rem,calc(100vw-2rem))] flex-col overflow-hidden"
+          role="dialog"
+          aria-modal="false"
           aria-label={t.assistant.ariaLabel}
         >
           <header className="flex justify-between gap-4 border-b border-[var(--rule)] p-4 sm:p-5">
@@ -105,7 +132,7 @@ export function VenueAssistant() {
                 <p className="text-xs text-[var(--graphite)] m-0 mt-1">{t.assistant.subtitle}</p>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} aria-label={t.assistant.launcherClose} className="guider-close">
+            <button onClick={closePanel} aria-label={t.assistant.launcherClose} className="guider-close">
               ×
             </button>
           </header>
@@ -114,7 +141,14 @@ export function VenueAssistant() {
             {t.assistant.disclosure}
           </p>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3" aria-live="polite">
+          <div
+            ref={messageListRef}
+            className="guider-messages flex-1 overflow-y-auto p-4 space-y-3"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            aria-busy={busy}
+          >
             {messages.map((m, i) => (
               <p
                 key={i}
@@ -125,7 +159,12 @@ export function VenueAssistant() {
                 {m.content}
               </p>
             ))}
-            {busy ? <p className="font-mono text-xs text-[var(--graphite)]">{t.assistant.loading}</p> : null}
+            {busy ? (
+              <div className="guider-typing" role="status">
+                <span className="sr-only">{t.assistant.loading}</span>
+                <span aria-hidden="true" /><span aria-hidden="true" /><span aria-hidden="true" />
+              </div>
+            ) : null}
           </div>
 
           {messages.length <= 2 ? (
@@ -138,10 +177,8 @@ export function VenueAssistant() {
                   <button
                     key={starter}
                     type="button"
-                    onClick={() => {
-                      setInput(starter);
-                      composerRef.current?.focus();
-                    }}
+                    onClick={() => void sendMessage(starter)}
+                    disabled={busy}
                     className="guider-starter text-left text-[0.68rem]"
                   >
                     {starter}
@@ -171,9 +208,10 @@ export function VenueAssistant() {
               onChange={(e) => setInput(e.target.value)}
               maxLength={1200}
               placeholder={t.assistant.placeholder}
+              autoComplete="off"
               className="field-input min-w-0 flex-1"
             />
-            <button className="btn-primary px-4" disabled={busy}>
+            <button className="btn-primary px-4" disabled={busy || !input.trim()}>
               {t.assistant.send}
             </button>
           </form>
@@ -187,6 +225,7 @@ export function VenueAssistant() {
         </section>
       ) : null}
       <button
+        ref={launcherRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}

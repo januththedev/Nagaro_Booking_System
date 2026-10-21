@@ -149,9 +149,9 @@ values.
 
 ## Release smoke test
 
-After deployment, verify `/`, `/spaces`, one venue detail page, a booking request,
-approval, registration-fee checkout with and without an optional advance, the
-private management link, cancellation, `/admin`, a staff login, a venue-rate
-edit, an image upload, a Guider Markdown upload and an inquiry. Ask Guider one
-question answered by that Markdown. Confirm that a second overlapping booking
-is rejected and that the paid advance is deducted from the remaining balance.
+After deployment, verify `/`, `/spaces`, one venue detail page, direct booking,
+registration-fee checkout with and without an optional advance, the private
+management link, cancellation, `/admin`, a staff login, a venue-rate edit, an
+image upload, a Guider Markdown upload and an inquiry. Ask Guider one question
+answered by that Markdown. Confirm that a second overlapping booking is rejected
+and that the paid advance is deducted from the remaining balance.

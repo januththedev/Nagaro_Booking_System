@@ -95,3 +95,12 @@ test('the app ships its own fonts instead of calling a font CDN', async () => {
     assert.doesNotMatch(content, /fonts\.(googleapis|gstatic)\.com/, `${file} must not load remote fonts`);
   }
 });
+
+test('Vercel Analytics is mounted once at the public app root', async () => {
+  const layout = await readApp('app/layout.tsx');
+  const manifest = JSON.parse(await readApp('package.json'));
+
+  assert.match(layout, /import\s+\{\s*Analytics\s*\}\s+from\s+["']@vercel\/analytics\/next["']/);
+  assert.equal((layout.match(/<Analytics\s*\/>/g) ?? []).length, 1);
+  assert.match(manifest.dependencies['@vercel/analytics'], /^\^2\./);
+});

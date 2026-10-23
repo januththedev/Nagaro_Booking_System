@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { cookies, headers } from "next/headers";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { MotionProvider } from "../components/MotionProvider";
 import { PublicShell } from "../components/PublicShell";
@@ -43,6 +44,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <PublicShell>{children}</PublicShell>
           </MotionProvider>
         </I18nProvider>
+        <Analytics />
       </body>
     </html>
   );

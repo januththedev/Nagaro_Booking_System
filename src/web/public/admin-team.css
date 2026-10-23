@@ -1,0 +1,406 @@
+/* Team & access — two-role administration, the Super Admin cap and the
+   30-day recycle bin. Scoped to the team screen so the rest of the admin
+   console keeps its existing visual rhythm. */
+
+.team-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--sunken);
+}
+
+.team-tabs__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.team-tabs__link:hover {
+  background: var(--card);
+}
+
+.team-tabs__link.is-active {
+  background: var(--card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.team-tabs__count {
+  min-width: 1.6rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------- cap */
+
+.team-cap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 18rem);
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.team-cap--full {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.team-cap__copy .card__title {
+  margin-bottom: 0.35rem;
+}
+
+.team-cap__meter {
+  position: relative;
+  overflow: hidden;
+  height: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.team-cap__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--pine), var(--gold));
+  transition: width 180ms ease;
+}
+
+.team-cap__fill--0 { width: 0; }
+.team-cap__fill--1 { width: 33.333%; }
+.team-cap__fill--2 { width: 66.666%; }
+.team-cap__fill--3 { width: 100%; }
+
+.team-cap--full .team-cap__fill {
+  background: linear-gradient(90deg, var(--danger), #c94a55);
+}
+
+/* ------------------------------------------------------------- credential */
+
+.team-credential {
+  border-color: var(--gold);
+  background: #fffdf5;
+}
+
+.team-credential__details {
+  margin-top: var(--space-3);
+}
+
+.team-credential__password {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.team-credential__password code {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ add */
+
+.team-add > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.team-add > summary::-webkit-details-marker {
+  display: none;
+}
+
+.team-add__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.team-add__summary .section-eyebrow,
+.team-add__summary .card__title {
+  display: block;
+}
+
+.team-add__summary .card__title {
+  margin: 0.15rem 0 0;
+}
+
+.team-add__plus {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--pine);
+  font-size: 1.35rem;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+
+.team-add[open] .team-add__plus {
+  transform: rotate(45deg);
+}
+
+.team-add__form {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* --------------------------------------------------------------- members */
+
+.team-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-4);
+}
+
+.team-member {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.team-member--super {
+  border-top: 3px solid var(--gold);
+}
+
+.team-member--deleted {
+  border-style: dashed;
+  background: var(--sunken);
+}
+
+.team-member__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.team-avatar {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--pine);
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.team-member--super .team-avatar {
+  border-color: var(--gold);
+  background: #fff8e6;
+}
+
+.team-member__identity {
+  min-width: 0;
+}
+
+.team-member__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.team-member__email {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.team-member__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.team-you {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ----------------------------------------------------------------- badges */
+
+.team-role,
+.team-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.team-role--super {
+  border-color: var(--gold);
+  background: #fff8e6;
+  color: #6d4b00;
+}
+
+.team-role--admin {
+  background: var(--sunken);
+  color: var(--pine);
+}
+
+.team-status--active {
+  border-color: #b7d8c4;
+  background: #edf8f1;
+  color: var(--ok);
+}
+
+.team-status--pending {
+  border-color: #e6cf9a;
+  background: #fff8e6;
+  color: var(--warn);
+}
+
+.team-status--disabled {
+  border-color: var(--line-strong);
+  background: var(--sunken);
+  color: var(--muted);
+}
+
+.team-status--deleted {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------------ meta */
+
+.team-member__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.team-member__meta dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+}
+
+.team-member__meta dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+}
+
+/* --------------------------------------------------------------- actions */
+
+.team-member__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.team-member__actions .button {
+  white-space: nowrap;
+}
+
+.team-member__edit,
+.team-member__edit > summary {
+  cursor: pointer;
+}
+
+.team-member__edit > summary {
+  color: var(--pine);
+  font-size: 0.875rem;
+  font-weight: 650;
+  list-style: none;
+}
+
+.team-member__edit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.team-member__edit > summary::after {
+  content: ' +';
+}
+
+.team-member__edit[open] > summary::after {
+  content: ' −';
+}
+
+.team-member__edit .form-grid {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sunken);
+}
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 760px) {
+  .team-cap {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-member__actions .inline-form,
+  .team-member__actions .button {
+    width: 100%;
+  }
+
+  .team-member__actions .button {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-cap__fill,
+  .team-add__plus {
+    transition: none;
+  }
+}

@@ -30,7 +30,7 @@ import {
 } from '../domain/constants.js';
 import { parseBookingWindow } from '../domain/validation.js';
 import { businessDateKey, coerceEpochMs, formatClock, parseClock } from '../domain/time.js';
-import { enforcePublicInquiryLimits } from '../security/rateLimit.js';
+import { enforcePublicInquiryLimits, enforcePublicReadLimit } from '../security/rateLimit.js';
 import { getSpaceByCode, listImages, listSpaces } from '../services/spaceService.js';
 import {
   availabilityLabel, checkBookingRules, getPublicAvailability, getSpaceDayGrid,
@@ -38,6 +38,7 @@ import {
 import {
   getInquiryByReference, submitInquiry, withdrawInquiry,
 } from '../services/inquiryService.js';
+import { buildPublicCalendar } from '../services/publicCalendarService.js';
 import {
   cancelPublicBooking, getPublicBooking,
 } from '../services/publicBookingService.js';
@@ -842,7 +843,7 @@ export function registerPublicRoutes(router, deps = {}) {
         status: 404,
         title: 'No request found for that reference',
         message: 'We could not find a booking request with that reference.',
-        hint: 'Check the reference in the acknowledgement message from Nagaro, or send a new request.',
+        hint: 'Check the reference in the acknowledgement message from TRACE, or send a new request.',
       }), 404);
       return;
     }
@@ -862,7 +863,7 @@ export function registerPublicRoutes(router, deps = {}) {
         status: 400,
         title: 'That withdrawal link is incomplete',
         message: 'This page needs both the request reference and the withdrawal token from your acknowledgement message.',
-        hint: 'Open the withdrawal link from the message Nagaro sent you, or send a new booking request.',
+        hint: 'Open the withdrawal link from the message TRACE sent you, or send a new booking request.',
       }), 400);
       return;
     }
@@ -878,7 +879,7 @@ export function registerPublicRoutes(router, deps = {}) {
         status: 400,
         title: 'That withdrawal link is incomplete',
         message: 'This page needs both the request reference and the withdrawal token from your acknowledgement message.',
-        hint: 'Open the withdrawal link from the message Nagaro sent you, or send a new booking request.',
+        hint: 'Open the withdrawal link from the message TRACE sent you, or send a new booking request.',
       }), 400);
       return;
     }
@@ -893,7 +894,7 @@ export function registerPublicRoutes(router, deps = {}) {
           status: 404,
           title: 'That withdrawal link was not recognised',
           message: 'We could not find a booking request for that reference and withdrawal link.',
-          hint: 'Open the withdrawal link exactly as it appears in the message from Nagaro. If it still fails, contact Nagaro reception.',
+          hint: 'Open the withdrawal link exactly as it appears in the message from TRACE. If it still fails, contact TRACE reception.',
         }), 404);
         return;
       }
@@ -902,7 +903,7 @@ export function registerPublicRoutes(router, deps = {}) {
           status: 409,
           title: 'This request can no longer be withdrawn here',
           message: error.message,
-          hint: 'Please contact Nagaro reception at Trace Expert City and quote your reference.',
+          hint: 'Please contact TRACE reception at Trace Expert City and quote your reference.',
         }), 409);
         return;
       }
@@ -911,7 +912,7 @@ export function registerPublicRoutes(router, deps = {}) {
           status: 400,
           title: 'That withdrawal link is incomplete',
           message: error.message,
-          hint: 'Open the withdrawal link from the message Nagaro sent you.',
+          hint: 'Open the withdrawal link from the message TRACE sent you.',
         }), 400);
         return;
       }
@@ -960,6 +961,28 @@ export function registerPublicRoutes(router, deps = {}) {
     // The only availability function public code may call: counts, anonymous
     // blocked periods, and nothing that names a customer or a reference.
     ctx.json(getPublicAvailability(db, { spaceId: space.id, startAt, endAt, deskCount: desks }));
+  });
+
+  /**
+   * Multi-day, optionally single-space calendar. The service validates the
+   * range (real dates, max 31 days) and returns counts only: no reservation
+   * reference, customer detail, purpose, payment data or maintenance reason
+   * ever reaches this projection. A short shared cache keeps repeat visits
+   * cheap without pretending availability is immutable.
+   */
+  router.get('/api/public/availability/calendar', async (ctx) => {
+    enforcePublicReadLimit(db, {
+      ip: clientIp(ctx.req),
+      scope: 'public-availability-calendar',
+      now: clock(),
+    });
+    const payload = buildPublicCalendar(db, {
+      from: firstValue(ctx.query.from),
+      to: firstValue(ctx.query.to),
+      spaceCode: firstValue(ctx.query.space ?? ctx.query.space_code),
+    });
+    ctx.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
+    ctx.json(payload);
   });
 
   router.get('/api/public/availability/day', async (ctx) => {

@@ -25,11 +25,11 @@ test('first bootstrap creates the administrator account', () => {
     const result = ensureFirstAdmin(db, {
       email: 'nimnaljanuth@gmail.com',
       password: 'Str0ng-Preview-Pass!',
-      displayName: 'Nagaro Owner',
+      displayName: 'TRACE Owner',
     });
     assert.equal(result.created, true);
     assert.equal(result.user.email, 'nimnaljanuth@gmail.com');
-    assert.equal(result.user.role, 'ADMIN');
+    assert.equal(result.user.role, 'SUPER_ADMIN');
     const row = db.prepare('SELECT * FROM admin_user WHERE email = ?').get('nimnaljanuth@gmail.com');
     assert.ok(row, 'row exists');
     assert.ok(verifyPassword('Str0ng-Preview-Pass!', row.password_hash), 'hash verifies');

@@ -20,6 +20,13 @@ export function PublicShell({ children }: { children: ReactNode }) {
             <TraceSpacesBrand />
           </Link>
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <Link
+              href="/availability"
+              aria-label={t.chrome.availability}
+              className="hidden min-[480px]:inline-flex items-center whitespace-nowrap px-1 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-[var(--bone)]/80 no-underline transition-colors hover:text-[var(--chartreuse)]"
+            >
+              {t.chrome.availability}
+            </Link>
             <LanguageSwitcher />
             <Link href="/spaces" className="header-book-link no-underline" aria-label={t.chrome.bookCta}>
               <span className="header-book-label">{t.chrome.bookCta}</span>
@@ -38,7 +45,10 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
           <div className="md:col-span-4 md:text-right text-sm text-[var(--bone)]/65">
             <p>{t.footer.scheduleNote}<br />{t.footer.rateNote}</p>
-            <Link href="/spaces" className="text-[var(--chartreuse)] font-mono text-xs uppercase tracking-wider">{t.footer.explore} →</Link>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 md:justify-end">
+              <Link href="/availability" className="text-[var(--chartreuse)] font-mono text-xs uppercase tracking-wider">{t.chrome.availability} →</Link>
+              <Link href="/spaces" className="text-[var(--chartreuse)] font-mono text-xs uppercase tracking-wider">{t.footer.explore} →</Link>
+            </div>
           </div>
         </div>
       </footer>

@@ -54,7 +54,7 @@ try {
   if (!admin) {
     const email = String(process.env.NAGARO_BOOTSTRAP_ADMIN_EMAIL ?? '').trim();
     const password = String(process.env.NAGARO_BOOTSTRAP_ADMIN_PASSWORD ?? '');
-    const displayName = String(process.env.NAGARO_BOOTSTRAP_ADMIN_NAME ?? 'Nagaro Administrator').trim();
+    const displayName = String(process.env.NAGARO_BOOTSTRAP_ADMIN_NAME ?? 'TRACE Administrator').trim();
     if (!email || !password) {
       throw new Error(
         'The database has no administrator. Set NAGARO_BOOTSTRAP_ADMIN_EMAIL and '

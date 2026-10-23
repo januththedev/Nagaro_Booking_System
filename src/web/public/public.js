@@ -1,5 +1,5 @@
 /**
- * Nagaro Space Booking — public site progressive enhancement.
+ * TRACE Space Booking — public site progressive enhancement.
  * src/web/public/public.js  (ES module, no dependencies, no build step)
  *
  * Contract: EVERY feature here is an enhancement. With JavaScript disabled the
@@ -246,7 +246,7 @@ function describeBlockedPeriods(blocked) {
 }
 
 function availabilityCaveat() {
-  return 'Provisional only — this check does not hold the space. A booking is confirmed only once Nagaro staff confirm it.';
+  return 'Provisional only — this check does not hold the space. A booking is confirmed only once TRACE staff confirm it.';
 }
 
 function renderAvailabilityFromPayload(region, payload) {
@@ -291,7 +291,7 @@ function renderAvailabilityError(region, message) {
     kind: 'error',
     headline: 'Availability could not be checked.',
     details: [message],
-    caveat: 'You can still send a booking request — Nagaro staff will check the calendar by hand before confirming.',
+    caveat: 'You can still send a booking request — TRACE staff will check the calendar by hand before confirming.',
   });
 }
 
@@ -351,7 +351,7 @@ function requestAvailability(form, region, options) {
     .catch(function () {
       renderAvailabilityError(
         region,
-        'This browser could not reach the server. Check your connection and try again, or call Nagaro reception.',
+        'This browser could not reach the server. Check your connection and try again, or call TRACE reception.',
       );
       return null;
     });

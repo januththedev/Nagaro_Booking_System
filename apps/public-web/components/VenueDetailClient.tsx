@@ -159,6 +159,9 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
           </div>
 
           <div className="lg:col-span-4 flex flex-wrap lg:justify-end gap-3">
+            <Link href={`/availability?space=${encodeURIComponent(space.code)}`} className="btn-outline">
+              {t.chrome.availability}
+            </Link>
             <Link href={directBookHref} className="btn-primary">
               {t.venue.requestCta}
             </Link>

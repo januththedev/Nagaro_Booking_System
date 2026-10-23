@@ -36,7 +36,7 @@ export function loadConfig(env = process.env) {
     bootstrapAdmin: {
       email: env.NAGARO_BOOTSTRAP_ADMIN_EMAIL ?? null,
       password: env.NAGARO_BOOTSTRAP_ADMIN_PASSWORD ?? null,
-      name: env.NAGARO_BOOTSTRAP_ADMIN_NAME ?? 'Nagaro Administrator',
+      name: env.NAGARO_BOOTSTRAP_ADMIN_NAME ?? 'TRACE Administrator',
     },
 
     adminNotificationEmail: env.NAGARO_ADMIN_NOTIFICATION_EMAIL ?? null,
@@ -47,7 +47,7 @@ export function loadConfig(env = process.env) {
       user: env.SMTP_USER ?? null,
       pass: env.SMTP_PASS ?? null,
       secure: flag('SMTP_SECURE', false),
-      from: env.SMTP_FROM ?? env.NAGARO_ADMIN_NOTIFICATION_EMAIL ?? 'no-reply@nagaro.local',
+      from: env.SMTP_FROM ?? env.NAGARO_ADMIN_NOTIFICATION_EMAIL ?? 'no-reply@trace.local',
       transport: env.NAGARO_MAIL_TRANSPORT ?? null,
     },
 

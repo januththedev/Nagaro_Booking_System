@@ -39,7 +39,7 @@ const BOOKED = businessWindow(DATE, '09:00', '11:00'); // used in steps 2-3
 const RACE = businessWindow(DATE, '13:00', '15:00');   // free; used in step 4
 const label = (epochMs) => clockLabel(epochMs, DATE);
 
-title('NAGARO DOUBLE-BOOKING DEMO — one room, one window, many processes');
+title('TRACE DOUBLE-BOOKING DEMO - one room, one window, many processes');
 console.log(`Room window : ${DATE} ${label(RACE.startAt)}-${label(RACE.endAt)} (Asia/Colombo, half-open)`);
 console.log('Engine      : node:sqlite / SQLite, WAL, busy_timeout = 10000, BEGIN IMMEDIATE + DB triggers');
 

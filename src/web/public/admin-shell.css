@@ -1,0 +1,67 @@
+/* Shared admin shell additions: global search in the topbar. */
+
+.admin-search-form {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: min(16rem, 28vw);
+  min-width: 10rem;
+}
+
+.admin-search-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.admin-search-form input:focus {
+  border-color: var(--pine);
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(11 61 46 / 12%);
+}
+
+.admin-search-form__button {
+  display: inline-flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.admin-search-form__button:hover {
+  border-color: var(--pine);
+  color: var(--pine);
+}
+
+.admin-search-form__button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .admin-search-form {
+    width: 10rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-search-form {
+    width: 100%;
+    flex: 1 1 100%;
+    order: -1;
+  }
+}

@@ -63,24 +63,24 @@ const CATEGORY_ICON = Object.freeze({
 
 /** The one sentence every acknowledgement page must carry. */
 export const NOT_CONFIRMED_NOTICE = 'This request is not a confirmed booking yet. '
-  + 'Nagaro staff will check the calendar and confirm it with you.';
+  + 'TRACE staff will check the calendar and confirm it with you.';
 
 /**
  * Honest delivery wording, keyed by the inquiry's stored `email_status`.
  * A saved inquiry is never described as a delivered email.
  */
 export const EMAIL_STATUS_NOTICE = Object.freeze({
-  SENT: 'Nagaro staff have been notified by email and will confirm your request.',
+  SENT: 'TRACE staff have been notified by email and will confirm your request.',
   NOT_CONFIGURED: 'Your request has been received and saved. Email delivery is not configured on '
-    + 'this server, so Nagaro staff will see your request in the booking queue and contact you directly.',
+    + 'this server, so TRACE staff will see your request in the booking queue and contact you directly.',
   FAILED: 'Your request has been received and saved. A notification email could not be delivered, '
-    + 'so Nagaro staff will see your request in the booking queue and contact you directly.',
+    + 'so TRACE staff will see your request in the booking queue and contact you directly.',
   PENDING: 'Your request has been received and saved. The notification email has not been delivered '
-    + 'yet — Nagaro staff will see your request in the booking queue either way.',
+    + 'yet — TRACE staff will see your request in the booking queue either way.',
 });
 
 const UNKNOWN_EMAIL_NOTICE = 'Your request has been received and saved. No delivery confirmation is '
-  + 'available, so Nagaro staff will see your request in the booking queue and contact you directly.';
+  + 'available, so TRACE staff will see your request in the booking queue and contact you directly.';
 
 /** Human wording for a form field, used to rewrite "field is required." */
 const FIELD_WORDS = Object.freeze({
@@ -253,7 +253,7 @@ function coverImage(space) {
 
 function altFor(image, space) {
   const alt = text(image?.altText).trim();
-  return alt || `${space.name} at Nagaro, Trace Expert City`;
+  return alt || `${space.name} at TRACE, Trace Expert City`;
 }
 
 /**
@@ -263,7 +263,7 @@ function altFor(image, space) {
 function venueCard(space) {
   const cover = coverImage(space);
   const src = cover?.url ?? PLACEHOLDER_IMAGE;
-  const alt = cover ? altFor(cover, space) : `${space.name} at Nagaro, Trace Expert City (illustration placeholder)`;
+  const alt = cover ? altFor(cover, space) : `${space.name} at TRACE, Trace Expert City (illustration placeholder)`;
   const meta = [
     space.location || 'Trace Expert City',
     space.floor ? `Floor ${space.floor}` : null,
@@ -532,7 +532,7 @@ export function renderSpaceDirectoryPage({
     <header data-reveal>
       <p class="section-eyebrow">Trace Expert City · Venue Directory</p>
       <h1 class="page-title">Spaces &amp; Architectural Venues</h1>
-      <p class="section-subtitle">Every published room, hall and co-working studio managed by Nagaro at Trace
+      <p class="section-subtitle">Every published room, hall and co-working studio managed by TRACE at Trace
         Expert City. Filter by capacity, billing unit or technical amenity. Availability shown on any venue
         page is provisional.</p>
     </header>
@@ -626,7 +626,7 @@ export function renderSpaceDirectoryPage({
 
   return publicShell({
     title: 'Spaces',
-    description: 'The published Nagaro spaces at Trace Expert City: meeting rooms, the auditorium and '
+    description: 'The published TRACE spaces at Trace Expert City: meeting rooms, the auditorium and '
       + 'co-working desks, with capacity, amenities and rates.',
     activePath: '/spaces',
     pageClass: 'page--directory',
@@ -720,11 +720,11 @@ export function renderBookingRequestPage({
   const body = html`<section class="container booking-flow" data-reveal>
     <header class="venue-hero">
       <div>
-        <p class="section-eyebrow">${instant ? 'Direct Checkout' : 'Nagaro Concierge Desk'} · Trace Expert City</p>
+        <p class="section-eyebrow">${instant ? 'Direct Checkout' : 'TRACE Concierge Desk'} · Trace Expert City</p>
         <h1 class="page-title">${instant ? 'Book your space' : 'Request a booking'}</h1>
         <p class="section-subtitle">${instant
     ? 'Choose a published venue and schedule, enter your details, and secure the live slot immediately. No online payment is taken; the confirmed LKR price is recorded for offline settlement.'
-    : 'Tell us which venue and schedule you need. Nagaro staff verify every calendar request by hand and confirm the reservation with you — submitting this inquiry does not lock inventory and carries no payment.'}</p>
+    : 'Tell us which venue and schedule you need. TRACE staff verify every calendar request by hand and confirm the reservation with you — submitting this inquiry does not lock inventory and carries no payment.'}</p>
       </div>
       <ol class="flow-progress" aria-label="Checkout stages">
         <li class="is-current">Space &amp; schedule</li>
@@ -818,7 +818,7 @@ export function renderBookingRequestPage({
 
               <fieldset class="form-section">
                 <legend class="form-section__title">Your Contact Details</legend>
-                <p class="form-section__desc hint">Used exclusively by Nagaro staff to verify and confirm this booking request.</p>
+                <p class="form-section__desc hint">Used exclusively by TRACE staff to verify and confirm this booking request.</p>
                 <div class="form-grid">
                   ${field({
     id: 'customer_name', label: 'Your name', required: true,
@@ -878,7 +878,7 @@ export function renderBookingRequestPage({
                 </div>
                 <p class="hint">${instant
     ? 'Submitting runs one final availability check inside the booking transaction. If the slot is still free, inventory is reserved immediately. Nothing is charged online.'
-    : 'Sending this form saves a request for Nagaro staff. It is not a confirmed booking, does not reserve inventory, and nothing is charged.'}</p>
+    : 'Sending this form saves a request for TRACE staff. It is not a confirmed booking, does not reserve inventory, and nothing is charged.'}</p>
               </fieldset>
             </form>
           </div>
@@ -898,7 +898,7 @@ export function renderBookingRequestPage({
               <li><strong>Reference issued:</strong> A successful checkout receives one confirmed <code>NG-YYYY-NNNNN</code> reservation and a private management link.</li>
             </ol>
             <p class="hint">Prefer help with setup or a complex production? <a href="/booking-request">Ask the concierge team instead.</a></p>` : html`<ol class="inquiry-steps">
-              <li><strong>Instant reference issued:</strong> Your request is recorded in the Nagaro operations queue with a unique <code>INQ-YYYY-NNNNN</code> reference.</li>
+              <li><strong>Instant reference issued:</strong> Your request is recorded in the TRACE operations queue with a unique <code>INQ-YYYY-NNNNN</code> reference.</li>
               <li><strong>Calendar &amp; buffer review:</strong> Our team checks turnaround buffers, room configuration and desk pool capacity for your requested window.</li>
               <li><strong>Direct confirmation:</strong> Staff contact you to finalise billing and issue a confirmed reservation. Only then is the space held.</li>
             </ol>
@@ -913,7 +913,7 @@ export function renderBookingRequestPage({
     title: instant ? 'Book a space' : 'Request a booking',
     description: instant
       ? 'Check live availability and confirm a guest booking at TRACE Expert City.'
-      : 'Send Nagaro a request to book a meeting room, the auditorium or co-working desks at Trace Expert City. Staff confirm every booking by hand.',
+      : 'Send TRACE a request to book a meeting room, the auditorium or co-working desks at Trace Expert City. Staff confirm every booking by hand.',
     activePath: instant ? '/book' : '/booking-request',
     pageClass: instant ? 'page--request page--checkout' : 'page--request',
     body,
@@ -1008,7 +1008,7 @@ export function renderBookingReceivedPage({ inquiry, token = null } = {}) {
           <dd>${inquiry?.status ? statusBadge(inquiry.status) : '—'}</dd>
         </dl>
 
-        <p class="hint">Keep this reference. Nagaro staff use it when they contact you, and the
+        <p class="hint">Keep this reference. TRACE staff use it when they contact you, and the
           withdrawal link below is the only way to cancel the request yourself.</p>
 
         <div class="cluster">
@@ -1019,14 +1019,14 @@ export function renderBookingReceivedPage({ inquiry, token = null } = {}) {
     : ''}
         </div>
         ${withdrawHref ? '' : html`<p class="hint">If you need to withdraw this request, use the
-          withdrawal link in the acknowledgement email from Nagaro.</p>`}
+          withdrawal link in the acknowledgement email from TRACE.</p>`}
       </div>
     </div>
   </section>`;
 
   return publicShell({
     title: 'Request received',
-    description: `Your booking request ${reference} has been received by Nagaro. `
+    description: `Your booking request ${reference} has been received by TRACE. `
       + 'It is not a confirmed booking until staff confirm it.',
     activePath: '/booking-request',
     pageClass: 'page--received',
@@ -1042,7 +1042,7 @@ export function renderWithdrawFormPage({ reference = '', token = '' } = {}) {
         <p class="tag tag--warn">Self-service withdrawal</p>
         <h1 class="page-title">Withdraw a booking request</h1>
         <p>You are about to withdraw request <code>${reference}</code>.</p>
-        <p>Withdrawing tells Nagaro staff you no longer need this space. It cannot be undone here —
+        <p>Withdrawing tells TRACE staff you no longer need this space. It cannot be undone here —
           you would have to send a new request.</p>
         <form method="post" action="/booking-request/withdraw"
               data-confirm="Withdraw this booking request? It cannot be undone.">
@@ -1060,7 +1060,7 @@ export function renderWithdrawFormPage({ reference = '', token = '' } = {}) {
 
   return publicShell({
     title: 'Withdraw a request',
-    description: 'Confirm the withdrawal of a Nagaro booking request made with your reference and withdrawal link.',
+    description: 'Confirm the withdrawal of a TRACE booking request made with your reference and withdrawal link.',
     activePath: '/booking-request',
     pageClass: 'page--withdraw',
     body,
@@ -1076,9 +1076,9 @@ export function renderWithdrawalConfirmedPage({ reference = '', status = 'WITHDR
         <h1 class="page-title">Booking request withdrawn</h1>
         <p>Request <code>${reference}</code> is now marked
           ${status === 'WITHDRAWN' ? html`<strong>withdrawn</strong>` : html`<strong>${status}</strong>`}.
-          Nagaro staff will not treat it as a booking request.</p>
+          TRACE staff will not treat it as a booking request.</p>
         <p>Nothing was reserved, so there is nothing to release. If this was a mistake, please send a
-          new request or contact Nagaro reception at Trace Expert City.</p>
+          new request or contact TRACE reception at Trace Expert City.</p>
         <div class="cluster">
           <a class="button button--primary" href="/spaces">Browse spaces</a>
           <a class="button button--ghost" href="/booking-request">Send a new request</a>
@@ -1199,7 +1199,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/book'
           <div class="card__body stack">
             <p class="section-eyebrow">Architectural Overview</p>
             <h2 class="section-title">About this space</h2>
-            <p class="venue-lead">${space.description || space.shortDescription || 'Nagaro staff will describe this space shortly.'}</p>
+            <p class="venue-lead">${space.description || space.shortDescription || 'TRACE staff will describe this space shortly.'}</p>
           </div>
         </article>
 
@@ -1244,7 +1244,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/book'
                   </tr>`)}
                 </tbody>
               </table>`
-    : html`<p>Rate on request — mention what you need in your request and Nagaro staff will quote you.</p>`}
+    : html`<p>Rate on request — mention what you need in your request and TRACE staff will quote you.</p>`}
             <p class="hint">A request to book is not a confirmed booking and carries no payment.</p>
           </div>
         </article>
@@ -1331,7 +1331,7 @@ export function renderSpaceDetailPage({ space, check = {}, requestHref = '/book'
   return publicShell({
     title: space.name,
     description: space.shortDescription
-      || `${space.categoryLabel} at Nagaro, Trace Expert City. Capacity ${space.capacity}, ${space.openTime}–${space.closeTime}.`,
+      || `${space.categoryLabel} at TRACE, Trace Expert City. Capacity ${space.capacity}, ${space.openTime}–${space.closeTime}.`,
     activePath: '/spaces',
     pageClass: 'page--space',
     body,

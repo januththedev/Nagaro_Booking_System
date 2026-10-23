@@ -16,6 +16,7 @@ storage/
 # Local QA artefacts (browser screenshots, traces). Kept on disk for the
 # presentation deck, but deliberately not committed: they are large binaries.
 artifacts/
+.codex-runtime/
 
 # Logs and editor noise
 *.log

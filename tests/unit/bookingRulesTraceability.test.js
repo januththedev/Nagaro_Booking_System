@@ -448,6 +448,8 @@ test('R-SEC-012 both occupancy triggers exist after migrations', () => {
       '0005_booking_request_payments_ai.sql',
       '0006_guider_knowledge.sql',
       '0007_optional_advances.sql',
+      '0008_admin_roles_recycle_bin.sql',
+      '0009_notifications.sql',
     ],
   );
   db.close();

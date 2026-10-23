@@ -233,13 +233,46 @@ export function renderDashboardPage({
     csrfToken,
     flash,
     activePath: '/admin',
+    extraStyles: ['/assets/admin-ux.css'],
     pageActions: html`
       <a class="button button--ghost button--small" href="/admin/calendar?date=${businessDate}">Today's calendar</a>
       <a class="button button--primary button--small" href="/admin/reservations/new">New reservation</a>`,
     body: html`<div class="stack" data-dashboard="admin" data-summary-url="/api/admin/dashboard/summary" data-reveal>
 
+      <section class="dashboard-quick-actions" aria-label="Common tasks">
+        <a href="/admin/booking-requests">
+          <span><strong>Review requests</strong><span class="hint">Approve, reject or resolve payment holds</span></span>
+          <span aria-hidden="true">→</span>
+        </a>
+        <a href="/admin/calendar?date=${businessDate}">
+          <span><strong>Today's calendar</strong><span class="hint">Move bookings and see live holds</span></span>
+          <span aria-hidden="true">→</span>
+        </a>
+        <a href="/admin/reservations/new">
+          <span><strong>New reservation</strong><span class="hint">Block a space without leaving the desk</span></span>
+          <span aria-hidden="true">→</span>
+        </a>
+        ${actor?.role === 'SUPER_ADMIN' ? html`<a href="/admin/team">
+          <span><strong>Team &amp; access</strong><span class="hint">Add admins, reset access, recycle bin</span></span>
+          <span aria-hidden="true">→</span>
+        </a>` : ''}
+      </section>
+
       ${statGrid(primaryMetrics, 'stat-grid--primary')}
-      ${statGrid(secondaryMetrics, 'stat-grid--secondary')}
+
+      <details class="card dashboard-secondary">
+        <summary class="card__head">
+          <div>
+            <p class="section-eyebrow">More metrics</p>
+            <h2 class="card__title">Operational detail</h2>
+            <p class="card__description">Inquiries, payment follow-ups, cancellations and maintenance. Collapsed by default to keep the daily view calm.</p>
+          </div>
+          <span class="button button--ghost button--small" aria-hidden="true">Show / hide</span>
+        </summary>
+        <div class="card__body">
+          ${statGrid(secondaryMetrics, 'stat-grid--secondary')}
+        </div>
+      </details>
 
       <p class="hint">All figures are read live from the booking database. Generated
         ${timeTag(summary.generatedAt)} (Sri Lanka Standard Time).</p>

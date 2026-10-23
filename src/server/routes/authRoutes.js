@@ -19,6 +19,7 @@ import { recordAudit } from '../services/auditService.js';
 import { requiredString, asTrimmedString } from '../domain/validation.js';
 import { validationError } from '../domain/errors.js';
 import { businessDateTimeLabel } from '../domain/time.js';
+import { adminRoleLabel } from '../domain/constants.js';
 
 const SAFE_NEXT = /^\/admin(\/[A-Za-z0-9\-_./?=&%#]*)?$/;
 
@@ -86,16 +87,18 @@ export function registerAuthRoutes(router, deps) {
     });
     setSessionCookies(ctx, session);
 
+    const accountRole = account.is_super_admin === 1 ? 'SUPER_ADMIN' : 'ADMIN';
     recordAudit(db, {
       actorAdminUserId: account.id,
-      actorLabel: `${account.display_name} (${account.role})`,
+      actorLabel: `${account.display_name} (${adminRoleLabel(accountRole)})`,
       action: 'auth.login',
       entityType: 'admin_user',
       entityId: account.id,
       summary: `Signed in as ${account.email}`,
     });
 
-    redirect(ctx.res, next);
+    // A reset password must be replaced before the console can be used.
+    redirect(ctx.res, account.must_change_password === 1 ? '/admin/account' : next);
   });
 
   router.post('/admin/logout', async (ctx) => {
@@ -131,10 +134,15 @@ export function registerAuthRoutes(router, deps) {
       activePath: '/admin/account',
       breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'My account' }],
       body: html`<div class="card"><div class="card__body">
+        ${actor.mustChangePassword
+          ? html`<div class="alert alert--warning" role="alert">
+              <p><strong>Choose a new password to continue.</strong> Your password was reset by a Super Admin. The temporary password only opens this account page.</p>
+            </div>`
+          : ''}
         <dl class="detail-list">
           <dt>Name</dt><dd>${account?.displayName ?? actor.displayName}</dd>
           <dt>Email</dt><dd>${account?.email ?? actor.email}</dd>
-          <dt>Role</dt><dd>${account?.role ?? actor.role}</dd>
+          <dt>Role</dt><dd>${account?.roleLabel ?? adminRoleLabel(account?.role ?? actor.role)}</dd>
           <dt>Last sign-in</dt><dd>${account?.lastLoginAt ? businessDateTimeLabel(account.lastLoginAt) : '—'}</dd>
         </dl>
         <form method="post" action="/admin/account/password" class="form-grid">

@@ -51,11 +51,21 @@ import {
   cancelMaintenanceBlock, cancelReservation, createMaintenanceBlock, createReservation,
   listMaintenanceBlocks, loadReservation, updateReservation,
 } from '../services/bookingService.js';
+import { approveBookingRequest, rejectBookingRequest } from '../services/bookingRequestService.js';
 import { getSpace, getSpaceByCode, listSpaces } from '../services/spaceService.js';
 import { createCustomer, findPossibleDuplicates, getCustomer, searchCustomers } from '../services/customerService.js';
-import { activeUnits, getSpaceAvailability, getSpaceDayGrid } from '../services/availabilityService.js';
+import { activeUnits, getSpaceAvailability } from '../services/availabilityService.js';
 import { billingQuantityFor, formatMoney, loadRates, quote } from '../services/pricingService.js';
 import { listAudit } from '../services/auditService.js';
+import {
+  afterPublicReservationCancelled,
+  afterPublicReservationCreated,
+} from '../services/notificationHooks.js';
+import {
+  calendarEvents as unifiedCalendarEvents,
+  loadCalendarData as loadUnifiedCalendarData,
+  reservationToEvent,
+} from '../services/calendarService.js';
 import { renderReservationListPage, renderBookingFormPage, renderReservationDetailPage, renderMaintenancePage } from '../../web/views/admin/bookingViews.js';
 import { renderCalendarPage, renderCalendarWeekPage } from '../../web/views/admin/calendarViews.js';
 
@@ -533,7 +543,7 @@ export function buildFormPreview(db, space, window, { unitCount = 1, billingUnit
 /* ------------------------------------------------------------- calendar feed */
 
 export function parseCalendarFilters(query = {}) {
-  const view = CALENDAR_VIEWS.includes(text(query.view)) ? text(query.view) : 'day';
+  const view = CALENDAR_VIEWS.includes(text(query.view)) ? text(query.view) : 'week';
   const rawDate = text(query.date);
   const category = text(query.category);
   const status = text(query.status);
@@ -552,80 +562,12 @@ function statusesForFilter(status) {
 }
 
 /**
- * One query for the range's reservations plus one for its maintenance blocks,
- * each with its allocated unit codes, so the HTML projection and the JSON feed
- * are built from exactly the same data.
+ * Unified feed for the range's reservations, maintenance, payment holds and
+ * pending requests. Delegates to calendarService so the HTML projection, the
+ * JSON feed and the write responses all share one shape.
  */
 export function loadCalendarData(db, { fromAt, toAt, spaceIds = null, statuses = null }) {
-  const statusList = statuses && statuses.length ? statuses : statusesForFilter('all');
-  const where = ['r.start_at < ?', 'r.end_at > ?', `r.status IN (${statusList.map(() => '?').join(',')})`];
-  const params = [toAt, fromAt, ...statusList];
-  if (spaceIds && spaceIds.length) {
-    where.push(`r.space_id IN (${spaceIds.map(() => '?').join(',')})`);
-    params.push(...spaceIds);
-  }
-  const reservations = db.prepare(`
-    SELECT r.id, r.reference, r.status, r.start_at, r.end_at, r.unit_count, r.attendees, r.purpose,
-           s.id AS space_id, s.code AS space_code, s.name AS space_name, s.category AS space_category,
-           c.full_name AS customer_name
-      FROM reservation r
-      JOIN space s ON s.id = r.space_id
-      JOIN customer c ON c.id = r.customer_id
-     WHERE ${where.join(' AND ')}
-     ORDER BY r.start_at ASC, r.id ASC
-  `).all(...params);
-
-  const reservationIds = reservations.map((row) => row.id);
-  const unitCodes = groupUnitCodes(db, 'reservation_id', reservationIds);
-
-  const blockWhere = ['m.status = ?', 'm.start_at < ?', 'm.end_at > ?'];
-  const blockParams = ['ACTIVE', toAt, fromAt];
-  if (spaceIds && spaceIds.length) {
-    blockWhere.push(`m.space_id IN (${spaceIds.map(() => '?').join(',')})`);
-    blockParams.push(...spaceIds);
-  }
-  const blocks = db.prepare(`
-    SELECT m.id, m.space_id, m.start_at, m.end_at, m.reason, m.status,
-           s.code AS space_code, s.name AS space_name, s.category AS space_category
-      FROM maintenance_block m
-      JOIN space s ON s.id = m.space_id
-     WHERE ${blockWhere.join(' AND ')}
-     ORDER BY m.start_at ASC, m.id ASC
-  `).all(...blockParams);
-  const blockUnitCodes = groupUnitCodes(db, 'maintenance_block_id', blocks.map((row) => row.id));
-
-  return {
-    reservations: reservations.map((row) => ({
-      id: row.id,
-      reference: row.reference,
-      status: row.status,
-      startAt: row.start_at,
-      endAt: row.end_at,
-      unitCount: row.unit_count,
-      attendees: row.attendees,
-      purpose: row.purpose,
-      spaceId: row.space_id,
-      spaceCode: row.space_code,
-      spaceName: row.space_name,
-      category: row.space_category,
-      customerName: row.customer_name,
-      unitCodes: unitCodes.get(row.id) ?? [],
-      url: `/admin/reservations/${row.id}`,
-    })),
-    maintenance: blocks.map((row) => ({
-      id: row.id,
-      startAt: row.start_at,
-      endAt: row.end_at,
-      reason: row.reason,
-      status: row.status,
-      spaceId: row.space_id,
-      spaceCode: row.space_code,
-      spaceName: row.space_name,
-      category: row.space_category,
-      unitCodes: blockUnitCodes.get(row.id) ?? [],
-      url: '/admin/maintenance',
-    })),
-  };
+  return loadUnifiedCalendarData(db, { fromAt, toAt, spaceIds, statuses });
 }
 
 function groupUnitCodes(db, column, ids) {
@@ -647,45 +589,22 @@ function groupUnitCodes(db, column, ids) {
   return grouped;
 }
 
-/** The calendar JSON feed event shape (documented; consumed by admin.js). */
+/**
+ * The calendar JSON feed event shape (documented; consumed by admin-calendar.js
+ * and kept compatible with the former admin.js table projection).
+ */
 export function calendarEvents(data) {
-  return [
-    ...data.reservations.map((r) => ({
-      id: `reservation:${r.id}`,
-      kind: 'RESERVATION',
-      reference: r.reference,
-      title: `${r.reference} · ${r.spaceCode} · ${r.customerName}`,
-      spaceId: r.spaceId,
-      spaceCode: r.spaceCode,
-      spaceName: r.spaceName,
-      category: r.category,
-      customerName: r.customerName,
-      startAt: r.startAt,
-      endAt: r.endAt,
-      status: r.status,
-      unitCount: r.unitCount,
-      unitCodes: r.unitCodes,
-      url: r.url,
-    })),
-    ...data.maintenance.map((m) => ({
-      id: `maintenance:${m.id}`,
-      kind: 'MAINTENANCE',
-      reference: null,
-      title: `Maintenance · ${m.spaceCode} · ${m.reason}`,
-      spaceId: m.spaceId,
-      spaceCode: m.spaceCode,
-      spaceName: m.spaceName,
-      category: m.category,
-      customerName: null,
-      startAt: m.startAt,
-      endAt: m.endAt,
-      status: 'MAINTENANCE',
-      unitCount: m.unitCodes.length,
-      unitCodes: m.unitCodes,
-      url: m.url,
-      reason: m.reason,
-    })),
-  ].sort((a, b) => a.startAt - b.startAt);
+  return unifiedCalendarEvents(data).map((event) => ({
+    ...event,
+    title: calendarEventTitle(event),
+  }));
+}
+
+function calendarEventTitle(event) {
+  if (event.kind === 'MAINTENANCE') return `Maintenance \u2014 ${event.spaceCode} \u2014 ${event.reason}`;
+  if (event.kind === 'HOLD') return `Held \u2014 ${event.reference} \u2014 ${event.spaceCode}`;
+  if (event.kind === 'REQUEST') return `Request \u2014 ${event.reference} \u2014 ${event.spaceCode}`;
+  return `${event.reference} \u2014 ${event.spaceCode} \u2014 ${event.customerName}`;
 }
 
 /** Resolve a calendar `space` filter to a concrete list of space ids. */
@@ -699,7 +618,12 @@ export function calendarSpaceIds(db, filters) {
     if (filters.category && space.category !== filters.category) return false;
     return true;
   });
-  return { spaces: filtered, ids: filtered.map((space) => space.id), unknownSpace: Boolean(filters.space) && filtered.length === 0 };
+  return {
+    spaces: filtered,
+    all,
+    ids: filtered.map((space) => space.id),
+    unknownSpace: Boolean(filters.space) && filtered.length === 0,
+  };
 }
 
 /** `from`/`to` for the JSON feed: date keys, ISO strings or epoch milliseconds. */
@@ -728,6 +652,119 @@ export const _internals = {
   text, parsePositiveInt, resolveSubmittedSpaceId, resolveUnitCount, resolveBillingUnit,
   statusesForFilter, groupUnitCodes, pricingUnitWords, LIST_PAGE_SIZE,
 };
+
+/* --------------------------------------------------- create orchestration */
+
+/**
+ * Share the exact parser/customer-resolution/create sequence between the HTML
+ * form and the JSON quick-create endpoint. Only the response rendering differs.
+ */
+function reservationCreateContext(db, body) {
+  const values = valuesFromBookingBody(body);
+  const space = resolveSpaceReference(db, values.space_id);
+  const spaces = bookableSpaces(db, { includeSpaceId: space?.id ?? null });
+  return { values, space, spaces };
+}
+
+function executeReservationCreate(db, { actor, body, context }) {
+  const parsed = parseBookingFormInput(body, context.space);
+  const customer = resolveCustomerForBooking(db, { actor, parsed });
+  const result = createReservation(db, {
+    actor,
+    spaceId: parsed.spaceId,
+    customerId: customer.customerId,
+    startAt: parsed.startAt,
+    endAt: parsed.endAt,
+    unitCount: parsed.unitCount,
+    attendees: parsed.attendees,
+    purpose: parsed.purpose,
+    internalNotes: parsed.internalNotes,
+    billingUnit: parsed.billingUnit,
+    billingQuantity: parsed.billingQuantity,
+    idempotencyKey: parsed.idempotencyKey,
+    source: 'admin',
+  });
+  if (!result.idempotent && result.reservation?.id) {
+    afterPublicReservationCreated(db, {
+      reservationId: result.reservation.id,
+      excludeAdminUserId: actor.id,
+    });
+  }
+  return { ...context, parsed, customer, result };
+}
+
+function reservationJsonPayload({ result, customer }) {
+  const reservation = result.reservation;
+  return {
+    ok: true,
+    idempotent: Boolean(result.idempotent),
+    event: reservationToEvent(reservation),
+    reservation,
+    customer: {
+      id: reservation.customerId,
+      fullName: reservation.customer?.fullName ?? customer?.customer?.fullName ?? null,
+      fallback: customer?.fallback
+        ? { id: customer.fallback.id, fullName: customer.fallback.fullName }
+        : null,
+    },
+  };
+}
+
+/**
+ * The calendar drawer speaks camelCase JSON. Translate aliases to the same
+ * flat field names the existing form parser already understands, so there is
+ * one validation path, not two.
+ */
+function normalizeReservationJsonBody(body = {}) {
+  const source = body && typeof body === 'object' ? body : {};
+  const normalized = { ...source };
+  const alias = (from, to) => {
+    if (normalized[to] === undefined && source[from] !== undefined) normalized[to] = source[from];
+  };
+  alias('spaceId', 'space_id');
+  alias('startAt', 'start_at');
+  alias('endAt', 'end_at');
+  alias('startDate', 'date');
+  alias('startTime', 'start_time');
+  alias('endTime', 'end_time');
+  alias('unitCount', 'unit_count');
+  alias('customerId', 'customer_id');
+  alias('customerSearch', 'customer_search');
+  alias('formToken', 'form_token');
+  alias('idempotencyKey', 'form_token');
+  alias('internalNotes', 'internal_notes');
+  alias('billingUnit', 'billing_unit');
+  alias('billingQuantity', 'billing_quantity');
+  if (source.newCustomer && typeof source.newCustomer === 'object') {
+    alias('newCustomer.fullName', 'new_customer_name');
+    alias('newCustomer.email', 'new_customer_email');
+    alias('newCustomer.phone', 'new_customer_phone');
+    alias('newCustomer.organization', 'new_customer_organization');
+    if (normalized.new_customer_name === undefined && source.newCustomer.fullName !== undefined) {
+      normalized.new_customer_name = source.newCustomer.fullName;
+    }
+    if (normalized.new_customer_email === undefined && source.newCustomer.email !== undefined) {
+      normalized.new_customer_email = source.newCustomer.email;
+    }
+    if (normalized.new_customer_phone === undefined && source.newCustomer.phone !== undefined) {
+      normalized.new_customer_phone = source.newCustomer.phone;
+    }
+    if (normalized.new_customer_organization === undefined && source.newCustomer.organization !== undefined) {
+      normalized.new_customer_organization = source.newCustomer.organization;
+    }
+  }
+  if (normalized.customer_id !== undefined && normalized.customer_id !== null) {
+    normalized.customer_id = String(normalized.customer_id);
+  }
+  return normalized;
+}
+
+/** Allow the JSON syntax `csrfToken` in addition to `_csrf` before requireCsrf. */
+function normalizeCsrfBody(body = {}) {
+  if (!body || typeof body !== 'object') return;
+  if (body._csrf === undefined && body.csrfToken !== undefined) body._csrf = body.csrfToken;
+  if (body._csrf === undefined && body.csrf !== undefined) body._csrf = body.csrf;
+}
 
 /* ================================================================== routes */
 
@@ -795,62 +832,21 @@ export function registerAdminBookingRoutes(router, deps = {}) {
   router.post('/admin/reservations', async (ctx) => {
     guard(ctx, deps);
     await ctx.readBody();
+    normalizeCsrfBody(ctx.body);
     requireCsrfGuard(ctx, deps);
 
-    const values = valuesFromBookingBody(ctx.body);
-    const space = resolveSpaceReference(db, values.space_id);
-    const spaces = bookableSpaces(db, { includeSpaceId: space?.id ?? null });
+    const body = ctx.wantsJson ? normalizeReservationJsonBody(ctx.body) : ctx.body;
+    const context = reservationCreateContext(db, body);
 
-    let parsed;
+    let created;
     try {
-      parsed = parseBookingFormInput(ctx.body, space);
-    } catch (error) {
-      if (!(error instanceof AppError)) throw error;
-      if (ctx.wantsJson) throw error;
-      reRenderBookingForm(ctx, deps, db, {
-        status: error.status, mode: 'create', reservation: null, spaces, values,
-        fieldErrors: fieldMapFrom(error.details), problems: problemsFrom(error.details),
-        alert: { kind: 'error', title: error.message },
-      });
-      return;
-    }
-
-    let customer;
-    try {
-      customer = resolveCustomerForBooking(db, { actor: ctx.actor, parsed });
-    } catch (error) {
-      if (!(error instanceof AppError)) throw error;
-      if (ctx.wantsJson) throw error;
-      reRenderBookingForm(ctx, deps, db, {
-        status: error.status, mode: 'create', reservation: null, spaces, values,
-        fieldErrors: fieldMapFrom(error.details), problems: problemsFrom(error.details),
-        alert: { kind: 'error', title: error.message },
-      });
-      return;
-    }
-
-    let result;
-    try {
-      result = createReservation(db, {
-        actor: ctx.actor,
-        spaceId: parsed.spaceId,
-        customerId: customer.customerId,
-        startAt: parsed.startAt,
-        endAt: parsed.endAt,
-        unitCount: parsed.unitCount,
-        attendees: parsed.attendees,
-        purpose: parsed.purpose,
-        internalNotes: parsed.internalNotes,
-        billingUnit: parsed.billingUnit,
-        billingQuantity: parsed.billingQuantity,
-        idempotencyKey: parsed.idempotencyKey,
-        source: 'admin',
-      });
+      created = executeReservationCreate(db, { actor: ctx.actor, body, context });
     } catch (error) {
       if (ctx.wantsJson) throw error; // app.js emits the JSON error envelope
       if (!(error instanceof AppError)) throw error;
       reRenderBookingForm(ctx, deps, db, {
-        status: error.status, mode: 'create', reservation: null, spaces, values,
+        status: error.status, mode: 'create', reservation: null,
+        spaces: context.spaces, values: context.values,
         fieldErrors: fieldMapFrom(error.details), problems: problemsFrom(error.details),
         conflicts: error instanceof DoubleBookingError ? error.conflicts : null,
         alert: conflictAlert(error, { action: 'create' }),
@@ -858,6 +854,12 @@ export function registerAdminBookingRoutes(router, deps = {}) {
       return;
     }
 
+    if (ctx.wantsJson) {
+      ctx.json(reservationJsonPayload(created), created.result.idempotent ? 200 : 201);
+      return;
+    }
+
+    const { result, customer } = created;
     const reservation = result.reservation;
     if (result.idempotent) {
       flashRedirect(ctx, `/admin/reservations/${reservation.id}`, {
@@ -873,6 +875,23 @@ export function registerAdminBookingRoutes(router, deps = {}) {
       kind: customer.fallback ? 'warning' : 'success',
       message: `Created ${reservation.reference} for ${reservation.customer.fullName} \u00b7 ${reservation.spaceCode} \u00b7 ${formatMoney(reservation.totalCents, reservation.currency)}.${fallback}`,
     });
+  });
+
+  /**
+   * JSON twin of POST /admin/reservations, used by the calendar quick-create
+   * drawer. It runs the exact same parser, customer resolution and atomic
+   * service call as the HTML form; only the response representation differs.
+   */
+  router.post('/api/admin/reservations', async (ctx) => {
+    guard(ctx, deps);
+    await ctx.readBody();
+    normalizeCsrfBody(ctx.body);
+    requireCsrfGuard(ctx, deps);
+
+    const body = normalizeReservationJsonBody(ctx.body);
+    const context = reservationCreateContext(db, body);
+    const created = executeReservationCreate(db, { actor: ctx.actor, body, context });
+    ctx.json(reservationJsonPayload(created), created.result.idempotent ? 200 : 201);
   });
 
   /* ------------------------------------------------------- detail / edit */
@@ -1011,6 +1030,10 @@ export function registerAdminBookingRoutes(router, deps = {}) {
 
     try {
       const result = cancelReservation(db, { actor: ctx.actor, reservationId: reservation.id, reason });
+      afterPublicReservationCancelled(db, {
+        reservationId: reservation.id,
+        excludeAdminUserId: ctx.actor.id,
+      });
       flashRedirect(ctx, `/admin/reservations/${reservation.id}`, {
         kind: 'success',
         message: `Cancelled ${result.reservation.reference}. ${result.releasedOccupancyRows} inventory claim(s) released; the booking history is preserved.`,
@@ -1039,44 +1062,54 @@ export function registerAdminBookingRoutes(router, deps = {}) {
   router.get('/admin/calendar', async (ctx) => {
     guard(ctx, deps);
     const filters = parseCalendarFilters(ctx.query);
-    const { spaces, unknownSpace } = calendarSpaceIds(db, filters);
+    const { spaces: visibleSpaces, all: allSpaces, unknownSpace } = calendarSpaceIds(db, filters);
+    const spaces = allSpaces ?? visibleSpaces;
     const nav = calendarNav(filters);
+    const today = todayBusinessDate();
 
     if (filters.view === 'week') {
       const weekStart = startOfWeekKey(filters.date);
       const fromAt = businessLocalToEpoch(weekStart, '00:00');
       const toAt = businessLocalToEpoch(addDaysToDateKey(weekStart, 7), '00:00');
       const data = loadCalendarData(db, {
-        fromAt, toAt, spaceIds: spaces.map((space) => space.id), statuses: statusesForFilter(filters.status),
+        fromAt, toAt, spaceIds: visibleSpaces.map((space) => space.id), statuses: statusesForFilter(filters.status),
       });
       const days = [];
       for (let index = 0; index < 7; index += 1) {
         const dateKey = addDaysToDateKey(weekStart, index);
         const dayStart = businessLocalToEpoch(dateKey, '00:00');
         const dayEnd = businessLocalToEpoch(addDaysToDateKey(dateKey, 1), '00:00');
+        const inDay = (event) => event.startAt < dayEnd && event.endAt > dayStart;
         days.push({
           dateKey,
           startAt: dayStart,
           endAt: dayEnd,
-          reservations: data.reservations.filter((r) => r.startAt < dayEnd && r.endAt > dayStart),
-          maintenance: data.maintenance.filter((m) => m.startAt < dayEnd && m.endAt > dayStart),
+          reservations: data.reservations.filter(inDay),
+          maintenance: data.maintenance.filter(inDay),
+          holds: data.holds.filter(inDay),
+          requests: data.requests.filter(inDay),
         });
       }
       ctx.html(renderCalendarWeekPage({
         actor: ctx.actor, csrfToken: ctx.csrfToken, flash: ctx.flash,
-        filters, spaces, days, nav, unknownSpace,
+        filters, spaces, days, nav, unknownSpace, data, today,
+        events: calendarEvents(data),
+        range: { fromAt, toAt },
         eventsUrl: '/api/admin/calendar/events',
       }));
       return;
     }
 
-    const dayGrids = spaces.map((space) => ({
-      space,
-      grid: getSpaceDayGrid(db, { spaceId: space.id, dateKey: filters.date, includeDetails: true }),
-    }));
+    const fromAt = businessLocalToEpoch(filters.date, '00:00');
+    const toAt = businessLocalToEpoch(addDaysToDateKey(filters.date, 1), '00:00');
+    const data = loadCalendarData(db, {
+      fromAt, toAt, spaceIds: visibleSpaces.map((space) => space.id), statuses: statusesForFilter(filters.status),
+    });
     ctx.html(renderCalendarPage({
       actor: ctx.actor, csrfToken: ctx.csrfToken, flash: ctx.flash,
-      filters, spaces, dayGrids, nav, unknownSpace,
+      filters, spaces, dayGrids: [], nav, unknownSpace, data, today,
+      events: calendarEvents(data),
+      range: { fromAt, toAt },
       eventsUrl: '/api/admin/calendar/events',
     }));
   });
@@ -1196,23 +1229,144 @@ export function registerAdminBookingRoutes(router, deps = {}) {
     const desks = asInteger(q(ctx.query, 'desks'), { field: 'desks', min: 1, max: MAX_UNITS_PER_BOOKING, fallback: 1 });
 
     // Authenticated staff endpoint: full conflict detail is deliberate here.
-    ctx.json(getSpaceAvailability(db, {
+    const availability = getSpaceAvailability(db, {
       spaceId: space.id, startAt, endAt, deskCount: desks, includeConflicts: true,
-    }));
+    });
+    ctx.json({
+      ...availability,
+      price: previewQuote(db, space, { startAt, endAt }, { unitCount: desks }),
+      space: {
+        id: space.id,
+        code: space.code,
+        name: space.name,
+        category: space.category,
+        openTime: space.openTime,
+        closeTime: space.closeTime,
+        minDurationMinutes: space.minDurationMinutes,
+        maxDurationMinutes: space.maxDurationMinutes,
+        bufferMinutes: space.bufferMinutes,
+        unitCount: space.unitCount ?? null,
+      },
+    });
   });
 
   router.get('/api/admin/calendar/events', async (ctx) => {
     guard(ctx, deps);
     const { fromAt, toAt } = parseCalendarRange(ctx.query);
     const filters = parseCalendarFilters(ctx.query);
-    const { spaces } = calendarSpaceIds(db, filters);
+    const { spaces: visibleSpaces } = calendarSpaceIds(db, filters);
     const data = loadCalendarData(db, {
       fromAt,
       toAt,
-      spaceIds: spaces.map((space) => space.id),
+      spaceIds: visibleSpaces.map((space) => space.id),
       statuses: statusesForFilter(filters.status),
     });
-    ctx.json({ events: calendarEvents(data) });
+    ctx.json({
+      ok: true,
+      fromAt,
+      toAt,
+      filters,
+      events: calendarEvents(data),
+    });
+  });
+
+  /**
+   * Atomically move/resize a reservation from the calendar. This is a thin
+   * adapter over updateReservation: opening-hours, capacity, buffer, trigger
+   * and rollback behaviour all remain in the service.
+   */
+  router.post('/api/admin/calendar/reschedule', async (ctx) => {
+    guard(ctx, deps);
+    await ctx.readBody();
+    normalizeCsrfBody(ctx.body);
+    requireCsrfGuard(ctx, deps);
+
+    const body = ctx.body && typeof ctx.body === 'object' ? ctx.body : {};
+    const kind = (text(body.kind) || 'reservation').toUpperCase();
+    if (kind !== 'RESERVATION') {
+      throw validationError('Only confirmed reservations can be moved or resized from the calendar.', { field: 'kind' });
+    }
+
+    const rawId = text(body.id ?? body.reservationId ?? body.reservation_id).replace(/^reservation:/i, '');
+    const reservationId = parsePositiveInt(rawId);
+    if (reservationId === null) throw validationError('A valid reservation id is required.', { field: 'id' });
+
+    const startAt = coerceEpochMs(body.startAt ?? body.start_at);
+    const endAt = coerceEpochMs(body.endAt ?? body.end_at);
+    if (startAt === null) throw validationError('Provide a valid start time.', { field: 'startAt' });
+    if (endAt === null) throw validationError('Provide a valid end time.', { field: 'endAt' });
+    if (endAt <= startAt) throw validationError('The end time must be after the start time.', { field: 'endAt' });
+
+    const patch = { startAt, endAt };
+    const rawSpace = text(body.spaceId ?? body.space_id);
+    if (rawSpace) {
+      const space = resolveSpaceReference(db, rawSpace);
+      if (!space) throw validationError('Choose a valid space.', { field: 'spaceId' });
+      patch.spaceId = space.id;
+    }
+    const rawUnits = text(body.unitCount ?? body.unit_count);
+    if (rawUnits) {
+      const units = parsePositiveInt(rawUnits);
+      if (units === null || units > MAX_UNITS_PER_BOOKING) {
+        throw validationError('The unit count must be a positive whole number.', { field: 'unitCount' });
+      }
+      patch.unitCount = units;
+    }
+
+    try {
+      const updated = updateReservation(db, {
+        actor: ctx.actor,
+        reservationId,
+        patch,
+      });
+      ctx.json({
+        ok: true,
+        event: reservationToEvent(updated.reservation),
+        reservation: updated.reservation,
+      });
+    } catch (error) {
+      if (error instanceof DoubleBookingError) {
+        ctx.json({
+          ok: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            details: error.details ?? { conflicts: error.conflicts ?? [] },
+          },
+          conflicts: error.conflicts ?? [],
+        }, 409);
+        return;
+      }
+      throw error;
+    }
+  });
+
+  /* Pending requests are annotations; approving/rejecting still runs through
+     bookingRequestService, including its hold and payment rules. */
+  router.post('/api/admin/calendar/requests/:id/approve', async (ctx) => {
+    guard(ctx, deps);
+    await ctx.readBody();
+    normalizeCsrfBody(ctx.body);
+    requireCsrfGuard(ctx, deps);
+    const id = parsePositiveInt(ctx.params.id);
+    if (id === null) throw notFound('Booking request not found.');
+    const request = approveBookingRequest(db, { actor: ctx.actor, requestId: id });
+    ctx.json({ ok: true, request });
+  });
+
+  router.post('/api/admin/calendar/requests/:id/reject', async (ctx) => {
+    guard(ctx, deps);
+    await ctx.readBody();
+    normalizeCsrfBody(ctx.body);
+    requireCsrfGuard(ctx, deps);
+    const id = parsePositiveInt(ctx.params.id);
+    if (id === null) throw notFound('Booking request not found.');
+    const request = rejectBookingRequest(db, {
+      actor: ctx.actor,
+      requestId: id,
+      reason: text(ctx.body.reason),
+    });
+    ctx.json({ ok: true, request });
   });
 }
 

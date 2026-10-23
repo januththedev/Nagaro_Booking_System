@@ -3,6 +3,7 @@
  * framework is required for any core workflow.
  */
 import { html, raw, join } from '../lib/html.js';
+import { ADMIN_ROLE, ADMIN_ROLE_LABEL, isAdminRole } from '../../server/domain/constants.js';
 
 /** Geometric "workspace skyline" brand mark. */
 function brandMark() {
@@ -75,6 +76,12 @@ const ADMIN_NAV = [
       href: '/admin/customers',
       label: 'Customers',
       icon: navIcon('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
+    },
+    {
+      href: '/admin/team',
+      label: 'Team & access',
+      superAdminOnly: true,
+      icon: navIcon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
     },
     {
       href: '/admin/audit',
@@ -180,31 +187,66 @@ ${body}
 </html>`;
 }
 
+function notificationBell(csrfToken) {
+  return html`<div class="admin-bell" data-notification-bell data-csrf="${csrfToken}">
+    <button class="admin-bell__button" type="button" data-notification-toggle
+            aria-expanded="false" aria-controls="admin-notification-panel" aria-label="Notifications">
+      ${navIcon('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>')}
+      <span class="admin-bell__badge" data-notification-badge hidden>0</span>
+    </button>
+    <section class="admin-bell__panel" id="admin-notification-panel" data-notification-panel hidden aria-label="Notifications">
+      <header class="admin-bell__head">
+        <div>
+          <p class="section-eyebrow">Operations</p>
+          <h2 class="admin-bell__title">Notifications</h2>
+        </div>
+        <button class="button button--ghost button--small" type="button" data-notification-enable hidden>Enable desktop alerts</button>
+      </header>
+      <p class="hint admin-bell__status" data-notification-bell-status role="status" aria-live="polite"></p>
+      <div class="admin-bell__list" data-notification-list>
+        <p class="hint">Loading notifications…</p>
+      </div>
+      <footer class="admin-bell__foot">
+        <a href="/admin/notifications">View all notifications</a>
+        <button class="button button--ghost button--small" type="button" data-notification-read-all>Mark all read</button>
+      </footer>
+    </section>
+  </div>`;
+}
+
 export function adminShell({
   title, actor, csrfToken, flash = null, activePath = '/admin', body, breadcrumbs = [],
-  pageActions = null, subtitle = null,
+  pageActions = null, subtitle = null, extraStyles = [], extraScripts = [],
 }) {
+  const roleLabel = ADMIN_ROLE_LABEL[actor?.role] ?? adminRoleFallback(actor?.role);
   return html`<!doctype html>
 <html lang="en">
 <head>
-${documentHead({ title: `${title} · Nagaro Admin` })}
+${documentHead({ title: `${title} · TRACE Ops` })}
+<meta name="csrf-token" content="${csrfToken}">
+${extraStyles.map((href) => html`<link rel="stylesheet" href="${href}">`)}
+<link rel="stylesheet" href="/assets/admin-shell.css">
+<link rel="stylesheet" href="/assets/admin-notifications.css">
 </head>
 <body class="page page--admin">
 <a class="skip-link" href="#main">Skip to main content</a>
 <div class="app-shell admin-shell">
   <aside class="sidebar admin-sidebar" id="admin-sidebar">
     <div class="sidebar__brand admin-sidebar__brand">
-      <a class="brand" href="/admin" aria-label="Nagaro admin home">
+      <a class="brand" href="/admin" aria-label="TRACE operations home">
         ${brandMark()}
-        <span class="brand__word"><span class="brand__name">Nagaro</span>
-          <span class="brand__sub">Operations Console</span></span>
+        <span class="brand__word"><span class="brand__name">TRACE</span>
+          <span class="brand__sub">Operations</span></span>
       </a>
     </div>
-    <nav class="sidebar__nav admin-nav" aria-label="Administration">
+    <nav class="sidebar__nav admin-nav" aria-label="TRACE operations administration">
       ${ADMIN_NAV.map((section) => html`<div class="nav-group admin-nav__section">
         <h2 class="admin-nav__heading">${section.group}</h2>
         <ul class="admin-nav__list">
-          ${section.items.filter((item) => !item.adminOnly || actor?.role === 'ADMIN').map((item) => html`<li>
+          ${section.items
+    .filter((item) => !item.adminOnly || isAdminRole(actor?.role))
+    .filter((item) => !item.superAdminOnly || actor?.role === ADMIN_ROLE.SUPER_ADMIN)
+    .map((item) => html`<li>
             <a href="${item.href}"
                class="nav-link admin-nav__link ${isActiveNav(activePath, item.href) ? 'is-active' : ''}"
                ${isActiveNav(activePath, item.href) ? raw('aria-current="page"') : ''}>
@@ -218,12 +260,15 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
     <div class="sidebar__user admin-sidebar__footer">
       <p class="admin-user">
         <span class="admin-user__name">${actor?.displayName ?? 'Staff'}</span>
-        <span class="admin-user__role">${actor?.role ?? ''}</span>
+        <span class="admin-user__role">${roleLabel}</span>
       </p>
-      <form method="post" action="/admin/logout" class="inline-form">
-        <input type="hidden" name="_csrf" value="${csrfToken}">
-        <button class="button button--ghost button--small" type="submit">Sign out</button>
-      </form>
+      <div class="admin-user__actions">
+        <a class="button button--ghost button--small" href="/admin/account">My account</a>
+        <form method="post" action="/admin/logout" class="inline-form">
+          <input type="hidden" name="_csrf" value="${csrfToken}">
+          <button class="button button--ghost button--small" type="submit">Sign out</button>
+        </form>
+      </div>
     </div>
   </aside>
   <div class="maincol admin-main">
@@ -241,11 +286,29 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
         </ol></nav>`
     : html`<span class="breadcrumbs breadcrumbs--empty"></span>`}
       <div class="topbar__actions admin-topbar__actions">
+        <form class="admin-search-form" method="get" action="/admin/search" role="search">
+          <label class="visually-hidden" for="admin-global-search">Search the admin console</label>
+          <input id="admin-global-search" name="q" type="search" maxlength="120"
+                 placeholder="Search records…" autocomplete="off" data-admin-search>
+          <button class="admin-search-form__button" type="submit" aria-label="Search">
+            ${navIcon('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')}
+          </button>
+        </form>
+        ${notificationBell(csrfToken)}
         <span class="tag" title="Business timezone: Asia/Colombo">SLST · UTC+05:30</span>
         <a class="button button--ghost button--small" href="/" target="_blank" rel="noopener">View public site</a>
         ${pageActions ?? ''}
       </div>
     </header>
+    <div class="admin-prep-strip" data-notification-prep hidden role="status" aria-live="polite">
+      <span class="admin-prep-strip__mark" aria-hidden="true">!</span>
+      <span class="admin-prep-strip__copy">
+        <strong data-notification-prep-title>Room preparation reminder</strong>
+        <span data-notification-prep-body></span>
+      </span>
+      <a class="admin-prep-strip__open" href="/admin/notifications" data-notification-prep-open>Open</a>
+      <button class="admin-prep-strip__dismiss" type="button" data-notification-prep-dismiss aria-label="Dismiss this room preparation reminder">×</button>
+    </div>
     <main id="main" class="admin-content">
       <div class="page-head admin-page-head">
         <div>
@@ -259,8 +322,16 @@ ${documentHead({ title: `${title} · Nagaro Admin` })}
   </div>
 </div>
 <script type="module" src="/assets/admin.js"></script>
+<script type="module" src="/assets/admin-search.js"></script>
+<script type="module" src="/assets/admin-notifications.js"></script>
+${extraScripts.map((src) => html`<script type="module" src="${src}"></script>`)}
 </body>
 </html>`;
+}
+
+function adminRoleFallback(role) {
+  if (!role) return '';
+  return String(role).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function isActiveNav(activePath, href) {

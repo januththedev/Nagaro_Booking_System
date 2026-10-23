@@ -166,7 +166,7 @@ export function inquiryNotificationEmail({ inquiry, space = null, baseUrl = null
  */
 export function inquiryAcknowledgementEmail({ inquiry, space = null, baseUrl = null } = {}) {
   const reference = inquiry.reference ?? '(new inquiry)';
-  const subject = `We received your booking request ${reference} - Nagaro`;
+  const subject = `We received your booking request ${reference} - TRACE`;
   const duration = durationText(inquiry);
   const quantities = quantityLines(inquiry, space);
   const message = inquiry.message ? String(inquiry.message) : null;
@@ -188,7 +188,7 @@ export function inquiryAcknowledgementEmail({ inquiry, space = null, baseUrl = n
   textLines.push(
     '',
     'This request is provisional: no booking is confirmed and no payment has been taken.',
-    'A member of the Nagaro team will be in touch using the contact details you provided.',
+    'A member of the TRACE team will be in touch using the contact details you provided.',
   );
   if (withdrawal) {
     textLines.push(
@@ -197,7 +197,7 @@ export function inquiryAcknowledgementEmail({ inquiry, space = null, baseUrl = n
       withdrawal,
     );
   }
-  textLines.push('', 'Nagaro - Trace Expert City');
+  textLines.push('', 'TRACE - Trace Expert City');
 
   const quantityRows = quantities
     .map((line) => {
@@ -222,9 +222,9 @@ export function inquiryAcknowledgementEmail({ inquiry, space = null, baseUrl = n
             ${quantityRows}
           </table>
           ${message ? `<h2 style="margin:24px 0 8px;font-size:16px;">Your message</h2><p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;">${esc(message)}</p>` : ''}
-          <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#57534e;">This request is provisional: no booking is confirmed and no payment has been taken. A member of the Nagaro team will be in touch using the contact details you provided.</p>
+          <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#57534e;">This request is provisional: no booking is confirmed and no payment has been taken. A member of the TRACE team will be in touch using the contact details you provided.</p>
           ${withdrawal ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.6;">If you no longer need this space, you can <a href="${esc(withdrawal)}" style="color:#1d4ed8;">withdraw your request</a>.</p>` : ''}
-          <p style="margin:24px 0 0;font-size:13px;color:#78716c;">Nagaro - Trace Expert City</p>
+          <p style="margin:24px 0 0;font-size:13px;color:#78716c;">TRACE - Trace Expert City</p>
         </td>
       </tr>
     </table>

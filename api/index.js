@@ -50,7 +50,7 @@ async function buildApp() {
   const { purgeExpiredSessions } = await import('../src/server/security/sessions.js');
   const { reconcileCompletedReservations } = await import('../src/server/services/bookingService.js');
   const { expireBookingHolds } = await import('../src/server/services/bookingRequestService.js');
-  const { ensureFirstAdmin } = await import('../src/server/services/adminUserService.js');
+  const { ensureFirstAdmin, purgeDeletedAdmins } = await import('../src/server/services/adminUserService.js');
 
   if (config.isVercel && !config.databaseUrl) {
     // Serverless filesystems are ephemeral: keep throwaway state in /tmp and
@@ -86,6 +86,12 @@ async function buildApp() {
 
   if (!blobEnabled()) ensureUploadDir();
   purgeExpiredSessions(db);
+  try {
+    const purged = purgeDeletedAdmins(db);
+    if (purged.count > 0) console.log(`[auth] purged ${purged.count} expired recycle-bin account(s)`);
+  } catch (error) {
+    console.error('[auth] recycle-bin purge failed', error?.message ?? error);
+  }
   reconcileCompletedReservations(db);
   expireBookingHolds(db);
 

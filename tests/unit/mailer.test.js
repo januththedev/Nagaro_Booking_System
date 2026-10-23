@@ -57,7 +57,7 @@ test('NOT_CONFIGURED: no SMTP_HOST means no connection attempt and an honest sta
     const config = mailerConfig();
     assert.equal(config.configured, false);
     assert.equal(config.reason, 'SMTP is not configured (SMTP_HOST is unset).');
-    assert.equal(config.from, 'no-reply@nagaro.local');
+    assert.equal(config.from, 'no-reply@trace.local');
 
     const result = await sendMail({ to: 'someone@example.com', subject: 'Hi', text: 'Body' });
     assert.equal(result.status, 'NOT_CONFIGURED');

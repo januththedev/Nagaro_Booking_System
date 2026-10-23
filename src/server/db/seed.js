@@ -8,13 +8,18 @@
  * Idempotent: existing spaces (matched by code) are never duplicated or
  * overwritten. Demo reservations are only created when the database has no
  * reservations at all, so re-running never piles up fake bookings.
+ *
+ * Plain catalogue mode requires an existing administrator to attribute the
+ * seed audit entries to. The demo administrator is only created when `--demo`
+ * (or NAGARO_DEMO_ADMIN_PASSWORD) explicitly opts in, so an empty production
+ * database can never receive documented demo credentials by accident.
  */
 import { deflateSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { getDb, closeDb } from './connection.js';
-import { applyMigrations } from './migrate.js';
+import { getDb, closeDb, databasePath } from './connection.js';
+import { applyMigrations, postgresSchemaReady } from './migrate.js';
 import { businessLocalToEpoch, businessDateKey, startOfBusinessDay } from '../domain/time.js';
 import { SPACE_CATEGORY, SPACE_STATUS } from '../domain/constants.js';
 import { createSpace, getSpaceByCode, publishSpace, addImageRecord } from '../services/spaceService.js';
@@ -1548,24 +1553,41 @@ export function maybeSeedDemoData(db) {
     console.log('[seed] spaces already present; demo seed skipped');
     return { skipped: true };
   }
-  const actor = ensureSeedActor(db);
+  const actor = ensureSeedActor(db, { demo: true });
   seedCatalogue(db, { actor });
   seedDemoContent(db, { actor });
   console.log('[seed] demo catalogue, customers, reservations and inquiries created');
   return { skipped: false };
 }
 
-function ensureSeedActor(db) {
-  const existing = db.prepare("SELECT * FROM admin_user WHERE role = 'ADMIN' ORDER BY id LIMIT 1").get();
-  if (existing) return { id: existing.id, label: `${existing.display_name} (${existing.role})`, role: existing.role };
+function ensureSeedActor(db, { demo = false } = {}) {
+  const existing = db.prepare(`
+    SELECT * FROM admin_user
+     WHERE role = 'ADMIN' AND COALESCE(is_system, 0) = 0 AND deleted_at IS NULL
+     ORDER BY is_super_admin DESC, id ASC LIMIT 1
+  `).get();
+  if (existing) {
+    const isSuper = existing.is_super_admin === 1;
+    return {
+      id: existing.id,
+      label: `${existing.display_name} (${isSuper ? 'SUPER_ADMIN' : 'ADMIN'})`,
+      role: isSuper ? 'SUPER_ADMIN' : 'ADMIN',
+    };
+  }
 
-  const email = process.env.NAGARO_DEMO_ADMIN_EMAIL ?? 'admin@nagaro.local';
-  const password = process.env.NAGARO_DEMO_ADMIN_PASSWORD ?? 'NagaroDemo2026';
+  if (!demo) {
+    throw new Error(
+      'No administrator exists. Bootstrap the first Super Admin (NAGARO_BOOTSTRAP_ADMIN_*) or run `npm run seed -- --demo` for a demo database.',
+    );
+  }
+
+  const email = process.env.NAGARO_DEMO_ADMIN_EMAIL ?? 'admin@trace.local';
+  const password = process.env.NAGARO_DEMO_ADMIN_PASSWORD ?? 'TraceDemo2026';
   const now = Date.now();
   const info = db.prepare(`INSERT INTO admin_user
-      (email, password_hash, display_name, role, is_active, created_at, updated_at)
-      VALUES (?,?,?,'ADMIN',1,?,?)`)
-    .run(email, hashPassword(password), 'Demo Administrator', now, now);
+      (email, password_hash, display_name, role, is_super_admin, is_active, created_at, updated_at)
+      VALUES (?,?,?,'ADMIN',1,1,?,?)`)
+    .run(email, hashPassword(password), 'TRACE Demo Administrator', now, now);
   const id = Number(info.lastInsertRowid);
   recordAudit(db, {
     actorAdminUserId: id, actorLabel: 'seed',
@@ -1573,23 +1595,40 @@ function ensureSeedActor(db) {
     summary: `Seeded demonstration administrator ${email}`,
   });
   console.log(`[seed] created demonstration administrator ${email}`);
-  return { id, label: 'Demo Administrator (ADMIN)', role: 'ADMIN' };
+  return { id, label: 'TRACE Demo Administrator (SUPER_ADMIN)', role: 'SUPER_ADMIN' };
 }
 
 const invokedDirectly = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('db/seed.js');
 if (invokedDirectly) {
   const db = getDb();
-  applyMigrations(db);
-  const actor = ensureSeedActor(db);
-  const catalogue = seedCatalogue(db, { actor });
-  const published = catalogue.filter((c) => c.space.status === SPACE_STATUS.PUBLISHED).length;
-  console.log(`Catalogue ready: ${catalogue.length} spaces (${published} published).`);
-  if (process.argv.includes('--demo')) {
-    const demo = seedDemoContent(db, { actor });
-    console.log(demo.skipped ? `Demo reservations skipped: ${demo.reason}` : `Demo content: ${demo.reservations} reservations, ${demo.customers} customers.`);
+  if (db.dialect === 'postgres' && !postgresSchemaReady(db)) {
+    console.error('PostgreSQL schema is not migrated. Run `npm run migrate:postgres` first.');
+    process.exitCode = 1;
+    closeDb();
+  } else {
+    if (db.dialect !== 'postgres') applyMigrations(db);
+    let actor;
+    try {
+      actor = ensureSeedActor(db, {
+        demo: process.argv.includes('--demo') || Boolean(process.env.NAGARO_DEMO_ADMIN_PASSWORD),
+      });
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 1;
+      closeDb();
+    }
+    if (actor) {
+      const catalogue = seedCatalogue(db, { actor });
+      const published = catalogue.filter((c) => c.space.status === SPACE_STATUS.PUBLISHED).length;
+      console.log(`Catalogue ready: ${catalogue.length} spaces (${published} published).`);
+      if (process.argv.includes('--demo')) {
+        const demo = seedDemoContent(db, { actor });
+        console.log(demo.skipped ? `Demo reservations skipped: ${demo.reason}` : `Demo content: ${demo.reservations} reservations, ${demo.customers} customers.`);
+      }
+      console.log(`Database: ${db.dialect === 'postgres' ? 'PostgreSQL (DATABASE_URL)' : databasePath()}`);
+      closeDb();
+    }
   }
-  console.log(`Database: ${process.env.NAGARO_DB_PATH ?? 'data/nagaro.db'}`);
-  closeDb();
 }
 
 export { encodePng, gradientPng, renderSpaceScenePng, existsSync, mkdirSync };

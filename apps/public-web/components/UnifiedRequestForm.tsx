@@ -8,11 +8,30 @@ import { format } from "../lib/i18n";
 import { useLiveRefresh } from "../lib/useLiveRefresh";
 import { useT } from "./I18nProvider";
 
+function prefillClock(value:string|null){
+  const match=/^(\d{1,2}):(\d{2})$/.exec((value??"").trim());
+  if(!match)return "";
+  const hours=Number(match[1]);const minutes=Number(match[2]);
+  if(hours>23||minutes>59)return "";
+  return `${hours<10?"0":""}${hours}:${minutes<10?"0":""}${minutes}`;
+}
+
 export function UnifiedRequestForm({space,formToken}:{space:PublicSpace;formToken:string}){
   const t=useT();
   const router=useRouter(); const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [draftLoaded,setDraftLoaded]=useState(false);
   const [values,setValues]=useState({date:"",startTime:space.openTime||"09:00",endTime:space.closeTime||"17:00",unitCount:"1",attendees:"",purpose:"",fullName:"",email:"",phone:"",organization:""});
   const [liveAvailability,setLiveAvailability]=useState<{state:"idle"|"checking"|"ok"|"busy"|"invalid"|"error-window"|"error";freeUnits?:number;totalUnits?:number}>({state:"idle"});
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const rawDate=(params.get("date")??"").trim();
+    const date=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:"";
+    const startTime=prefillClock(params.get("start")??params.get("start_time"));
+    const endTime=prefillClock(params.get("end")??params.get("end_time"));
+    const rawUnits=(params.get("unit_count")??params.get("desks")??"").trim();
+    const unitCount=/^\d{1,3}$/.test(rawUnits)&&Number(rawUnits)>=1&&Number(rawUnits)<=500?String(Number(rawUnits)):"";
+    if(!date&&!startTime&&!endTime&&!unitCount)return;
+    setValues(v=>({...v,...(date?{date}:{}),...(startTime?{startTime}:{}),...(endTime?{endTime}:{}),...(unitCount?{unitCount}:{})}));
+  },[]);
   useEffect(()=>{const raw=window.location.hash.match(/draft=([^&]+)/)?.[1];if(!raw)return;fetch(clientApiPath('/api/public/assistant/drafts/resolve'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:decodeURIComponent(raw)})}).then(r=>r.json()).then(body=>{const d=body?.draft;if(!d)return;setValues(v=>({...v,date:d.date||v.date,startTime:d.startTime||v.startTime,endTime:d.endTime||v.endTime,unitCount:String(d.unitCount||v.unitCount),attendees:String(d.attendees||v.attendees),purpose:d.purpose||v.purpose,fullName:d.customerName||v.fullName,email:d.email||v.email,phone:d.phone||v.phone,organization:d.organization||v.organization}));setDraftLoaded(true);history.replaceState(null,'',location.pathname);}).catch(()=>{});},[]);
   const set=(key:keyof typeof values)=>(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>setValues(v=>({...v,[key]:e.target.value}));
   const startIso=values.date?`${values.date}T${values.startTime}:00+05:30`:"";

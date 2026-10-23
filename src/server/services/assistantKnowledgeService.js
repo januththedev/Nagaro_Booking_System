@@ -7,7 +7,7 @@
  * from leaking into public answers.
  */
 import { withWriteTransaction } from '../db/connection.js';
-import { ADMIN_ROLE } from '../domain/constants.js';
+import { isAdminRole } from '../domain/constants.js';
 import { conflict, forbidden, notFound, validationError } from '../domain/errors.js';
 import { recordAudit } from './auditService.js';
 
@@ -29,7 +29,7 @@ const STOP_WORDS = new Set([
 
 function requireAdminActor(actor) {
   if (!actor?.id) throw validationError('An authenticated administrator is required.');
-  if (actor.role !== ADMIN_ROLE.ADMIN) throw forbidden('Only administrators can manage Guider knowledge.');
+  if (!isAdminRole(actor.role)) throw forbidden('Only administrators can manage Guider knowledge.');
 }
 
 function integerId(value) {

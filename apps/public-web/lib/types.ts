@@ -105,6 +105,45 @@ export type BookingRequest = {
   };
 };
 
+export type PublicCalendarSlot = {
+  startAt: number;
+  endAt: number;
+  freeUnits: number;
+  totalUnits: number;
+  isFree: boolean;
+};
+
+export type PublicCalendarSpaceDay = {
+  spaceCode: string;
+  openTime: string;
+  closeTime: string;
+  totalUnits: number;
+  slots: PublicCalendarSlot[];
+};
+
+export type PublicCalendarDay = {
+  dateKey: string;
+  spaces: PublicCalendarSpaceDay[];
+};
+
+export type PublicCalendarSpace = {
+  code: string;
+  name: string;
+  category: string;
+  openTime: string;
+  closeTime: string;
+  totalUnits: number;
+};
+
+/** GET /api/public/availability/calendar */
+export type PublicCalendarResponse = {
+  from: string;
+  to: string;
+  timezone: string;
+  spaces: PublicCalendarSpace[];
+  days: PublicCalendarDay[];
+};
+
 export type ApiError = {
   ok?: false;
   error?: { code?: string; message?: string; details?: Record<string, unknown> };

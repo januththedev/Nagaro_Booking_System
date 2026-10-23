@@ -1,0 +1,353 @@
+/* TRACE Ops notification bell, alert centre and reminder emphasis. */
+
+.admin-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-bell__button {
+  position: relative;
+  display: inline-flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.admin-bell__button:hover,
+.admin-bell__button[aria-expanded="true"] {
+  border-color: var(--pine);
+  color: var(--pine);
+}
+
+.admin-bell__button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.admin-bell__badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.3rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.3rem;
+  border: 2px solid var(--card);
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1rem;
+  text-align: center;
+}
+
+.admin-bell__panel {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + 0.55rem);
+  right: 0;
+  width: min(25rem, calc(100vw - 1.5rem));
+  max-height: min(34rem, 72vh);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: 0 18px 55px -18px rgb(7 42 33 / 45%);
+}
+
+.admin-bell__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+
+.admin-bell__title {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.admin-bell__status {
+  min-height: 1rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+  font-size: 0.76rem;
+}
+
+.admin-bell__status--ok { color: var(--ok); }
+.admin-bell__status--error { color: var(--danger); }
+
+.admin-bell__list {
+  display: grid;
+  gap: 0.6rem;
+  padding: var(--space-3);
+}
+
+.admin-bell__foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--line);
+  background: var(--card);
+  font-size: 0.82rem;
+}
+
+/* ---------------------------------------------------------- prep alert strip */
+
+.admin-prep-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem var(--space-5);
+  border-bottom: 1px solid var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--ink);
+  box-shadow: inset 4px 0 0 var(--warn);
+}
+
+.admin-prep-strip[hidden] {
+  display: none;
+}
+
+.admin-prep-strip__mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 1.55rem;
+  height: 1.55rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--warn);
+  color: #fff;
+  font-weight: 900;
+}
+
+.admin-prep-strip__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 0.45rem;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+  font-size: 0.84rem;
+}
+
+.admin-prep-strip__open {
+  color: var(--ink);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.admin-prep-strip__dismiss {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+
+.admin-prep-strip__dismiss:hover {
+  background: rgb(0 0 0 / 7%);
+  color: var(--ink);
+}
+
+/* -------------------------------------------------------------- alert items */
+
+.notification-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.notification-item {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid transparent;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.notification-item:hover {
+  border-color: var(--line-strong);
+  background: var(--paper);
+}
+
+.notification-item.is-read {
+  opacity: 0.72;
+}
+
+.notification-item--reminder {
+  border-color: var(--warn-border);
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.notification-item--reminder:hover {
+  background: #f7e7c4;
+}
+
+.notification-item__mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 1.55rem;
+  height: 1.55rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--sunken);
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+.notification-item--reminder .notification-item__mark {
+  background: var(--warn);
+  color: #fff;
+}
+
+.notification-item__copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.notification-item__top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.notification-item__title {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.notification-item__body {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.notification-item__meta {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- alert centre */
+
+.notification-page__lead-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.notification-page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.notification-page__status {
+  min-height: 1.25rem;
+  margin: 0;
+}
+
+.notification-page__status--ok {
+  color: var(--ok);
+}
+
+.notification-page__status--error {
+  color: var(--danger);
+}
+
+.notification-group {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.notification-group__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.notification-group__head .card__title {
+  margin: 0.1rem 0 0;
+}
+
+.notification-group .notification-item {
+  background: var(--paper);
+}
+
+.notification-group .notification-item--reminder {
+  background: var(--warn-bg);
+}
+
+@media (max-width: 640px) {
+  .admin-bell__panel {
+    position: fixed;
+    top: 4.25rem;
+    right: 0.6rem;
+    left: 0.6rem;
+    width: auto;
+    max-height: calc(100vh - 5rem);
+  }
+
+  .notification-page__lead-body {
+    flex-direction: column;
+  }
+
+  .admin-bell__foot {
+    flex-wrap: wrap;
+  }
+
+  .admin-prep-strip {
+    align-items: flex-start;
+    padding-inline: var(--space-3);
+  }
+
+  .admin-prep-strip__copy {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+}

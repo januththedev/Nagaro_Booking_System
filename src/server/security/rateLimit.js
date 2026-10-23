@@ -65,6 +65,18 @@ export function enforcePublicInquiryLimits(db, { ip, email, now = Date.now() }) 
   });
 }
 
+/** Anonymous read protection for cache-miss-heavy public data endpoints. */
+export function enforcePublicReadLimit(db, {
+  ip, scope = 'public-read', limit = 120, windowMs = 60_000, now = Date.now(),
+} = {}) {
+  return enforce(db, ipBucket(scope, ip), {
+    limit,
+    windowMs,
+    now,
+    message: 'Too many availability checks from this connection. Please try again shortly.',
+  });
+}
+
 export function enforceLoginLimits(db, { ip, email, now = Date.now() }) {
   enforce(db, ipBucket('login', ip), {
     limit: 30, windowMs: 15 * 60_000, now,

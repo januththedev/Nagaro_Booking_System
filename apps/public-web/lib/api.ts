@@ -1,4 +1,11 @@
-import type { Availability, BookingRequest, PublicSpace, Reservation, SpaceListResponse } from "./types";
+import type {
+  Availability,
+  BookingRequest,
+  PublicCalendarResponse,
+  PublicSpace,
+  Reservation,
+  SpaceListResponse,
+} from "./types";
 
 export const serverBase = () => {
   // Order matters. The deployment-specific VERCEL_URL sits behind Vercel's
@@ -63,6 +70,31 @@ export async function getBooking(reference: string, token: string): Promise<Rese
       { headers: { Authorization: `Bearer ${token}` } },
     );
     return body.data.reservation;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAvailabilityCalendar(
+  from: string,
+  to: string,
+): Promise<PublicCalendarResponse | null> {
+  try {
+    const query = new URLSearchParams({ from, to });
+    // This request runs during Next server rendering. Cache it briefly so a
+    // busy page does not proxy every visitor through the same server IP and
+    // exhaust the API's anonymous read limit. The hydrated calendar continues
+    // polling the same-origin endpoint directly for live updates.
+    const response = await fetch(
+      `${serverBase()}/api/public/availability/calendar?${query.toString()}`,
+      {
+        headers: { Accept: "application/json" },
+        next: { revalidate: 30 },
+      },
+    );
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body || !Array.isArray(body.days)) return null;
+    return body as PublicCalendarResponse;
   } catch {
     return null;
   }

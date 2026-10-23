@@ -124,6 +124,8 @@ export function renderReservationListPage({
     sort: filters.sort ?? 'start',
   };
   Object.keys(extraQuery).forEach((key) => { if (!extraQuery[key]) delete extraQuery[key]; });
+  const activeFilterCount = ['space', 'category', 'customer', 'q', 'from', 'to']
+    .filter((key) => filters[key]).length + (currentStatus !== 'all' ? 1 : 0);
 
   const statusTabs = html`<nav class="quick-tabs cluster" aria-label="Filter reservations by status">
     ${RESERVATION_STATUS_TABS.map((tab) => {
@@ -157,64 +159,77 @@ export function renderReservationListPage({
     };
   });
 
+  const todayKey = businessDateKey(Date.now());
+  const weekEndKey = businessDateKey(Date.now() + 7 * 86400000);
+  const quickDateHref = (from, to) => `/admin/reservations?status=${encodeURIComponent(currentStatus)}&from=${from}&to=${to}`;
+
   const body = html`<div class="stack">
-    <div class="cluster">
+    <div class="cluster reservations-toolbar">
       ${statusTabs}
+      <span class="hint">Jump to:</span>
+      <a class="button button--ghost button--small" href="${quickDateHref(todayKey, todayKey)}">Today</a>
+      <a class="button button--ghost button--small" href="${quickDateHref(todayKey, weekEndKey)}">Next 7 days</a>
     </div>
 
     ${card({
     title: 'Filters',
-    description: 'Narrow the reservation ledger by status, space, category, customer, reference or date range.',
-    body: html`<form class="filter-bar" method="get" action="/admin/reservations">
-      <div class="filter-bar__field">
-        <label for="filter-status">Status</label>
-        <select id="filter-status" name="status">
-          ${[['all', 'All statuses'], ['CONFIRMED', 'Confirmed'], ['COMPLETED', 'Completed'], ['CANCELLED', 'Cancelled']]
+    description: 'Status tabs are always one click away. Open this panel for space, customer, reference and date filters.',
+    body: html`<details class="filter-disclosure"${raw(activeFilterCount > 0 ? ' open' : '')}>
+      <summary class="filter-disclosure__summary">
+        <strong>Search &amp; advanced filters</strong>
+        <span class="hint">${activeFilterCount > 0 ? `${activeFilterCount} active filter${activeFilterCount === 1 ? '' : 's'}` : 'Optional — open to narrow the ledger'}</span>
+      </summary>
+      <form class="filter-bar" method="get" action="/admin/reservations">
+        <div class="filter-bar__field">
+          <label for="filter-status">Status</label>
+          <select id="filter-status" name="status">
+            ${[['all', 'All statuses'], ['CONFIRMED', 'Confirmed'], ['COMPLETED', 'Completed'], ['CANCELLED', 'Cancelled']]
         .map(([value, label]) => html`<option value="${value}"${raw(currentStatus === value ? ' selected' : '')}>${label}</option>`)}
-        </select>
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-space">Space</label>
-        <select id="filter-space" name="space">
-          <option value="">All spaces</option>
-          ${spaces.map((space) => html`<option value="${space.id}"${raw(String(filters.space ?? '') === String(space.id) ? ' selected' : '')}>${space.code} \u2014 ${space.name}</option>`)}
-        </select>
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-category">Category</label>
-        <select id="filter-category" name="category">
-          <option value="">All categories</option>
-          ${SPACE_CATEGORY_ORDER.map((category) => html`<option value="${category}"${raw(filters.category === category ? ' selected' : '')}>${SPACE_CATEGORY_LABEL[category]}</option>`)}
-        </select>
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-customer">Customer</label>
-        <input id="filter-customer" name="customer" type="search" value="${filters.customer ?? ''}" placeholder="Name, organisation or email">
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-q">Reference</label>
-        <input id="filter-q" name="q" type="search" value="${filters.q ?? ''}" placeholder="NG-2026-00001, customer or space">
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-from">From</label>
-        <input id="filter-from" name="from" type="date" value="${filters.from ?? ''}">
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-to">To</label>
-        <input id="filter-to" name="to" type="date" value="${filters.to ?? ''}">
-      </div>
-      <div class="filter-bar__field">
-        <label for="filter-sort">Sort</label>
-        <select id="filter-sort" name="sort">
-          ${[['start', 'Period (earliest first)'], ['created', 'Most recently created'], ['reference', 'Reference']]
+          </select>
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-space">Space</label>
+          <select id="filter-space" name="space">
+            <option value="">All spaces</option>
+            ${spaces.map((space) => html`<option value="${space.id}"${raw(String(filters.space ?? '') === String(space.id) ? ' selected' : '')}>${space.code} \u2014 ${space.name}</option>`)}
+          </select>
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-category">Category</label>
+          <select id="filter-category" name="category">
+            <option value="">All categories</option>
+            ${SPACE_CATEGORY_ORDER.map((category) => html`<option value="${category}"${raw(filters.category === category ? ' selected' : '')}>${SPACE_CATEGORY_LABEL[category]}</option>`)}
+          </select>
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-customer">Customer</label>
+          <input id="filter-customer" name="customer" type="search" value="${filters.customer ?? ''}" placeholder="Name, organisation or email">
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-q">Reference</label>
+          <input id="filter-q" name="q" type="search" value="${filters.q ?? ''}" placeholder="NG-2026-00001, customer or space">
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-from">From</label>
+          <input id="filter-from" name="from" type="date" value="${filters.from ?? ''}">
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-to">To</label>
+          <input id="filter-to" name="to" type="date" value="${filters.to ?? ''}">
+        </div>
+        <div class="filter-bar__field">
+          <label for="filter-sort">Sort</label>
+          <select id="filter-sort" name="sort">
+            ${[['start', 'Period (earliest first)'], ['created', 'Most recently created'], ['reference', 'Reference']]
         .map(([value, label]) => html`<option value="${value}"${raw((filters.sort ?? 'start') === value ? ' selected' : '')}>${label}</option>`)}
-        </select>
-      </div>
-      <div class="filter-bar__actions">
-        <button class="button button--primary button--small" type="submit">Apply</button>
-        <a class="button button--ghost button--small" href="/admin/reservations">Reset</a>
-      </div>
-    </form>`,
+          </select>
+        </div>
+        <div class="filter-bar__actions">
+          <button class="button button--primary button--small" type="submit">Apply</button>
+          <a class="button button--ghost button--small" href="/admin/reservations">Reset</a>
+        </div>
+      </form>
+    </details>`,
   })}
 
     ${card({
@@ -241,6 +256,7 @@ export function renderReservationListPage({
     csrfToken,
     flash,
     activePath: '/admin/reservations',
+    extraStyles: ['/assets/admin-ux.css'],
     breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'Reservations' }],
     pageActions: html`<a class="button button--primary button--small" href="/admin/reservations/new">New reservation</a>`,
     body,
@@ -462,6 +478,7 @@ export function renderBookingFormPage({
     csrfToken,
     flash,
     activePath: '/admin/reservations',
+    extraStyles: ['/assets/admin-ux.css'],
     breadcrumbs: isEdit
       ? [{ label: 'Admin', href: '/admin' }, { label: 'Reservations', href: '/admin/reservations' },
         { label: reservation.reference, href: `/admin/reservations/${reservation.id}` }, { label: 'Edit' }]

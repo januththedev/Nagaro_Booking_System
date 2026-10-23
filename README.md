@@ -28,7 +28,7 @@ See `ARCHITECTURE.md` §5 and `DATA_MODEL.md` for the full mechanism, and `tests
 ## Getting started
 
 ```bash
-npm install                 # one dependency: nodemailer
+npm install                 # install backend and public-web dependencies
 cp .env.example .env        # optional; sensible defaults work without it
 npm run migrate             # create/upgrade the database schema
 npm run seed -- --demo      # optional: demonstration catalogue, customers and bookings
@@ -65,11 +65,20 @@ Either set both `NAGARO_BOOTSTRAP_ADMIN_EMAIL` and `NAGARO_BOOTSTRAP_ADMIN_PASSW
 before the first boot (ignored once any administrator exists), or run:
 
 ```bash
-npm run admin:create -- --email ops@nagaro.example --name "Ops Lead" --role ADMIN
+npm run admin:create -- --email ops@trace.example --name "Ops Lead" --role ADMIN
 ```
 
 The password is read from the prompt, `--password`, or `NAGARO_NEW_ADMIN_PASSWORD`.
-`--demo` seeding creates `admin@nagaro.local` / `NagaroDemo2026` — **development only**.
+Use `--role SUPER_ADMIN` to create another Super Admin, subject to the three-seat
+cap. The first administrator created by bootstrap is a **Super Admin**. Only Super Admins
+can manage accounts, and at most three may be active at once; ordinary Admins can
+use the console and change their own password. See `docs/TRACE_UPGRADE.md`.
+
+Seeding an empty development database with `npm run seed -- --demo` creates
+`admin@trace.local` / `TraceDemo2026` - **development only**. Plain
+`npm run seed` does not create an account; bootstrap the first Super Admin or
+use the demo flag. Production uses `provision:postgres` and the bootstrap
+variables instead.
 
 ## Scripts
 
@@ -77,7 +86,8 @@ The password is read from the prompt, `--password`, or `NAGARO_NEW_ADMIN_PASSWOR
 |---|---|
 | `npm start` | Run the server |
 | `npm run dev` | Run with `--watch` |
-| `npm run migrate` | Apply pending migrations |
+| `npm run migrate` | Apply pending SQLite migrations |
+| `npm run migrate:postgres` | Apply pending PostgreSQL migrations (requires `DIRECT_URL` or `DATABASE_URL`) |
 | `npm run seed` | Seed the catalogue (`-- --demo` adds demo bookings and inquiries) |
 | `npm run provision:postgres` | Migrate Supabase, create the first admin if needed, and seed the production catalogue |
 | `npm run verify:vercel` | Validate the checked-in Vercel layout (`-- --require-env` also checks connected environment names) |
@@ -124,6 +134,7 @@ data/          the SQLite database (created at runtime, not committed)
 | `API_CONTRACTS.md` | Frozen shared vocabulary, service signatures, object shapes, route inventory, error codes |
 | `docs/BOOKING_RULES.md` | Business rules in plain language, plus every documented assumption |
 | `docs/IMAGE_PROVENANCE.md` | Where demo imagery comes from and why it is not a photograph of the venue |
+| `docs/TRACE_UPGRADE.md` | Two-role team management, recycle bin, calendars, notifications, Web Push and scheduler setup |
 | `REQUIREMENT_TEST_MATRIX.md` | Requirement → implementation → test traceability |
 | `SECURITY_REVIEW.md` | Security findings and their resolution |
 | `docs/UX_GUIDE.md` | Palette, contrast ratios, breakpoints, client-side feature contracts |

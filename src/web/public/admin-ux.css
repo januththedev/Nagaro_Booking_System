@@ -1,0 +1,286 @@
+/* Focused UX upgrades shared by the admin inbox, reservation ledger and dashboard.
+   Kept separate from styles.css so the redesign can evolve safely. */
+
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.request-tabs {
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.request-tabs .button.is-active {
+  background: var(--pine);
+  border-color: var(--pine);
+  color: #fff;
+}
+
+.request-tabs .tag {
+  margin-left: 0.35rem;
+}
+
+.request-card .card__head {
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.request-card .card__title {
+  margin: 0;
+}
+
+.request-card .card__description {
+  margin-bottom: 0;
+}
+
+.request-card__actions {
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.request-decision {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.request-decision > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.request-decision > summary::-webkit-details-marker {
+  display: none;
+}
+
+.request-decision__form {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sunken);
+  min-width: min(28rem, calc(100vw - 3rem));
+}
+
+.request-policy > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.request-policy > summary::-webkit-details-marker {
+  display: none;
+}
+
+.request-policy[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.filter-disclosure > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0;
+  list-style: none;
+}
+
+.filter-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-disclosure > summary::after {
+  content: 'Show';
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--pine);
+  margin-left: auto;
+}
+
+.filter-disclosure[open] > summary::after {
+  content: 'Hide';
+}
+
+.filter-disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-4);
+}
+
+.dashboard-secondary > summary {
+  cursor: pointer;
+  list-style: none;
+  border-bottom: 1px solid transparent;
+}
+
+.dashboard-secondary > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-secondary[open] > summary {
+  border-bottom-color: var(--line);
+}
+
+.dashboard-secondary[open] > summary .button {
+  border-color: var(--line);
+}
+
+.dashboard-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.dashboard-quick-actions a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+
+.dashboard-quick-actions a:hover {
+  border-color: var(--pine);
+  transform: translateY(-1px);
+}
+
+.dashboard-quick-actions strong {
+  display: block;
+}
+
+.dashboard-quick-actions .hint {
+  margin: 0;
+}
+
+/* ------------------------------------------------------- inline row actions */
+.space-row-actions {
+  position: relative;
+  display: inline-block;
+}
+
+.space-row-actions > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.space-row-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.space-row-actions__menu {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + 0.3rem);
+  right: 0;
+  display: grid;
+  min-width: 10rem;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.space-row-actions__menu .inline-form,
+.space-row-actions__menu .button {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------- global search */
+.admin-search-page__row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.admin-search-page__row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search-group__list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.search-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.65rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.search-result:hover {
+  border-color: var(--line);
+  background: var(--sunken);
+}
+
+.search-result__copy {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.search-result__title {
+  font-size: 0.9rem;
+}
+
+.search-result__subtitle,
+.search-result__meta {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.search-result__meta {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.search-result__arrow {
+  color: var(--gold);
+  font-size: 1.1rem;
+}
+
+@media (min-width: 1024px) {
+  [data-booking-form] > aside {
+    position: sticky;
+    top: 5.5rem;
+    align-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .request-card .card__head {
+    flex-direction: column;
+  }
+
+  .request-decision__form {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .request-tabs {
+    gap: var(--space-1);
+  }
+
+  .request-tabs .button {
+    padding-inline: var(--space-3);
+  }
+}

@@ -14,7 +14,7 @@ import { createPublicFrontendProxy } from './http/publicFrontendProxy.js';
 import { ensureUploadDir } from './security/uploads.js';
 import { blobEnabled } from './security/blobStorage.js';
 import { purgeExpiredSessions } from './security/sessions.js';
-import { ensureFirstAdmin } from './services/adminUserService.js';
+import { ensureFirstAdmin, purgeDeletedAdmins } from './services/adminUserService.js';
 import { reconcileCompletedReservations } from './services/bookingService.js';
 import { expireBookingHolds } from './services/bookingRequestService.js';
 import { mailerConfig } from './mail/mailer.js';
@@ -59,6 +59,19 @@ if (db.dialect === 'postgres') {
 
 if (!blobEnabled()) ensureUploadDir();
 purgeExpiredSessions(db);
+const purgedAccounts = purgeDeletedAdmins(db);
+if (purgedAccounts.count > 0) console.log(`[auth] purged ${purgedAccounts.count} expired recycle-bin account(s)`);
+// Keep the recycle bin honest while the process stays up: a daily sweep
+// removes accounts whose 30-day window elapsed after boot.
+const recycleBinTimer = setInterval(() => {
+  try {
+    const result = purgeDeletedAdmins(db);
+    if (result.count > 0) console.log(`[auth] purged ${result.count} expired recycle-bin account(s)`);
+  } catch (error) {
+    console.error('[auth] recycle-bin purge failed', error);
+  }
+}, 24 * 60 * 60 * 1000);
+recycleBinTimer.unref();
 const completed = reconcileCompletedReservations(db);
 if (completed > 0) console.log(`[db] marked ${completed} past reservation(s) as completed`);
 const expiredHolds = expireBookingHolds(db);
@@ -109,7 +122,7 @@ server.requestTimeout = 30_000;
 
 server.listen(config.port, config.host, () => {
   const mail = mailerConfig();
-  console.log('Nagaro Space Booking System');
+  console.log('TRACE Space Booking System');
   console.log(`             ${describeConfig(config)}`);
   console.log(`             email status: ${mail.configured ? 'SMTP configured' : 'NOT configured'}`);
   console.log(`             booking integrity: ${integrityGuards} database overlap guard(s) active`);

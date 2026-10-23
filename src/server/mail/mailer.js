@@ -18,7 +18,7 @@
 import nodemailer from 'nodemailer';
 import { INQUIRY_EMAIL_STATUS } from '../domain/constants.js';
 
-const DEFAULT_FROM = 'no-reply@nagaro.local';
+const DEFAULT_FROM = 'no-reply@trace.local';
 const TIMEOUTS = Object.freeze({
   connectionTimeout: 8000,
   greetingTimeout: 8000,

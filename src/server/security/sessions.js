@@ -10,7 +10,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { randomToken } from '../domain/references.js';
 import { forbidden, unauthorized, validationError } from '../domain/errors.js';
-import { ADMIN_ROLE } from '../domain/constants.js';
+import { ADMIN_ROLE, adminRoleLabel } from '../domain/constants.js';
 import { recordAudit } from '../services/auditService.js';
 import { verifyPassword } from './passwords.js';
 
@@ -50,6 +50,9 @@ export function authenticate(db, { email, password, ip = null, now = Date.now() 
   };
 
   if (!account) genericFailure();
+  if (account.deleted_at !== null && account.deleted_at !== undefined) {
+    throw forbidden('This account is no longer available.');
+  }
   if (account.is_active !== 1) throw forbidden('This account has been disabled.');
   if (account.locked_until && account.locked_until > now) {
     throw forbidden('Too many failed attempts. Try again in a few minutes.');
@@ -90,7 +93,8 @@ export function createSession(db, { adminUserId, userAgent = null, ip = null, no
 export function resolveSession(db, token, { now = Date.now() } = {}) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT s.*, u.email, u.display_name, u.role, u.is_active
+    SELECT s.*, u.email, u.display_name, u.role, u.is_active,
+           u.is_super_admin, u.deleted_at, u.must_change_password
       FROM admin_session s
       JOIN admin_user u ON u.id = s.admin_user_id
      WHERE s.token_hash = ?
@@ -103,9 +107,11 @@ export function resolveSession(db, token, { now = Date.now() } = {}) {
     return null;
   }
   if (row.is_active !== 1) return null;
+  if (row.deleted_at !== null && row.deleted_at !== undefined) return null;
 
   db.prepare('UPDATE admin_session SET last_seen_at = ? WHERE id = ?').run(now, row.id);
 
+  const role = row.is_super_admin === 1 ? ADMIN_ROLE.SUPER_ADMIN : ADMIN_ROLE.ADMIN;
   return {
     sessionId: row.id,
     csrfSecret: row.csrf_secret,
@@ -114,8 +120,9 @@ export function resolveSession(db, token, { now = Date.now() } = {}) {
       id: row.admin_user_id,
       email: row.email,
       displayName: row.display_name,
-      role: row.role,
-      label: `${row.display_name} (${row.role})`,
+      role,
+      mustChangePassword: row.must_change_password === 1,
+      label: `${row.display_name} (${adminRoleLabel(role)})`,
     },
   };
 }
@@ -158,8 +165,16 @@ export function requireAuth(ctx) {
 
 export function requireAdmin(ctx) {
   const actor = requireAuth(ctx);
-  if (actor.role !== ADMIN_ROLE.ADMIN) {
+  if (actor.role !== ADMIN_ROLE.ADMIN && actor.role !== ADMIN_ROLE.SUPER_ADMIN) {
     throw forbidden('This action requires an administrator role.');
+  }
+  return actor;
+}
+
+export function requireSuperAdmin(ctx) {
+  const actor = requireAuth(ctx);
+  if (actor.role !== ADMIN_ROLE.SUPER_ADMIN) {
+    throw forbidden('This action requires a Super Admin role.');
   }
   return actor;
 }
@@ -184,7 +199,7 @@ export function requireCsrf(ctx) {
 }
 
 export function assertOwnAccountOrAdmin(actor, adminUserId) {
-  if (actor.role === ADMIN_ROLE.ADMIN) return true;
+  if (actor.role === ADMIN_ROLE.SUPER_ADMIN) return true;
   if (Number(adminUserId) !== actor.id) throw forbidden('You can only manage your own account.');
   return true;
 }

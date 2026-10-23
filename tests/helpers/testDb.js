@@ -51,11 +51,13 @@ export function createTestActor(db, {
   name = 'Test Admin',
 } = {}) {
   const now = Date.now();
+  const storageRole = role === 'STAFF' ? 'STAFF' : 'ADMIN';
+  const isSuperAdmin = role === 'SUPER_ADMIN' ? 1 : 0;
   const info = db.prepare(`
     INSERT INTO admin_user
-      (email, password_hash, display_name, role, is_active, created_at, updated_at)
-    VALUES (?,?,?,?,1,?,?)
-  `).run(email, hashPassword(TEST_PASSWORD), name, role, now, now);
+      (email, password_hash, display_name, role, is_super_admin, is_active, created_at, updated_at)
+    VALUES (?,?,?,?,?,1,?,?)
+  `).run(email, hashPassword(TEST_PASSWORD), name, storageRole, isSuperAdmin, now, now);
   const id = Number(info.lastInsertRowid);
   return { id, label: name, role };
 }

@@ -34,6 +34,11 @@ import { registerMediaRoutes } from './routes/mediaRoutes.js';
 import { registerAdminUploadRoutes } from './routes/adminUploadRoutes.js';
 import { registerBookingWorkflowRoutes } from './routes/bookingWorkflowRoutes.js';
 import { registerAdminAssistantKnowledgeRoutes } from './routes/adminAssistantKnowledgeRoutes.js';
+import { registerAdminTeamRoutes } from './routes/adminTeamRoutes.js';
+import { registerAdminNotificationRoutes } from './routes/adminNotificationRoutes.js';
+import { registerInternalNotificationRoutes } from './routes/internalNotificationRoutes.js';
+import { registerServiceWorkerRoute } from './routes/serviceWorkerRoutes.js';
+import { registerAdminSearchRoutes } from './routes/adminSearchRoutes.js';
 
 const STATIC_PREFIX = '/assets/';
 const FLASH_MAX_AGE_SECONDS = 30;
@@ -157,6 +162,37 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
     return true;
   });
 
+  /* 3b. forced password change. A reset password may only reach the account
+     page (where it can be replaced), sign-out and the notification bell. */
+  router.use(async (ctx) => {
+    if (!ctx.actor?.mustChangePassword) return true;
+    const rawPath = ctx.url.pathname;
+    const path = rawPath.length > 1 && rawPath.endsWith('/') ? rawPath.slice(0, -1) : rawPath;
+    const allowed = path === '/admin/account'
+      || path === '/admin/account/password'
+      || path === '/admin/logout'
+      || path === '/admin/login'
+      || path === '/admin/notifications'
+      || path.startsWith('/admin/notifications/')
+      || path === '/api/admin/notifications'
+      || path.startsWith('/api/admin/notifications/');
+    if (allowed) return true;
+
+    if (ctx.wantsJson || path.startsWith('/api/')) {
+      ctx.json({
+        ok: false,
+        error: {
+          code: 'PASSWORD_CHANGE_REQUIRED',
+          message: 'Choose a new password before continuing.',
+          details: null,
+        },
+      }, 403);
+      return false;
+    }
+    redirect(ctx.res, '/admin/account', 303);
+    return false;
+  });
+
   /* 4. routes */
   const deps = { db, config, setFlash, readFlashCookie, renderErrorPage, html, raw, escapeHtml };
   deps.requireAuth = requireAuthFromSessions;
@@ -172,6 +208,11 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   registerAdminOpsRoutes(router, deps);
   registerAdminUploadRoutes(router, deps);
   registerAdminAssistantKnowledgeRoutes(router, deps);
+  registerAdminTeamRoutes(router, deps);
+  registerAdminNotificationRoutes(router, deps);
+  registerAdminSearchRoutes(router, deps);
+  registerInternalNotificationRoutes(router, deps);
+  registerServiceWorkerRoute(router, deps);
 
   /* 5. error boundary */
   router.onError(async (ctx, error) => {

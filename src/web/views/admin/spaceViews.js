@@ -273,6 +273,36 @@ function statusFilterHref(statusValue, filters) {
 
 /* ---------------------------------------------------------- list of spaces */
 
+function inlineStatusForm(space, action, label, csrfToken, { danger = false, confirm = null } = {}) {
+  return html`<form method="post" action="/admin/spaces/${space.id}/${action}" class="inline-form"
+                    ${confirm ? attr('data-confirm', confirm) : ''} data-submit-once>
+    ${csrfField(csrfToken)}
+    <button class="button ${danger ? 'button--danger' : 'button--ghost'} button--small" type="submit">${label}</button>
+  </form>`;
+}
+
+function inlineSpaceStatus(space, csrfToken) {
+  const forms = [];
+  if (space.status === SPACE_STATUS.DRAFT) {
+    forms.push(inlineStatusForm(space, 'publish', 'Publish', csrfToken));
+  }
+  if (space.status === SPACE_STATUS.PUBLISHED) {
+    forms.push(inlineStatusForm(space, 'unpublish', 'Unpublish', csrfToken));
+    forms.push(inlineStatusForm(space, 'archive', 'Archive', csrfToken, {
+      danger: true,
+      confirm: `Archive ${space.name}? It will disappear from the public site and cannot take new bookings.`,
+    }));
+  }
+  if (space.status === SPACE_STATUS.ARCHIVED) {
+    forms.push(inlineStatusForm(space, 'restore', 'Restore', csrfToken));
+  }
+  if (forms.length === 0) return '';
+  return html`<details class="space-row-actions">
+    <summary class="button button--ghost button--small">Status actions</summary>
+    <div class="space-row-actions__menu">${forms}</div>
+  </details>`;
+}
+
 export function renderSpaceListPage({
   actor, csrfToken, flash, spaces, total, filters, page, pageSize,
 }) {
@@ -309,6 +339,7 @@ export function renderSpaceListPage({
         <a class="button button--primary button--small" href="/admin/spaces/${space.id}">Manage</a>
         <a class="button button--ghost button--small" href="/admin/spaces/${space.id}/edit">Edit</a>
         <a class="button button--ghost button--small" href="/admin/calendar?space=${space.id}">Calendar</a>
+        ${inlineSpaceStatus(space, csrfToken)}
       </span>`,
     ],
   }));
@@ -383,6 +414,7 @@ export function renderSpaceListPage({
     csrfToken,
     flash,
     activePath: '/admin/spaces',
+    extraStyles: ['/assets/admin-ux.css'],
     breadcrumbs: [{ label: 'Admin', href: '/admin' }, { label: 'Spaces' }],
     pageActions: html`<a class="button button--primary button--small" href="/admin/spaces/new">New space</a>`,
     body,

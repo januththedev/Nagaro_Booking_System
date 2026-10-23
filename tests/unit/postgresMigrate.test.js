@@ -18,6 +18,7 @@ import { newDb } from 'pg-mem';
 import {
   applyPgMigrations, listPgMigrationFiles, pgConnectionString, pgMigrationsDir,
 } from '../../scripts/migrate-postgres.js';
+import { applyMigrations } from '../../src/server/db/migrate.js';
 
 function memClient() {
   const db = newDb();
@@ -30,6 +31,13 @@ function fixtureDir(files) {
   for (const [name, sql] of Object.entries(files)) writeFileSync(join(dir, name), sql);
   return dir;
 }
+
+test('SQLite migration runner refuses a PostgreSQL handle', () => {
+  assert.throws(
+    () => applyMigrations({ dialect: 'postgres' }),
+    (error) => /migrate:postgres/.test(error.message),
+  );
+});
 
 test('pgConnectionString prefers DIRECT_URL, falls back to DATABASE_URL, else null', () => {
   assert.equal(pgConnectionString({ DIRECT_URL: 'direct', DATABASE_URL: 'pooled' }), 'direct');
@@ -103,6 +111,42 @@ test('CONTRACT (static): optional advances are stored as immutable attempt snaps
   const sql = readFileSync(joinPath(pgMigrationsDir(), '0004_optional_advances.sql'), 'utf8');
   assert.match(sql, /ALTER TABLE payment_obligation[\s\S]+advance_paid_cents BIGINT NOT NULL DEFAULT 0/i);
   assert.match(sql, /ALTER TABLE payment_attempt[\s\S]+advance_cents BIGINT NOT NULL DEFAULT 0/i);
+});
+
+test('CONTRACT (static): 0005 adds the two-role model, recycle bin and cap indexes', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join: joinPath } = await import('node:path');
+  const sql = readFileSync(joinPath(pgMigrationsDir(), '0005_admin_roles_recycle_bin.sql'), 'utf8');
+  assert.match(sql, /ADD COLUMN is_super_admin INTEGER NOT NULL DEFAULT 0/i);
+  assert.match(sql, /ADD COLUMN deleted_at BIGINT/i);
+  assert.match(sql, /ADD COLUMN deleted_by BIGINT REFERENCES admin_user\(id\) ON DELETE SET NULL/i);
+  assert.match(sql, /ADD COLUMN purge_after BIGINT/i);
+  assert.match(sql, /ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0/i);
+  assert.match(sql, /UPDATE admin_user SET role = 'ADMIN' WHERE role = 'STAFF'/i);
+  assert.match(sql, /SET is_super_admin = 1/i);
+  assert.match(sql, /COALESCE\(is_system, 0\) = 0/i);
+  assert.match(sql, /ORDER BY is_active DESC, created_at ASC, id ASC/i);
+  assert.match(sql, /LIMIT 3/i);
+  assert.match(sql, /CREATE INDEX ix_admin_user_active_super/i);
+  assert.match(sql, /CREATE INDEX ix_admin_user_deleted/i);
+});
+
+test('CONTRACT (static): 0006 adds notifications, push subscriptions and dispatch indexes', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join: joinPath } = await import('node:path');
+  const sql = readFileSync(joinPath(pgMigrationsDir(), '0006_notifications.sql'), 'utf8');
+  assert.match(sql, /CREATE TABLE notification/i);
+  assert.match(sql, /type\s+TEXT NOT NULL CHECK \(type IN \('NEW_BOOKING','BOOKING_CANCELLED','REMINDER'\)\)/i);
+  assert.match(sql, /priority\s+TEXT NOT NULL DEFAULT 'NORMAL' CHECK \(priority IN \('NORMAL','HIGH'\)\)/i);
+  assert.match(sql, /UNIQUE \(admin_user_id, dedupe_key\)/i);
+  assert.match(sql, /CREATE INDEX ix_notification_unread/i);
+  assert.match(sql, /CREATE INDEX ix_notification_priority/i);
+  assert.match(sql, /CREATE INDEX ix_notification_due/i);
+  assert.match(sql, /CREATE TABLE push_subscription/i);
+  assert.match(sql, /endpoint\s+TEXT NOT NULL UNIQUE/i);
+  assert.match(sql, /failure_count\s+INTEGER NOT NULL DEFAULT 0 CHECK \(failure_count >= 0\)/i);
+  assert.match(sql, /CREATE INDEX ix_push_subscription_user/i);
+  assert.match(sql, /CREATE INDEX ix_push_subscription_prune/i);
 });
 
 test('CONTRACT (static): 0001_init.sql carries the full schema and the overlap guard', async () => {

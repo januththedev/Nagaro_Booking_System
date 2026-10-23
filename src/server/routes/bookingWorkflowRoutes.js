@@ -9,6 +9,7 @@ import {
   rejectBookingRequest, resolvePaymentException, updateBookingFeePolicy,
 } from '../services/bookingRequestService.js';
 import { adminShell } from '../../web/views/layout.js';
+import { renderBookingRequestsPage } from '../../web/views/admin/bookingRequestViews.js';
 import { html } from '../../web/lib/html.js';
 import { chatWithVenueAssistant, consumeAssistantDraft, createAssistantDraft } from '../services/assistantService.js';
 
@@ -117,58 +118,16 @@ export function registerBookingWorkflowRoutes(router, deps = {}) {
 
   router.get('/admin/booking-requests', async ctx => {
     const actor = requireAuth(ctx);
-    const items = listBookingRequests(db, { status: q(ctx.query, 'status'), limit: 200 });
+    const items = listBookingRequests(db, { limit: 200 });
     const policy = getBookingFeePolicy(db);
-    const feeRows = items.map(item => {
-      const payment = item.payment;
-      return html`<tr>
-        <td><strong>${item.reference}</strong><br><small>${new Date(item.startAt).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })} – ${new Date(item.endAt).toLocaleTimeString('en-LK', { timeZone: 'Asia/Colombo' })}</small></td>
-        <td>${item.spaceName}<br><small>${item.unitCount} unit(s) · ${item.attendees ?? '—'} attending</small></td>
-        <td>${item.customer.fullName}<br><small>${item.customer.email}</small></td>
-        <td><small>Total ${lkr(item.venueTotalCents)}</small><br><small>Registration ${payment ? lkr(payment.bookingFeeCents) : '—'}</small><br><small>Advance paid ${payment ? lkr(payment.advancePaidCents) : '—'}</small><br><small>Balance ${payment ? lkr(payment.remainingBalanceCents) : '—'}</small></td>
-        <td><span class="status-badge">${item.paymentStatus}</span>${payment?.latestAttempt ? html`<br><small>${payment.latestAttempt.orderId} · ${payment.latestAttempt.status}</small>${payment.latestAttempt.paymentId ? html`<br><small>PayHere ${payment.latestAttempt.paymentId}</small>` : ''}` : ''}</td>
-        <td><span class="status-badge">${item.status}</span>${item.holdExpiresAt ? html`<br><small>Hold until ${new Date(item.holdExpiresAt).toLocaleTimeString('en-LK', { timeZone: 'Asia/Colombo' })}</small>` : ''}${item.rejectionReason ? html`<br><small>${item.rejectionReason}</small>` : ''}</td>
-        <td>${item.status === 'REQUESTED' ? html`
-          <form method="post" action="/admin/booking-requests/${item.reference}/approve" class="cluster"><input type="hidden" name="_csrf" value="${ctx.csrfToken}"><button class="button button--primary">Approve</button></form>
-          <form method="post" action="/admin/booking-requests/${item.reference}/reject" class="stack"><input type="hidden" name="_csrf" value="${ctx.csrfToken}"><label>Reason <input name="reason" required maxlength="1000"></label><button class="button button--danger">Reject</button></form>`
-        : item.paymentStatus === 'REVIEW_REQUIRED' ? html`
-          <form method="post" action="/admin/booking-requests/${item.reference}/resolve-payment" class="stack"><input type="hidden" name="_csrf" value="${ctx.csrfToken}">
-            <label>Outcome <select name="outcome"><option value="REFUND_RECORDED">Refund recorded</option><option value="PAYMENT_KEPT">Payment kept</option></select></label>
-            <label>Note <input name="note" required maxlength="1000"></label>
-            <button class="button button--primary">Resolve</button></form>`
-        : '—'}</td>
-      </tr>`;
-    });
-    const body = html`<section class="container">
-      <div class="page-header"><div>
-        <p class="eyebrow">Approval queue</p>
-        <h1 class="page-title">Booking requests</h1>
-        <p class="hint">Approve only after reviewing the schedule. Approval creates a database-enforced temporary hold and payment obligation. Nothing is confirmed until the registration fee, when configured, has been verified by PayHere. Visitors may add an optional advance toward the venue balance.</p>
-      </div></div>
-
-      ${actor.role === 'ADMIN' ? html`<form method="post" action="/admin/booking-requests/fee-policy" class="stack" style="border:1px solid var(--rule);padding:1rem;margin-bottom:1.5rem">
-        <input type="hidden" name="_csrf" value="${ctx.csrfToken}">
-        <h2 class="page-title" style="font-size:1.1rem;margin:0">Registration fee policy</h2>
-        <p class="hint">Disabled by default. Set the registration fee in ordinary LKR or as a percentage. The amount is snapshotted on every approval and credited toward the venue total.</p>
-        <div class="cluster">
-          <label>Mode <select name="mode">
-            <option value="DISABLED" ${policy?.mode === 'DISABLED' ? 'selected' : ''}>Disabled (no registration fee)</option>
-            <option value="FIXED" ${policy?.mode === 'FIXED' ? 'selected' : ''}>Fixed amount (LKR)</option>
-            <option value="PERCENTAGE" ${policy?.mode === 'PERCENTAGE' ? 'selected' : ''}>Percentage of venue total</option>
-          </select></label>
-          <label>Fixed fee (LKR) <input name="fixed_lkr" type="number" min="0" step="0.01" value="${((policy?.fixedCents ?? 0) / 100).toFixed(2)}"></label>
-          <label>Percentage <input name="percentage" type="number" min="0" max="100" step="0.01" value="${((policy?.percentageBps ?? 0) / 100).toFixed(2)}">%</label>
-          <label>Payment window (minutes) <input name="payment_window_minutes" type="number" min="5" max="10080" value="${policy?.paymentWindowMinutes ?? 120}"></label>
-          <button class="button button--primary">Save registration fee</button>
-        </div>
-      </form>` : ''}
-
-      <div class="table-wrap"><table>
-        <thead><tr><th>Request</th><th>Space</th><th>Customer</th><th>Amounts</th><th>Payment</th><th>State</th><th>Decision</th></tr></thead>
-        <tbody>${feeRows.length ? feeRows : html`<tr><td colspan="7">No booking requests yet.</td></tr>`}</tbody>
-      </table></div>
-    </section>`;
-    ctx.html(adminShell({ title: 'Booking requests', actor, csrfToken: ctx.csrfToken, flash: ctx.flash, activePath: '/admin/booking-requests', body }));
+    ctx.html(renderBookingRequestsPage({
+      actor,
+      csrfToken: ctx.csrfToken,
+      flash: ctx.flash,
+      items,
+      policy,
+      filters: { status: q(ctx.query, 'status') || 'open', q: q(ctx.query, 'q') || '' },
+    }));
   });
 
   router.post('/admin/booking-requests/:reference/approve', async ctx => { const actor = requireAuth(ctx); await ctx.readBody(); requireCsrf(ctx); const row = db.prepare('SELECT id FROM booking_request WHERE reference=?').get(ctx.params.reference); approveBookingRequest(db, { actor, requestId: row?.id }); redirect(ctx.res, '/admin/booking-requests'); ctx.responded = true; });

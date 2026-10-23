@@ -8,6 +8,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { notFound, conflict, validationError } from '../domain/errors.js';
 import { cancelReservation, createReservation } from './bookingService.js';
+import {
+  afterPublicReservationCancelled, afterPublicReservationCreated,
+} from './notificationHooks.js';
 
 function systemActor(db) {
   let row = db.prepare(`
@@ -27,7 +30,7 @@ function systemActor(db) {
       'public-booking@system.nagaro',
       '!NO_LOGIN_PUBLIC_BOOKING_PRINCIPAL!',
       'Public booking checkout',
-      'STAFF',
+      'ADMIN',
       0,
       now,
       now,
@@ -98,6 +101,9 @@ export function createPublicBooking(db, input = {}) {
     bookingChannel: 'PUBLIC',
     manageTokenHash: tokenHash(manageToken),
   });
+  if (!result.idempotent && result.reservation?.id) {
+    afterPublicReservationCreated(db, { reservationId: result.reservation.id });
+  }
   return {
     reservation: safeReservation(result.reservation),
     idempotent: result.idempotent,
@@ -151,5 +157,6 @@ export function cancelPublicBooking(db, { reference, token, now = Date.now() } =
     reservationId: id,
     reason: 'Cancelled by guest through the private booking link.',
   });
+  afterPublicReservationCancelled(db, { reservationId: id });
   return safeReservation(result.reservation);
 }

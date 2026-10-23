@@ -14,16 +14,19 @@ import {
 import {
   listAdminUsers, getAdminUser, createAdminUser, updateAdminUser, changeOwnPassword,
   setPassword, countActiveAdmins, ensureFirstAdmin, deactivateAdminUser,
+  softDeleteAdminUser, restoreAdminUser, purgeDeletedAdmins,
 } from '../../src/server/services/adminUserService.js';
 import { authenticate, createSession, resolveSession } from '../../src/server/security/sessions.js';
 import { verifyPassword } from '../../src/server/security/passwords.js';
+import { seedScenario } from '../helpers/concurrencyHelpers.js';
+import { createReservation } from '../../src/server/services/bookingService.js';
 
 const scalar = (db, sql, ...params) => Number(Object.values(db.prepare(sql).get(...params))[0] ?? 0);
 
 test('createAdminUser: hashes the password, normalises the email and never returns the hash', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db);
+  const actor = createTestActor(db, { role: 'SUPER_ADMIN' });
 
   const password = 'SuperSecret123';
   const user = createAdminUser(db, {
@@ -61,7 +64,7 @@ test('createAdminUser: hashes the password, normalises the email and never retur
 test('createAdminUser: weak passwords are rejected with field problems and no row is written', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db);
+  const actor = createTestActor(db, { role: 'SUPER_ADMIN' });
 
   const before = scalar(db, 'SELECT COUNT(*) FROM admin_user');
 
@@ -95,18 +98,18 @@ test('createAdminUser: weak passwords are rejected with field problems and no ro
 test('createAdminUser / updateAdminUser: duplicate emails are a friendly conflict, case-insensitively', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db);
+  const actor = createTestActor(db, { role: 'SUPER_ADMIN' });
 
   createAdminUser(db, {
     actor,
-    payload: { email: 'dup@example.com', display_name: 'First', role: 'STAFF', password: 'DuplicatePass1' },
+    payload: { email: 'dup@example.com', display_name: 'First', role: 'ADMIN', password: 'DuplicatePass1' },
   });
   const before = scalar(db, 'SELECT COUNT(*) FROM admin_user');
 
   assert.throws(
     () => createAdminUser(db, {
       actor,
-      payload: { email: 'DUP@EXAMPLE.COM', display_name: 'Copy', role: 'STAFF', password: 'DuplicatePass1' },
+      payload: { email: 'DUP@EXAMPLE.COM', display_name: 'Copy', role: 'ADMIN', password: 'DuplicatePass1' },
     }),
     (error) => error.code === 'CONFLICT' && /already exists/i.test(error.message),
   );
@@ -114,7 +117,7 @@ test('createAdminUser / updateAdminUser: duplicate emails are a friendly conflic
 
   const other = createAdminUser(db, {
     actor,
-    payload: { email: 'other@example.com', display_name: 'Other', role: 'STAFF', password: 'OtherPerson123' },
+    payload: { email: 'other@example.com', display_name: 'Other', role: 'ADMIN', password: 'OtherPerson123' },
   });
   assert.throws(
     () => updateAdminUser(db, { actor, adminUserId: other.id, payload: { email: 'dup@example.com' } }),
@@ -126,39 +129,39 @@ test('createAdminUser / updateAdminUser: duplicate emails are a friendly conflic
 test('last-admin protection: the only active administrator cannot be demoted or deactivated', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db, { email: 'only-admin@test.local', name: 'Only Admin' });
+  const actor = createTestActor(db, { email: 'only-admin@test.local', name: 'Only Admin', role: 'SUPER_ADMIN' });
   assert.equal(countActiveAdmins(db), 1);
 
   assert.throws(
-    () => updateAdminUser(db, { actor, adminUserId: actor.id, payload: { role: 'STAFF' } }),
-    (error) => error.code === 'CONFLICT' && /at least one active administrator/i.test(error.message),
+    () => updateAdminUser(db, { actor, adminUserId: actor.id, payload: { role: 'ADMIN' } }),
+    (error) => error.code === 'CONFLICT' && /at least one active super admin/i.test(error.message),
   );
   assert.throws(
     () => deactivateAdminUser(db, { actor, adminUserId: actor.id }),
-    (error) => error.code === 'CONFLICT' && /at least one active administrator/i.test(error.message),
+    (error) => error.code === 'CONFLICT' && /at least one active super admin/i.test(error.message),
   );
 
-  assert.equal(getAdminUser(db, actor.id).role, 'ADMIN');
+  assert.equal(getAdminUser(db, actor.id).role, 'SUPER_ADMIN');
   assert.equal(getAdminUser(db, actor.id).isActive, true);
   assert.equal(countActiveAdmins(db), 1);
 
-  // With a second active administrator, demoting one works ...
+  // With a second Super Admin, demoting one works ...
   const second = createAdminUser(db, {
     actor,
-    payload: { email: 'second@test.local', display_name: 'Second', role: 'ADMIN', password: 'SecondAdmin123' },
+    payload: { email: 'second@test.local', display_name: 'Second', role: 'SUPER_ADMIN', password: 'SecondAdmin123' },
   });
-  const demoted = updateAdminUser(db, { actor, adminUserId: second.id, payload: { role: 'STAFF' } });
-  assert.equal(demoted.role, 'STAFF');
-  assert.equal(countActiveAdmins(db), 1);
+  const demoted = updateAdminUser(db, { actor, adminUserId: second.id, payload: { role: 'ADMIN' } });
+  assert.equal(demoted.role, 'ADMIN');
+  assert.equal(countActiveAdmins(db), 2);
 
-  // ... and the first administrator cannot be demoted now either.
+  // ... and the first Super Admin cannot be demoted now either.
   assert.throws(
-    () => updateAdminUser(db, { actor, adminUserId: actor.id, payload: { role: 'STAFF' } }),
+    () => updateAdminUser(db, { actor, adminUserId: actor.id, payload: { role: 'ADMIN' } }),
     (error) => error.code === 'CONFLICT',
   );
-  assert.equal(getAdminUser(db, actor.id).role, 'ADMIN');
+  assert.equal(getAdminUser(db, actor.id).role, 'SUPER_ADMIN');
 
-  // Deactivating a STAFF account is fine.
+  // Deactivating an ordinary Admin is fine.
   const off = deactivateAdminUser(db, { actor, adminUserId: second.id });
   assert.equal(off.isActive, false);
   assert.equal(countActiveAdmins(db), 1);
@@ -173,7 +176,7 @@ test('ensureFirstAdmin: creates one administrator, then refuses to touch anythin
     });
     assert.equal(first.created, true);
     assert.equal(first.reason, null);
-    assert.equal(first.user.role, 'ADMIN');
+    assert.equal(first.user.role, 'SUPER_ADMIN');
     assert.equal(first.user.email, 'first@example.com');
     assert.equal(scalar(db, 'SELECT COUNT(*) FROM admin_user'), 1);
 
@@ -197,7 +200,7 @@ test('ensureFirstAdmin: creates one administrator, then refuses to touch anythin
 test('ensureFirstAdmin: any existing row (even inactive or staff) blocks creation', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  createTestActor(db, { email: 'existing@test.local', role: 'STAFF' });
+  createTestActor(db, { email: 'existing@test.local', role: 'ADMIN' });
 
   const result = ensureFirstAdmin(db, { email: 'new@example.com', password: 'NewAdmin12345', displayName: 'New' });
   assert.deepEqual(result, { created: false, reason: 'administrators already exist' });
@@ -223,10 +226,10 @@ test('ensureFirstAdmin: rejects a weak bootstrap password and defaults the name 
 test('deactivating a user revokes every session and blocks sign-in', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db, { email: 'session-admin@test.local' });
+  const actor = createTestActor(db, { email: 'session-admin@test.local', role: 'SUPER_ADMIN' });
   const user = createAdminUser(db, {
     actor,
-    payload: { email: 'staffer@test.local', display_name: 'Staffer', role: 'STAFF', password: 'StafferPass123' },
+    payload: { email: 'staffer@test.local', display_name: 'Staffer', role: 'ADMIN', password: 'StafferPass123' },
   });
 
   const session = createSession(db, { adminUserId: user.id, userAgent: 'test-agent' });
@@ -255,10 +258,10 @@ test('deactivating a user revokes every session and blocks sign-in', (t) => {
 test('changeOwnPassword: checks the current password, keeps the caller session, revokes the rest', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const admin = createTestActor(db, { email: 'pw-admin@test.local' });
+  const admin = createTestActor(db, { email: 'pw-admin@test.local', role: 'SUPER_ADMIN' });
   const user = createAdminUser(db, {
     actor: admin,
-    payload: { email: 'pw-user@test.local', display_name: 'PW User', role: 'STAFF', password: 'OriginalPass123' },
+    payload: { email: 'pw-user@test.local', display_name: 'PW User', role: 'ADMIN', password: 'OriginalPass123' },
   });
   const ownActor = { id: user.id, label: user.displayName, role: user.role };
 
@@ -282,7 +285,7 @@ test('changeOwnPassword: checks the current password, keeps the caller session, 
 
   assert.throws(
     () => changeOwnPassword(db, {
-      actor: { id: 9999, label: 'Someone else', role: 'STAFF' },
+      actor: { id: 9999, label: 'Someone else', role: 'ADMIN' },
       adminUserId: user.id, currentPassword: 'OriginalPass123', newPassword: 'NewPassword456',
     }),
     (error) => error.code === 'FORBIDDEN',
@@ -305,20 +308,32 @@ test('changeOwnPassword: checks the current password, keeps the caller session, 
     () => authenticate(db, { email: 'pw-user@test.local', password: 'OriginalPass123' }),
     (error) => error.code === 'UNAUTHORIZED',
   );
+
+  // A change without a keepSessionId revokes every remaining session.
+  const laterSession = createSession(db, { adminUserId: user.id, userAgent: 'browser-c' });
+  changeOwnPassword(db, {
+    actor: ownActor,
+    adminUserId: user.id,
+    currentPassword: 'NewPassword456',
+    newPassword: 'FinalPassword789',
+  });
+  assert.equal(resolveSession(db, callerSession.token), null);
+  assert.equal(resolveSession(db, laterSession.token), null);
+  assert.equal(authenticate(db, { email: 'pw-user@test.local', password: 'FinalPassword789' }).id, user.id);
 });
 
-test('setPassword: ADMIN only, no current password needed, revokes all target sessions', (t) => {
+test('setPassword: Super Admin only, no current password needed, revokes all target sessions', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const admin = createTestActor(db, { email: 'reset-admin@test.local' });
+  const admin = createTestActor(db, { email: 'reset-admin@test.local', role: 'SUPER_ADMIN' });
   const user = createAdminUser(db, {
     actor: admin,
-    payload: { email: 'reset-user@test.local', display_name: 'Reset User', role: 'STAFF', password: 'BeforeReset123' },
+    payload: { email: 'reset-user@test.local', display_name: 'Reset User', role: 'ADMIN', password: 'BeforeReset123' },
   });
 
   assert.throws(
     () => setPassword(db, {
-      actor: { id: user.id, label: user.displayName, role: 'STAFF' },
+      actor: { id: user.id, label: user.displayName, role: 'ADMIN' },
       adminUserId: user.id,
       newPassword: 'AfterReset1234',
     }),
@@ -340,11 +355,11 @@ test('setPassword: ADMIN only, no current password needed, revokes all target se
 test('every mutation writes its audit entry', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db, { email: 'audit-admin@test.local' });
+  const actor = createTestActor(db, { email: 'audit-admin@test.local', role: 'SUPER_ADMIN' });
 
   const created = createAdminUser(db, {
     actor,
-    payload: { email: 'audit-user@test.local', display_name: 'Audit User', role: 'STAFF', password: 'AuditPass1234' },
+    payload: { email: 'audit-user@test.local', display_name: 'Audit User', role: 'ADMIN', password: 'AuditPass1234' },
   });
   updateAdminUser(db, { actor, adminUserId: created.id, payload: { display_name: 'Audit User Renamed' } });
   changeOwnPassword(db, {
@@ -359,7 +374,9 @@ test('every mutation writes its audit entry', (t) => {
   const actions = db.prepare(
     "SELECT DISTINCT action FROM audit_log WHERE entity_type = 'admin_user'",
   ).all().map((row) => row.action).sort();
-  assert.deepEqual(actions, ['admin_user.created', 'admin_user.password_changed', 'admin_user.updated']);
+  assert.deepEqual(actions, [
+    'admin_user.created', 'admin_user.password_changed', 'admin_user.password_reset', 'admin_user.updated',
+  ]);
 
   const auditEntries = db.prepare(
     'SELECT actor_label, summary FROM audit_log WHERE entity_type = ? ORDER BY id',
@@ -369,16 +386,45 @@ test('every mutation writes its audit entry', (t) => {
   assert.ok(auditEntries.every((entry) => entry.actor_label === 'system' || entry.actor_label.length > 0));
 });
 
-test('createAdminUser: role defaults to STAFF and unknown roles are rejected', (t) => {
+test('recycle-bin purge removes the account and reassigns restricted authorship', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db);
+  const scenario = seedScenario(db);
+  const owner = createTestActor(db, { email: 'purge-owner@test.local', role: 'SUPER_ADMIN' });
+  const leaving = createTestActor(db, { email: 'leaving@test.local', role: 'ADMIN' });
+  const dateKey = new Date(Date.now() + 12 * 86400000 + 330 * 60000).toISOString().slice(0, 10);
+  const reservation = createReservation(db, {
+    actor: leaving,
+    spaceId: scenario.roomSpace.id,
+    customerId: scenario.customer.id,
+    startAt: Date.parse(`${dateKey}T10:00:00+05:30`),
+    endAt: Date.parse(`${dateKey}T11:00:00+05:30`),
+    unitCount: 1,
+    attendees: 3,
+    purpose: 'Purge authorship test',
+    source: 'admin',
+  }).reservation;
 
-  const staff = createAdminUser(db, {
+  softDeleteAdminUser(db, { actor: owner, adminUserId: leaving.id, now: 1_000 });
+  db.prepare('UPDATE admin_user SET purge_after = 1 WHERE id = ?').run(leaving.id);
+  const result = purgeDeletedAdmins(db, { now: 2_000 });
+  assert.equal(result.count, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM admin_user WHERE id = ?').get(leaving.id).c, 0);
+  const stored = db.prepare('SELECT created_by FROM reservation WHERE id = ?').get(reservation.id);
+  assert.notEqual(stored.created_by, leaving.id, 'ON DELETE RESTRICT authorship was reassigned');
+  assert.ok(db.prepare('SELECT id FROM admin_user WHERE id = ?').get(stored.created_by), 'the system principal exists');
+});
+
+test('createAdminUser: role defaults to ADMIN and unknown roles are rejected', (t) => {
+  const db = createTestDb();
+  t.after(() => closeTestDb(db));
+  const actor = createTestActor(db, { role: 'SUPER_ADMIN' });
+
+  const admin = createAdminUser(db, {
     actor,
     payload: { email: 'default-role@test.local', display_name: 'Default Role', password: 'DefaultRole123' },
   });
-  assert.equal(staff.role, 'STAFF');
+  assert.equal(admin.role, 'ADMIN');
 
   assert.throws(
     () => createAdminUser(db, {
@@ -389,19 +435,35 @@ test('createAdminUser: role defaults to STAFF and unknown roles are rejected', (
   );
 
   assert.throws(
-    () => updateAdminUser(db, { actor, adminUserId: staff.id, payload: { role: 'OWNER' } }),
+    () => updateAdminUser(db, { actor, adminUserId: admin.id, payload: { role: 'OWNER' } }),
     (error) => error.code === 'VALIDATION_ERROR' && error.details.field === 'role',
   );
 });
 
-test('guests cannot create or modify accounts, and unknown ids are not found', (t) => {
+test('only Super Admins can manage accounts, and unknown ids are not found', (t) => {
   const db = createTestDb();
   t.after(() => closeTestDb(db));
-  const actor = createTestActor(db);
+  const actor = createTestActor(db, { role: 'SUPER_ADMIN' });
+  const ordinary = createTestActor(db, { email: 'ordinary@test.local', role: 'ADMIN' });
 
+  assert.throws(
+    () => createAdminUser(db, {
+      actor: ordinary,
+      payload: { email: 'x@example.com', display_name: 'X', password: 'NopeNope123' },
+    }),
+    (error) => error.code === 'FORBIDDEN',
+  );
   assert.throws(
     () => createAdminUser(db, { payload: { email: 'x@example.com', display_name: 'X', password: 'NopeNope123' } }),
     (error) => error.code === 'VALIDATION_ERROR',
+  );
+  assert.throws(
+    () => updateAdminUser(db, { actor: ordinary, adminUserId: ordinary.id, payload: { display_name: 'Nope' } }),
+    (error) => error.code === 'FORBIDDEN',
+  );
+  assert.throws(
+    () => setPassword(db, { actor: ordinary, adminUserId: ordinary.id, newPassword: 'NoAccount123' }),
+    (error) => error.code === 'FORBIDDEN',
   );
   assert.throws(
     () => updateAdminUser(db, { actor, adminUserId: 424242, payload: { display_name: 'Ghost' } }),

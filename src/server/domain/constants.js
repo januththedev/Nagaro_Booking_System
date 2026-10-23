@@ -138,10 +138,38 @@ export const INQUIRY_EMAIL_STATUS_LABEL = Object.freeze({
   NOT_CONFIGURED: 'Email not configured',
 });
 
+/**
+ * Application-level administrator roles. The database stores every account
+ * with role = 'ADMIN' (the historical CHECK constraint) and uses
+ * admin_user.is_super_admin to distinguish the two roles.
+ */
 export const ADMIN_ROLE = Object.freeze({
+  SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
-  STAFF: 'STAFF',
 });
+
+export const ADMIN_ROLE_LABEL = Object.freeze({
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+});
+
+/** At most this many active (non-deleted) Super Admins may exist at once. */
+export const MAX_SUPER_ADMINS = 3;
+
+/** Soft-deleted accounts are purged automatically after this many days. */
+export const RECYCLE_BIN_RETENTION_DAYS = 30;
+
+export function isAdminRole(role) {
+  return role === ADMIN_ROLE.SUPER_ADMIN || role === ADMIN_ROLE.ADMIN;
+}
+
+export function isSuperAdminRole(role) {
+  return role === ADMIN_ROLE.SUPER_ADMIN;
+}
+
+export function adminRoleLabel(role) {
+  return ADMIN_ROLE_LABEL[role] ?? String(role ?? '');
+}
 
 /** Bookable resource unit kinds. */
 export const RESOURCE_KIND = Object.freeze({

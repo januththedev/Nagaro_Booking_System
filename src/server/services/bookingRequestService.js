@@ -1,6 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { withWriteTransaction } from '../db/connection.js';
-import { BOOKING_REQUEST_STATUS, PAYMENT_STATUS, OCCUPANCY_SOURCE, OCCUPANCY_STATUS, SPACE_CATEGORY } from '../domain/constants.js';
+import {
+  BOOKING_REQUEST_STATUS, PAYMENT_STATUS, OCCUPANCY_SOURCE, OCCUPANCY_STATUS,
+  SPACE_CATEGORY, isAdminRole,
+} from '../domain/constants.js';
 import { conflict, notFound, validationError } from '../domain/errors.js';
 import { nextReference } from '../domain/references.js';
 import { normalizeEmail, optionalPhone, requiredEmail, requiredString, asInteger, asTrimmedString } from '../domain/validation.js';
@@ -8,6 +11,9 @@ import { allocateUnits, assertBookingRules } from './availabilityService.js';
 import { loadRates, quote } from './pricingService.js';
 import { resolveOrCreateCustomerInTransaction } from './customerService.js';
 import { recordAudit } from './auditService.js';
+import {
+  afterBookingRequestCancelled, afterBookingRequestConfirmed, afterBookingRequestCreated,
+} from './notificationHooks.js';
 
 const ACTIVE_REQUEST = [BOOKING_REQUEST_STATUS.APPROVED_AWAITING_PAYMENT, BOOKING_REQUEST_STATUS.PAYMENT_REVIEW_REQUIRED];
 
@@ -25,7 +31,7 @@ function publicSystemActor(db) {
     const now = Date.now();
     db.prepare(`INSERT OR IGNORE INTO admin_user
       (email,password_hash,display_name,role,is_active,created_at,updated_at,is_system)
-      VALUES (?,?,?,?,?,?,?,1)`).run('public-booking@system.nagaro','!NO_LOGIN_PUBLIC_BOOKING_PRINCIPAL!','Public booking workflow','STAFF',0,now,now);
+      VALUES (?,?,?,?,?,?,?,1)`).run('public-booking@system.nagaro','!NO_LOGIN_PUBLIC_BOOKING_PRINCIPAL!','Public booking workflow','ADMIN',0,now,now);
     row = db.prepare('SELECT id, display_name FROM admin_user WHERE COALESCE(is_system, 0) = 1 ORDER BY id LIMIT 1').get();
   }
   if (!row) throw new Error('Public booking principal is unavailable.');
@@ -103,7 +109,7 @@ export function createBookingRequest(db, input = {}) {
   const priced = quote({space,rates:loadRates(db,space.id),startAt,endAt,unitCount,billingUnit:input.billingUnit || null});
   const idempotencyKey = String(input.idempotencyKey ?? '').trim() || null;
   const manageToken = randomBytes(32).toString('base64url');
-  return withWriteTransaction(db, () => {
+  const result = withWriteTransaction(db, () => {
     if (idempotencyKey) {
       const existing = db.prepare(`${SELECT} WHERE br.idempotency_key=?`).get(idempotencyKey);
       if (existing) return { request: hydrate(db,existing), manageToken:null, idempotent:true };
@@ -116,6 +122,10 @@ export function createBookingRequest(db, input = {}) {
     recordAudit(db,{actorLabel:'public visitor',action:'booking_request.created',entityType:'booking_request',entityId:info.lastInsertRowid,summary:`Created ${reference}`,details:{spaceId:space.id,startAt,endAt,unitCount}});
     return {request:hydrate(db,db.prepare(`${SELECT} WHERE br.id=?`).get(Number(info.lastInsertRowid))),manageToken,idempotent:false};
   });
+  if (!result.idempotent && input.notify !== false) {
+    afterBookingRequestCreated(db, { reference: result.request.reference, now });
+  }
+  return result;
 }
 
 function loadForCapability(db, reference, token) {
@@ -134,7 +144,7 @@ export function getBookingRequest(db, capability) {
 export function cancelBookingRequest(db,{reference,token,reason=null,now=Date.now()}={}){
   const row=loadForCapability(db,reference,token);
   if(![BOOKING_REQUEST_STATUS.REQUESTED,BOOKING_REQUEST_STATUS.APPROVED_AWAITING_PAYMENT].includes(row.status))throw conflict('This request can no longer be cancelled online.');
-  return withWriteTransaction(db,()=>{
+  const result = withWriteTransaction(db,()=>{
     db.prepare(`UPDATE occupancy SET status='RELEASED',released_at=? WHERE id IN (SELECT occupancy_id FROM booking_hold_claim WHERE booking_request_id=? AND status='ACTIVE') AND status='ACTIVE'`).run(now,row.id);
     db.prepare("UPDATE booking_hold_claim SET status='RELEASED',released_at=? WHERE booking_request_id=? AND status='ACTIVE'").run(now,row.id);
     const note=reason?String(reason).trim().slice(0,1000):'Cancelled by visitor through the private request link.';
@@ -142,6 +152,8 @@ export function cancelBookingRequest(db,{reference,token,reason=null,now=Date.no
     recordAudit(db,{actorLabel:'public visitor',action:'booking_request.cancelled',entityType:'booking_request',entityId:row.id,summary:`Cancelled ${row.reference}`,details:{reason:note}});
     return hydrate(db,db.prepare(`${SELECT} WHERE br.id=?`).get(row.id));
   });
+  afterBookingRequestCancelled(db, { reference: result.reference, now });
+  return result;
 }
 
 function feeSnapshot(policy, total) {
@@ -176,7 +188,7 @@ function confirmFromHold(db, row, now) {
 
 export function approveBookingRequest(db,{actor,requestId,now=Date.now()}={}) {
   if (!actor?.id) throw validationError('An authenticated staff actor is required.');
-  return withWriteTransaction(db,()=>{
+  const result = withWriteTransaction(db,()=>{
     const row=db.prepare('SELECT * FROM booking_request WHERE id=?').get(Number(requestId));
     if(!row) throw notFound('Booking request not found.');
     if(row.status!==BOOKING_REQUEST_STATUS.REQUESTED) throw conflict('Only a new request can be approved.');
@@ -196,6 +208,14 @@ export function approveBookingRequest(db,{actor,requestId,now=Date.now()}={}) {
     recordAudit(db,{actorAdminUserId:actor.id,actorLabel:actor.label,action:'booking_request.approved',entityType:'booking_request',entityId:row.id,summary:`Approved ${row.reference}`,details:{bookingFeeCents:snapshot.fee,holdExpiresAt:expiresAt}});
     return hydrate(db,db.prepare(`${SELECT} WHERE br.id=?`).get(row.id),{includePrivate:true});
   });
+  if (result.status === BOOKING_REQUEST_STATUS.CONFIRMED && result.reservationReference) {
+    afterBookingRequestConfirmed(db, {
+      reference: result.reference,
+      now,
+      excludeAdminUserId: actor.id,
+    });
+  }
+  return result;
 }
 
 /**
@@ -207,7 +227,7 @@ export function approveBookingRequest(db,{actor,requestId,now=Date.now()}={}) {
  * under the canonical write transaction and database overlap constraint.
  */
 export function createSelfServiceBooking(db, input = {}) {
-  const created = createBookingRequest(db, input);
+  const created = createBookingRequest(db, { ...input, notify: false });
   if (created.request.status !== BOOKING_REQUEST_STATUS.REQUESTED) return created;
 
   const row = db.prepare('SELECT id FROM booking_request WHERE reference=?').get(created.request.reference);
@@ -272,7 +292,7 @@ export function getBookingFeePolicy(db){
 }
 
 export function updateBookingFeePolicy(db,{actor,mode,fixedCents=0,percentageBps=0,paymentWindowMinutes=120,now=Date.now()}={}){
-  if(!actor?.id||actor.role!=='ADMIN')throw validationError('An administrator is required.');
+  if(!actor?.id||!isAdminRole(actor.role))throw validationError('An administrator is required.');
   const selected=String(mode??'');if(!['DISABLED','FIXED','PERCENTAGE'].includes(selected))throw validationError('Choose a valid fee mode.');
   const fixed=Number(fixedCents),bps=Number(percentageBps),window=Number(paymentWindowMinutes);
   if(!Number.isInteger(fixed)||fixed<0||!Number.isInteger(bps)||bps<0||bps>10000||!Number.isInteger(window)||window<5||window>10080)throw validationError('Registration fee policy values are outside the supported range.');
@@ -358,7 +378,7 @@ export function processPayHereNotification(db,payload={},config={},now=Date.now(
   const expected=md5Upper(`${merchantId}${orderId}${amount}${currency}${statusCode}${md5Upper(config.merchantSecret??'')}`);
   const signatureValid=Boolean(config.merchantSecret)&&merchantId===String(config.merchantId??'')&&secureEqual(expected,String(payload.md5sig??'').toUpperCase());
   const fingerprint=sha256([orderId,payload.payment_id,statusCode,amount,currency,payload.md5sig].join('|'));
-  return withWriteTransaction(db,()=>{
+  const result = withWriteTransaction(db,()=>{
     const duplicate=db.prepare('SELECT id FROM payment_event WHERE event_fingerprint=?').get(fingerprint);
     if(duplicate) return {accepted:true,idempotent:true};
     const attempt=db.prepare('SELECT * FROM payment_attempt WHERE order_id=?').get(orderId);
@@ -393,7 +413,7 @@ export function processPayHereNotification(db,payload={},config={},now=Date.now(
       confirmFromHold(db,row,now);
       db.prepare("UPDATE payment_attempt SET status='SUCCEEDED',provider_payment_id=?,provider_method=?,provider_status_code=?,provider_message=?,updated_at=? WHERE id=?").run(payload.payment_id||null,payload.method||null,statusCode,payload.status_message||null,now,attempt.id);
       recordAudit(db,{actorLabel:'PayHere verified callback',action:'booking_request.payment_verified',entityType:'booking_request',entityId:row.id,summary:`Verified payment for ${row.reference}`,details:{amountCents:Number(attempt.amount_cents),registrationFeeCents:Number(row.booking_fee_cents),advanceCents:advance}});
-      return {accepted:true,confirmed:true};
+      return {accepted:true,confirmed:true,requestReference:row.reference};
     }
     if(statusCode==='2'&&!exact){
       db.prepare("UPDATE payment_attempt SET status='REVIEW_REQUIRED',provider_payment_id=?,provider_method=?,provider_status_code=?,provider_message=?,updated_at=? WHERE id=?").run(payload.payment_id||null,payload.method||null,statusCode,'Verified callback amount or currency did not match the immutable obligation.',now,attempt.id);
@@ -410,4 +430,8 @@ export function processPayHereNotification(db,payload={},config={},now=Date.now(
     db.prepare('UPDATE booking_request SET payment_status=?,updated_at=? WHERE id=?').run(statusCode==='0'?PAYMENT_STATUS.PENDING:PAYMENT_STATUS.FAILED,now,row.id);
     return {accepted:true,confirmed:false};
   });
+  if (result?.confirmed && result.requestReference) {
+    afterBookingRequestConfirmed(db, { reference: result.requestReference, now });
+  }
+  return result;
 }

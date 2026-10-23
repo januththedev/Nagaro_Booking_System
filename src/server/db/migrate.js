@@ -18,6 +18,12 @@ export function migrationFiles() {
 }
 
 export function applyMigrations(db = getDb()) {
+  if (db.dialect === 'postgres') {
+    throw new Error(
+      'SQLite migrations cannot be applied to a PostgreSQL connection. Use `npm run migrate:postgres` instead.',
+    );
+  }
+
   db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     name       TEXT PRIMARY KEY,
     applied_at INTEGER NOT NULL
@@ -46,14 +52,31 @@ export function applyMigrations(db = getDb()) {
   return performed;
 }
 
+/** Check that the PostgreSQL application schema has been migrated. */
+export function postgresSchemaReady(db) {
+  const row = db.prepare(`
+    SELECT 1 AS ready
+      FROM information_schema.columns
+     WHERE table_schema = current_schema()
+       AND table_name = 'admin_user'
+       AND column_name = 'is_super_admin'
+  `).get();
+  return Boolean(row);
+}
+
 const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (invokedDirectly) {
   const db = getDb();
-  const performed = applyMigrations(db);
-  if (performed.length === 0) {
-    console.log(`No pending migrations. Database: ${databasePath()}`);
+  if (db.dialect === 'postgres') {
+    console.error('This command only applies SQLite migrations. Use `npm run migrate:postgres` for PostgreSQL.');
+    process.exitCode = 2;
   } else {
-    for (const name of performed) console.log(`applied ${name}`);
-    console.log(`Migrations applied. Database: ${databasePath()}`);
+    const performed = applyMigrations(db);
+    if (performed.length === 0) {
+      console.log(`No pending migrations. Database: ${databasePath()}`);
+    } else {
+      for (const name of performed) console.log(`applied ${name}`);
+      console.log(`Migrations applied. Database: ${databasePath()}`);
+    }
   }
 }

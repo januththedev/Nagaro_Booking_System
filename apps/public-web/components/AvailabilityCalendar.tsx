@@ -128,7 +128,7 @@ export function AvailabilityCalendar({
     showDesks: boolean,
   ) => {
     const start = clockInColombo(slot.startAt);
-    const end = clockInColombo(slot.endAt);
+    const end = clockInColombo(slot.bookingEndAt ?? slot.endAt);
     const dateLabel = formatDateKey(dateKey, localeTag, {
       weekday: "long",
       day: "numeric",
@@ -148,12 +148,12 @@ export function AvailabilityCalendar({
         className={className}
       >
         <span className="font-mono text-[0.62rem] uppercase tracking-[0.08em]">
-          {t.availability.free}
+          {start}–{end}
         </span>
         {showDesks ? (
           <span className="text-[0.62rem] leading-tight">
             {format(t.availability.desksFree, {
-              free: slot.freeUnits,
+              free: slot.bookingFreeUnits,
               total: slot.totalUnits,
             })}
           </span>
@@ -208,6 +208,10 @@ export function AvailabilityCalendar({
               </button>
             </div>
 
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[0.65rem] uppercase tracking-[0.12em]">{t.status.dateLabel}</span>
+              <input type="date" value={weekStart} onChange={(event) => { if (event.target.value) goToWeek(event.target.value); }} className="field-input" />
+            </label>
             <label className="flex min-w-[13rem] flex-col gap-1">
               <span className="font-mono text-[0.65rem] uppercase tracking-[0.12em] text-[var(--graphite)]">
                 {t.availability.spaceFilter}
@@ -341,7 +345,7 @@ export function AvailabilityCalendar({
                                   />
                                 );
                               }
-                              if (slot.isFree) {
+                              if (slot.canBook && slot.startAt > Date.now()) {
                                 return freeSlotLink(
                                   space,
                                   dateKey,
@@ -356,7 +360,7 @@ export function AvailabilityCalendar({
                                   className="flex min-h-[3.2rem] flex-col items-center justify-center gap-0.5 border-l border-t border-[var(--rule)] bg-[var(--concrete)]/60 px-1 py-2 text-center text-[var(--muted-stone)]"
                                 >
                                   <span className="font-mono text-[0.62rem] uppercase tracking-[0.08em]">
-                                    {t.availability.booked}
+                                    {slot.isFree ? t.availability.notBookable : t.availability.booked}
                                   </span>
                                 </div>
                               );
@@ -402,7 +406,7 @@ export function AvailabilityCalendar({
                     <div className="mt-3 space-y-4">
                       {visibleSpaces.map((space) => {
                         const day = findSpaceDay(data, dateKey, space.code);
-                        const freeSlots = (day?.slots ?? []).filter((slot) => slot.isFree);
+                        const freeSlots = (day?.slots ?? []).filter((slot) => slot.canBook && slot.startAt > Date.now());
                         return (
                           <div key={`${dateKey}-${space.code}`}>
                             <p className="m-0 text-sm font-medium text-[var(--ink)]">{space.name}</p>

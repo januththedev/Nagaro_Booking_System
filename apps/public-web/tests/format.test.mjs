@@ -7,12 +7,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isoDateInColombo, formatDateTime, formatMoney, spaceMeta } from '../lib/format.ts';
 
-test('money is rendered as whole LKR, never negative-zero or NaN', () => {
+test('money preserves cents and handles invalid numeric inputs', () => {
   assert.match(formatMoney(125_000), /^LKR[\s\u00a0]?1,250$/);
   assert.match(formatMoney(0), /^LKR[\s\u00a0]?0$/);
   assert.match(formatMoney(Number.NaN), /^LKR[\s\u00a0]?0$/);
   assert.match(formatMoney(undefined), /^LKR[\s\u00a0]?0$/);
-  assert.match(formatMoney(987_654_321), /^LKR[\s\u00a0]?9,876,543$/);
+  assert.match(formatMoney(987_654_321), /^LKR[\s\u00a0]?9,876,543\.21$/);
 });
 
 test('timestamps are always shown in Colombo time (UTC+05:30)', () => {

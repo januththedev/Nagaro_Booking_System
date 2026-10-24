@@ -106,7 +106,7 @@ export function VenueDetailClient({ space }: { space: PublicSpace }) {
     }
   }
 
-  const directBookHref = `/spaces/${encodeURIComponent(space.code)}/book`;
+  const directBookHref = `/spaces/${encodeURIComponent(space.code)}/book?${new URLSearchParams({ date, start: startTime, end: endTime, desks }).toString()}`;
 
   const attributeEntries = Object.entries(space.attributes ?? {});
 

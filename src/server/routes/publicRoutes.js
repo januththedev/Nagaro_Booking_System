@@ -42,7 +42,7 @@ import { buildPublicCalendar } from '../services/publicCalendarService.js';
 import {
   cancelPublicBooking, getPublicBooking,
 } from '../services/publicBookingService.js';
-import { createSelfServiceBooking } from '../services/bookingRequestService.js';
+import { createSelfServiceBooking, previewCheckout } from '../services/bookingRequestService.js';
 import {
   publicErrorPage, publicSpaceProjection, renderBookingReceivedPage, renderBookingRequestPage,
   renderHomePage, renderPublicBookingConfirmedPage, renderPublicBookingManagePage,
@@ -960,7 +960,10 @@ export function registerPublicRoutes(router, deps = {}) {
     if (problems.length > 0) throw validationError(problems[0], { problems });
     // The only availability function public code may call: counts, anonymous
     // blocked periods, and nothing that names a customer or a reference.
-    ctx.json(getPublicAvailability(db, { spaceId: space.id, startAt, endAt, deskCount: desks }));
+    ctx.setHeader('Cache-Control', 'no-store');
+    ctx.json({ ...getPublicAvailability(db, { spaceId: space.id, startAt, endAt, deskCount: desks }),
+      quote: previewCheckout(db, { spaceId: space.id, startAt, endAt, unitCount: desks, now: clock() }),
+    });
   });
 
   /**
@@ -1002,7 +1005,7 @@ export function registerPublicRoutes(router, deps = {}) {
     const values = formValues(body);
     const formToken = publicBookingFormToken(ctx, body);
     enforcePublicInquiryLimits(db, { ip: clientIp(ctx.req), email: values.email, now: clock() });
-    const result = createSelfServiceBooking(db, publicBookingInput(db, values, formToken, clock()));
+    const result = createSelfServiceBooking(db, { ...publicBookingInput(db, values, formToken, clock()), expectedQuote: body.expectedQuote });
     ctx.json({ ok: true, data: selfServiceBookingResponse(result) }, result.idempotent ? 200 : 201);
   });
 

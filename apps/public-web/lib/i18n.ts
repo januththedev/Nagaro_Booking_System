@@ -209,6 +209,7 @@ const en = {
     badgeOccupied: "Occupied in selected window",
   },
   availability: {
+    notBookable: "Not bookable",
     eyebrow: "Live availability · TRACE Expert City",
     title: "Find an hour that is still free.",
     intro: "Browse published spaces by the week in Sri Lanka Standard Time (SLST). A free hour opens the booking form with its date and time already filled in.",
@@ -305,6 +306,7 @@ const en = {
     thumbLabel: "Show venue view {n}: {alt}",
   },
   request: {
+    draftError: "The booking draft could not be loaded. Please enter the details or ask Guider to prepare it again.",
     asideEyebrow: "Book this space",
     asideIntro: "Choose your schedule and book directly. The final transaction checks the live ledger again before it locks the inventory.",
     formEyebrow: "Direct booking · Live inventory",
@@ -637,6 +639,7 @@ const si: Dictionary = {
     badgeOccupied: "තෝරාගත් කාල පරතරයේදී කාර්යබහුලයි",
   },
   availability: {
+    notBookable: "වෙන්කරවා ගත නොහැක",
     eyebrow: "සජීවී ලබාගැනීම · TRACE Expert City",
     title: "තවමත් ලබා ගත හැකි වේලාවක් සොයාගන්න.",
     intro: "ශ්‍රී ලංකා ප්‍රමිත කාලයෙන් (SLST) සතිය අනුව ප්‍රකාශිත ස්ථාන බලන්න. ලබා ගත හැකි වේලාවක් තෝරාගත් විට දිනය සහ වේලාව පිරවූ වෙන්කිරීමේ පෝරමය විවෘත වේ.",
@@ -733,6 +736,7 @@ const si: Dictionary = {
     thumbLabel: "ස්ථාන දසුන {n} පෙන්වන්න: {alt}",
   },
   request: {
+    draftError: "වෙන්කරවා ගැනීමේ කෙටුම්පත පූරණය කළ නොහැකි විය. විස්තර ඇතුළත් කරන්න හෝ Guider වෙතින් නැවත ඉල්ලන්න.",
     asideEyebrow: "මෙම ස්ථානය වෙන්කරවා ගන්න",
     asideIntro: "ඔබේ වේලාව තෝරා සෘජුවම වෙන්කරවා ගන්න. ඉඩකඩ අගුළු දැමීමට පෙර අවසන් ගනුදෙනුව සජීවී කාලසටහන නැවත පරීක්ෂා කරයි.",
     formEyebrow: "සෘජු වෙන්කිරීම · සජීවී කාලසටහන",
@@ -1063,6 +1067,7 @@ const ta: Dictionary = {
     badgeOccupied: "தேர்ந்தெடுத்த இடைவெளியில் ஆக்கிரமிக்கப்பட்டுள்ளது",
   },
   availability: {
+    notBookable: "முன்பதிவு செய்ய முடியாது",
     eyebrow: "நிகழ்நேரக் கிடைப்பு · TRACE Expert City",
     title: "இன்னும் கிடைக்கக்கூடிய நேரத்தைக் கண்டறியுங்கள்.",
     intro: "இலங்கை நிலையான நேரப்படி (SLST) வாரம் வாரியாக வெளியிடப்பட்ட இடங்களைப் பாருங்கள். கிடைக்கும் நேரத்தைத் தேர்ந்தெடுத்தால் தேதியும் நேரமும் நிரப்பப்பட்ட முன்பதிவுப் படிவம் திறக்கும்.",
@@ -1159,6 +1164,7 @@ const ta: Dictionary = {
     thumbLabel: "இடக் காட்சி {n} காட்டு: {alt}",
   },
   request: {
+    draftError: "முன்பதிவு வரைவை ஏற்ற முடியவில்லை. விவரங்களை உள்ளிடவும் அல்லது Guider-இடம் மீண்டும் கேட்கவும்.",
     asideEyebrow: "இந்த இடத்தை முன்பதிவு செய்யுங்கள்",
     asideIntro: "உங்கள் நேரத்தைத் தேர்ந்தெடுத்து நேரடியாக முன்பதிவு செய்யுங்கள். இடத்தைப் பூட்டுவதற்கு முன் இறுதிப் பரிவர்த்தனை நிகழ்நேர அட்டவணையை மீண்டும் சரிபார்க்கும்.",
     formEyebrow: "நேரடி முன்பதிவு · நிகழ்நேர அட்டவணை",

@@ -99,7 +99,7 @@ export function renderLoginPage({
             ${emailConfigured ? '' : html`<p class="hint">Email delivery is not configured in this environment. Direct bookings still confirm on screen, and concierge inquiries remain visible in the operations queue.</p>`}
           </div>
         </div>
-        <p class="hint auth-panel__footnote">Visitors do not need an account. <a href="/spaces">Browse spaces</a>, <a href="/book">send a booking request</a> or <a href="/booking-request">ask the concierge</a>.</p>
+        <p class="hint auth-panel__footnote">Visitors do not need an account. <a href="/spaces">Browse spaces</a>, <a href="/book">book a space</a>.</p>
       </div>
     </div>
   </section>
@@ -116,7 +116,6 @@ export function renderLoginPage({
         <li><a href="/">Home</a></li>
         <li><a href="/spaces">All spaces</a></li>
         <li><a href="/book">Book a space</a></li>
-        <li><a href="/booking-request">Ask the concierge</a></li>
       </ul>
     </nav>
     <div class="footer__ops">

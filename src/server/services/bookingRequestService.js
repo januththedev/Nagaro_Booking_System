@@ -4,7 +4,7 @@ import {
   BOOKING_REQUEST_STATUS, PAYMENT_STATUS, OCCUPANCY_SOURCE, OCCUPANCY_STATUS,
   SPACE_CATEGORY, isAdminRole,
 } from '../domain/constants.js';
-import { conflict, notFound, validationError } from '../domain/errors.js';
+import { conflict, notFound, validationError, DoubleBookingError } from '../domain/errors.js';
 import { nextReference } from '../domain/references.js';
 import { normalizeEmail, optionalPhone, requiredEmail, requiredString, asInteger, asTrimmedString } from '../domain/validation.js';
 import { allocateUnits, assertBookingRules } from './availabilityService.js';
@@ -106,7 +106,6 @@ export function createBookingRequest(db, input = {}) {
   const phone = optionalPhone(input.customer?.phone);
   const organization = asTrimmedString(input.customer?.organization,{field:'organization',max:160});
   const purpose = asTrimmedString(input.purpose,{field:'purpose',max:2000});
-  const priced = quote({space,rates:loadRates(db,space.id),startAt,endAt,unitCount,billingUnit:input.billingUnit || null});
   const idempotencyKey = String(input.idempotencyKey ?? '').trim() || null;
   const manageToken = randomBytes(32).toString('base64url');
   const result = withWriteTransaction(db, () => {
@@ -114,6 +113,8 @@ export function createBookingRequest(db, input = {}) {
       const existing = db.prepare(`${SELECT} WHERE br.idempotency_key=?`).get(idempotencyKey);
       if (existing) return { request: hydrate(db,existing), manageToken:null, idempotent:true };
     }
+    const priced = quote({space,rates:loadRates(db,space.id),startAt,endAt,unitCount,billingUnit:input.billingUnit || null});
+    if (input.expectedQuote != null) assertAcceptedQuote(input.expectedQuote, previewCheckout(db, input));
     const reference = nextReference(db,'booking_request',now);
     const info = db.prepare(`INSERT INTO booking_request
       (reference,space_id,status,payment_status,customer_name,email,email_normalized,phone,organization,start_at,end_at,unit_count,attendees,purpose,billing_unit,billing_quantity,rate_cents,venue_total_cents,currency,manage_token_hash,idempotency_key,created_at,updated_at)
@@ -163,6 +164,27 @@ function feeSnapshot(policy, total) {
   return { mode:'PERCENTAGE', value:bps, fee:Math.max(0,Math.round(Number(total)*bps/10000)) };
 }
 
+/** Public checkout preview; uses the same tariff and fee rules as confirmation. */
+export function previewCheckout(db, { spaceId, startAt, endAt, unitCount = 1, now = Date.now() }) {
+  const space = db.prepare("SELECT * FROM space WHERE id=? AND status='PUBLISHED'").get(Number(spaceId));
+  if (!space) throw notFound('Space not found.');
+  if (startAt <= now) throw validationError('Choose a future date and time.');
+  assertBookingRules(space, { startAt, endAt });
+  const count = space.category === SPACE_CATEGORY.COWORKING
+    ? asInteger(unitCount, { field: 'unit_count', min: 1, max: 500, required: true }) : 1;
+  const price = quote({ space, rates: loadRates(db, space.id), startAt, endAt, unitCount: count });
+  const fee = feeSnapshot(db.prepare('SELECT * FROM booking_fee_policy WHERE id=1').get(), price.totalCents);
+  return { ...price, unitCount: count, bookingFeeCents: fee.fee,
+    remainingBalanceCents: Math.max(0, price.totalCents - fee.fee) };
+}
+
+function assertAcceptedQuote(expected, actual) {
+  if (expected == null) return; // legacy HTML clients retain their existing contract
+  if (expected.totalCents !== actual.totalCents || expected.bookingFeeCents !== actual.bookingFeeCents) {
+    throw conflict('The price has changed. Review the updated total before confirming.');
+  }
+}
+
 function confirmFromHold(db, row, now) {
   const actor = publicSystemActor(db);
   const customer = resolveOrCreateCustomerInTransaction(db,{actor,payload:{full_name:row.customer_name,email:row.email,phone:row.phone,organization:row.organization}});
@@ -186,7 +208,7 @@ function confirmFromHold(db, row, now) {
   return reservationId;
 }
 
-export function approveBookingRequest(db,{actor,requestId,now=Date.now()}={}) {
+export function approveBookingRequest(db,{actor,requestId,now=Date.now(),expectedQuote=null}={}) {
   if (!actor?.id) throw validationError('An authenticated staff actor is required.');
   const result = withWriteTransaction(db,()=>{
     const row=db.prepare('SELECT * FROM booking_request WHERE id=?').get(Number(requestId));
@@ -196,6 +218,7 @@ export function approveBookingRequest(db,{actor,requestId,now=Date.now()}={}) {
     const allocation=allocateUnits(db,{spaceId:row.space_id,startAt:row.start_at,endAt:row.end_at,requiredCount:row.unit_count,bufferMinutes:space.buffer_minutes??0});
     const policy=db.prepare('SELECT * FROM booking_fee_policy WHERE id=1').get();
     const snapshot=feeSnapshot(policy,row.venue_total_cents);
+    assertAcceptedQuote(expectedQuote, { totalCents: Number(row.venue_total_cents), bookingFeeCents: snapshot.fee });
     const expiresAt=now+Number(policy?.payment_window_minutes??120)*60000;
     const occupancyInsert=db.prepare(`INSERT INTO occupancy (resource_unit_id,space_id,start_at,end_at,status,source,reservation_id,maintenance_block_id,created_at) VALUES (?,?,?,?,?,'MAINTENANCE',NULL,NULL,?)`);
     const holdInsert=db.prepare(`INSERT INTO booking_hold_claim (booking_request_id,occupancy_id,status,expires_at,created_at) VALUES (?,?,'ACTIVE',?,?)`);
@@ -235,6 +258,7 @@ export function createSelfServiceBooking(db, input = {}) {
     approveBookingRequest(db, {
       actor: publicSystemActor(db),
       requestId: row?.id,
+      expectedQuote: input.expectedQuote,
       now: Number(input.now ?? Date.now()),
     });
   } catch (error) {
@@ -255,6 +279,10 @@ export function createSelfServiceBooking(db, input = {}) {
           BOOKING_REQUEST_STATUS.REQUESTED,
         );
       });
+    }
+    // Allocation conflicts contain staff-only customer/reference details.
+    if (error instanceof DoubleBookingError || error.code === 'DOUBLE_BOOKING_CONFLICT') {
+      throw new DoubleBookingError('The selected time is no longer available. Choose another time.');
     }
     throw error;
   }

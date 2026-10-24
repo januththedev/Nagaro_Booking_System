@@ -324,3 +324,12 @@ test('draft recognition only proposes details the customer actually supplied', (
   const partial = validateDraftInput({ date: '2030-08-14' });
   assert.equal(partial.partial, true, 'an incomplete draft is offered as editable, never as complete');
 });
+
+test('draft contact extraction never mistakes dates or time ranges for a phone', () => {
+  const candidate = extractDraftCandidate([{role:'user', content:'Find a meeting room for 10 people on 2031-10-26 from 10:00 to 12:00 and prepare a booking.'}]);
+  assert.equal(candidate.phone, null);
+  assert.equal(candidate.date, '2031-10-26');
+  assert.equal(candidate.attendees, 10);
+  const contact = extractDraftCandidate([{role:'user',content:'2031-10-26 10:00 to 12:00. Call +94 77 123 4567'}]);
+  assert.equal(contact.phone, '+94 77 123 4567');
+});

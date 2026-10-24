@@ -164,7 +164,7 @@ export function LandingExperience({ spaces }: { spaces: PublicSpace[] }) {
   }
 
   const bookingBridgeHref = bridgeSpace
-    ? `/spaces/${encodeURIComponent(bridgeSpace)}/book`
+    ? `/spaces/${encodeURIComponent(bridgeSpace)}/book?${new URLSearchParams({ date: bridgeDate, start: bridgeStart, end: bridgeEnd }).toString()}`
     : "/spaces";
 
   const activeChapterData = NARRATIVE_CHAPTERS[activeChapter];

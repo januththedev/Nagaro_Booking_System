@@ -330,7 +330,11 @@ export function extractDraftCandidate(rawMessages) {
     .map((m) => String(m?.content ?? ''))
     .join(' ');
   const email = text.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] ?? null;
-  const phone = text.match(/\+?\d[\d\s().-]{7,}\d/)?.[0] ?? null;
+  // Dates and times are scheduling data, never contact information.
+  const contactText = text.replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ').replace(/\b\d{1,2}:\d{2}\b/g, ' ');
+  const phone = [...contactText.matchAll(/\+?\d[\d ().-]{7,}\d/g)]
+    .map((match) => match[0].trim())
+    .find((value) => { const digits = value.replace(/\D/g, ''); return digits.length >= 9 && digits.length <= 15; }) ?? null;
   const date = text.match(/\b20\d{2}-\d{2}-\d{2}\b/)?.[0] ?? null;
   const times = [...text.matchAll(/\b([01]?\d|2[0-3]):[0-5]\d\b/g)].map((m) => m[0]);
   const attendees = text.match(/\b(\d{1,3})\s*(?:people|persons|pax|attendees|guests)\b/i)?.[1] ?? null;

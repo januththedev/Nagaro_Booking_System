@@ -49,7 +49,19 @@ export type SpaceListResponse = {
   pageCount: number;
 };
 
+export type CheckoutQuote = {
+  totalCents: number;
+  bookingFeeCents: number;
+  remainingBalanceCents: number;
+  billingUnit: string;
+  billingQuantity: number;
+  unitCount: number;
+  rateCents: number;
+  currency: string;
+};
+
 export type Availability = {
+  quote?: CheckoutQuote;
   spaceCode: string;
   spaceName: string;
   startAt: number;
@@ -108,6 +120,9 @@ export type BookingRequest = {
 export type PublicCalendarSlot = {
   startAt: number;
   endAt: number;
+  bookingEndAt: number;
+  bookingFreeUnits: number;
+  canBook: boolean;
   freeUnits: number;
   totalUnits: number;
   isFree: boolean;

@@ -155,7 +155,7 @@ ${body}
           <span class="brand__sub">Colombo</span></span>
       </div>
       <p>Spaces with history, built for what comes next.</p>
-      <p class="site-footer__note">Direct checkout confirms live inventory immediately. Concierge inquiries remain provisional until the operations team confirms them.</p>
+      <p class="site-footer__note">Choose your time and review the total before booking. Availability is checked again at checkout.</p>
     </div>
     <nav class="footer__nav" aria-label="Spaces and booking">
       <h2 class="site-footer__heading">Spaces &amp; Booking</h2>
@@ -163,7 +163,6 @@ ${body}
         <li><a href="/">Home</a></li>
         <li><a href="/spaces">All spaces</a></li>
         <li><a href="/book">Book a space</a></li>
-        <li><a href="/booking-request">Ask the concierge</a></li>
         <li><a href="/spaces?category=MEETING_ROOM">Meeting rooms</a></li>
         <li><a href="/spaces?category=AUDITORIUM">Auditoriums &amp; event halls</a></li>
         <li><a href="/spaces?category=COWORKING">Co-working desks</a></li>

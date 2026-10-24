@@ -9,6 +9,7 @@
  *   5. error boundary            (HTML page for pages, JSON for /api/*)
  */
 import { createRouter } from './http/router.js';
+import { assertPostgresSchemaReady } from './db/schemaReadiness.js';
 import { getDb } from './db/connection.js';
 import { loadConfig } from './config.js';
 import { join, relative as relativePath, resolve, sep } from 'node:path';
@@ -112,6 +113,7 @@ export function renderErrorPage(ctx, { status, code, message, details = null }) 
 
 export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   const router = createRouter();
+  let staffSchemaReady = false;
 
   /* 1. static assets */
   router.use(async (ctx) => {
@@ -144,7 +146,19 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   router.use(async (ctx) => {
     ctx.secure = config.forceSecureCookies || Boolean(ctx.req.socket?.encrypted);
     const cookies = ctx.cookies = parseCookiesSafe(ctx.req);
-    const resolved = resolveSession(db, cookies[SESSION_COOKIE]);
+    const staffRoute = ctx.url.pathname === '/admin' || ctx.url.pathname.startsWith('/admin/')
+      || ctx.url.pathname.startsWith('/api/admin/');
+    if (staffRoute && !staffSchemaReady) {
+      try { assertPostgresSchemaReady(db); staffSchemaReady = true; }
+      catch (error) {
+        if (error.code !== 'SCHEMA_OUTDATED') throw error;
+        console.error('[staff-schema]', error.message);
+        throw new AppError('SCHEMA_OUTDATED', 'The staff console requires a database update. Please contact the site administrator.', { status: 503 });
+      }
+    }
+    // Guest APIs use booking capabilities, never a staff cookie. A stale staff
+    // session must not break customer availability, checkout or Guider.
+    const resolved = staffRoute ? resolveSession(db, cookies[SESSION_COOKIE]) : null;
     if (resolved) {
       ctx.session = { sessionId: resolved.sessionId, csrfSecret: resolved.csrfSecret, expiresAt: resolved.expiresAt };
       ctx.actor = resolved.actor;
@@ -226,7 +240,7 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
         ok: false,
         error: {
           code,
-          message: status >= 500
+          message: status >= 500 && code !== 'SCHEMA_OUTDATED'
             ? 'Something went wrong on our side. The operation was not completed.'
             : error.message,
           details: error.details ?? null,
@@ -243,8 +257,8 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
     if (ctx.method === 'POST' && referer) {
       setFlash(ctx, {
         kind: 'error',
-        message: error.message,
-        problems: error.details?.problems ?? null,
+        message: status >= 500 ? 'Something went wrong on our side. The operation was not completed.' : error.message,
+        problems: status >= 500 ? null : error.details?.problems ?? null,
       });
       try {
         const target = new URL(referer);
@@ -256,7 +270,7 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
     const page = renderErrorPage(ctx, {
       status,
       code,
-      message: status >= 500
+      message: status >= 500 && code !== 'SCHEMA_OUTDATED'
         ? 'Something went wrong on our side. The operation was not completed.'
         : error.message,
       details: error.details ?? null,

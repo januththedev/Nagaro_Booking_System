@@ -308,7 +308,7 @@ export function updateAdminUser(db, { actor, adminUserId, payload } = {}) {
     const currentIsSuper = current.is_super_admin === 1;
     const nextIsActive = patch.isActive ?? (current.is_active === 1);
 
-    if (!currentIsSuper && nextIsSuper) {
+    if (nextIsSuper && nextIsActive && (!currentIsSuper || current.is_active !== 1)) {
       assertSuperAdminCapacity(db, { excludeId: id });
     }
     if (currentIsSuper && (!nextIsSuper || nextIsActive === false)) {

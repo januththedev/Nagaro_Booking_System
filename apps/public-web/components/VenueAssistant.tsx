@@ -92,7 +92,9 @@ export function VenueAssistant() {
   }
 
   async function reviewDraft() {
-    if (!candidate) return;
+    if (!candidate || busy) return;
+    setBusy(true);
+    try {
     const currentCode = pathname.match(/^\/spaces\/([^/]+)(?:\/book)?$/)?.[1];
     const payload = { ...candidate, spaceCode: candidate.spaceCode || currentCode || null };
     const res = await fetch(clientApiPath("/api/public/assistant/drafts"), {
@@ -101,9 +103,20 @@ export function VenueAssistant() {
       body: JSON.stringify(payload),
     });
     const body = await res.json();
+    if (!res.ok || !body?.draft?.token) throw new Error("Draft request failed");
     if (body?.draft?.token) {
       const target = payload.spaceCode ? `/spaces/${encodeURIComponent(String(payload.spaceCode))}/book` : "/spaces";
-      router.push(`${target}#draft=${encodeURIComponent(body.draft.token)}`);
+      if (pathname === target) {
+        window.dispatchEvent(new CustomEvent('trace:booking-draft', { detail: { token: body.draft.token } }));
+        setOpen(false);
+      } else {
+        router.push(`${target}#draft=${encodeURIComponent(body.draft.token)}`);
+      }
+    }
+    } catch {
+      setMessages(previous => [...previous, { role: "assistant", content: t.request.draftError }]);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -190,7 +203,7 @@ export function VenueAssistant() {
 
           {candidate ? (
             <div className="px-4 pb-3">
-              <button onClick={reviewDraft} className="btn-outline w-full text-xs">
+              <button disabled={busy} onClick={reviewDraft} className="btn-outline w-full text-xs">
                 {t.assistant.draftCta}
               </button>
               <p className="text-[0.68rem] text-[var(--graphite)] mt-2 mb-0">{t.assistant.draftNote}</p>

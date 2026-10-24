@@ -97,13 +97,13 @@ export function bookingHref(
 export function slotBookingHref(
   spaceCode: string,
   dateKey: string,
-  slot: Pick<PublicCalendarSlot, "startAt" | "endAt">,
+  slot: Pick<PublicCalendarSlot, "startAt" | "endAt"> & Partial<Pick<PublicCalendarSlot, "bookingEndAt">>,
 ): string {
   return bookingHref(
     spaceCode,
     dateKey,
     clockInColombo(slot.startAt),
-    clockInColombo(slot.endAt),
+    clockInColombo(slot.bookingEndAt ?? slot.endAt),
   );
 }
 

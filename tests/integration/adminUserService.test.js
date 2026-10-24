@@ -479,3 +479,14 @@ test('only Super Admins can manage accounts, and unknown ids are not found', (t)
   const found = authenticate(db, { email: 'admin@test.local', password: TEST_PASSWORD });
   assert.equal(found.id, actor.id);
 });
+
+test('reactivating a disabled Super Admin cannot exceed the three-seat cap', (t) => {
+  const db = createTestDb(); t.after(() => closeTestDb(db));
+  const actor = createTestActor(db, { role: 'SUPER_ADMIN' });
+  const make = (n) => createAdminUser(db, { actor, payload: {email:`super-${n}@test.local`,display_name:`Super ${n}`,role:'SUPER_ADMIN',password:'TestingPass123'} });
+  const disabled = make(1);
+  updateAdminUser(db, {actor,adminUserId:disabled.id,payload:{is_active:false}});
+  make(2); make(3);
+  assert.throws(() => updateAdminUser(db, {actor,adminUserId:disabled.id,payload:{is_active:true}}), /at most 3/);
+  assert.equal(getAdminUser(db,disabled.id).isActive,false);
+});

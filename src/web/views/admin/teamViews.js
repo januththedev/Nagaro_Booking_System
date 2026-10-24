@@ -138,7 +138,7 @@ function memberCard(member, context) {
     </dl>
     ${member.isActive ? memberActions(member, context) : html`<p class="hint">This account is disabled and cannot sign in.</p>`}
     <details class="team-member__edit">
-      <summary>Edit name, email or role</summary>
+      <summary>Edit name, email, role or access</summary>
       <form method="post" action="/admin/team/${member.id}" class="form-grid" data-submit-once>
         ${csrfField(context.csrfToken)}
         <div class="form-field">
@@ -159,6 +159,14 @@ function memberCard(member, context) {
           </select>
           ${member.isSuperAdmin && lastActiveSuper
             ? html`<p class="hint">The last active Super Admin cannot be demoted.</p>` : ''}
+        </div>
+        <div class="form-field">
+          <label for="member-active-${member.id}">Account access</label>
+          <select id="member-active-${member.id}" name="is_active">
+            <option value="1"${attr('selected', member.isActive)}>Active — can sign in</option>
+            <option value="0"${attr('selected', !member.isActive)}${attr('disabled', lastActiveSuper)}>Disabled — access revoked</option>
+          </select>
+          <p class="hint">Disabling revokes all sessions. Account records are retained.</p>
         </div>
         <div class="form-actions form-field--full">
           <button class="button button--primary button--small" type="submit">Save details</button>

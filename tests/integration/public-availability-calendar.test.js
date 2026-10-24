@@ -198,7 +198,7 @@ test('returns a privacy-safe Monday-to-Sunday-shaped calendar for published spac
       for (const slot of daySpace.slots) {
         assert.deepEqual(
           Object.keys(slot).sort(),
-          ['endAt', 'freeUnits', 'isFree', 'startAt', 'totalUnits'],
+          ['bookingEndAt', 'bookingFreeUnits', 'canBook', 'endAt', 'freeUnits', 'isFree', 'startAt', 'totalUnits'],
         );
       }
     }
@@ -234,7 +234,7 @@ test('hourly slots reflect confirmed reservations, holds-free inventory and main
   const meetingSlot = (clock) => meeting.slots.find((slot) => slot.startAt === at(clock));
   assert.equal(meetingSlot('08:00').isFree, true);
   assert.deepEqual(meetingSlot('09:00'), {
-    startAt: at('09:00'), endAt: at('10:00'), freeUnits: 0, totalUnits: 1, isFree: false,
+    startAt: at('09:00'), endAt: at('10:00'), bookingEndAt: at('10:00'), bookingFreeUnits: 0, canBook: false, freeUnits: 0, totalUnits: 1, isFree: false,
   });
   assert.equal(meetingSlot('10:00').isFree, false, 'a reservation spanning two hours blocks both');
   assert.equal(meetingSlot('11:00').isFree, true, 'half-open intervals free the boundary');
@@ -245,7 +245,7 @@ test('hourly slots reflect confirmed reservations, holds-free inventory and main
   const coworkingSlot = (clock) => coworking.slots.find((slot) => slot.startAt === at(clock));
   assert.equal(coworkingSlot('09:00').freeUnits, 4);
   assert.deepEqual(coworkingSlot('10:00'), {
-    startAt: at('10:00'), endAt: at('11:00'), freeUnits: 2, totalUnits: 4, isFree: true,
+    startAt: at('10:00'), endAt: at('11:00'), bookingEndAt: at('11:00'), bookingFreeUnits: 2, canBook: true, freeUnits: 2, totalUnits: 4, isFree: true,
   });
   assert.equal(coworkingSlot('11:00').freeUnits, 2);
   assert.equal(coworkingSlot('12:00').freeUnits, 4);
@@ -297,4 +297,19 @@ test('a full 31-day range is accepted and capped exactly', async () => {
   assert.equal(body.days.length, 31);
   assert.equal(body.days[0].dateKey, '2031-01-01');
   assert.equal(body.days[30].dateKey, '2031-01-31');
+});
+
+test('booking links cover the minimum duration, closing time, buffers and past slots', async (t) => {
+  const { buildPublicCalendar } = await import('../../src/server/services/publicCalendarService.js');
+  db.prepare('UPDATE space SET min_duration_minutes=120, buffer_minutes=30 WHERE id=?').run(meetingId);
+  t.after(() => db.prepare('UPDATE space SET min_duration_minutes=60, buffer_minutes=0 WHERE id=?').run(meetingId));
+  const payload = buildPublicCalendar(db, { from: DATE, to: DATE, spaceCode:'MEETING-ROOM',now:at('08:00') });
+  const slots = payload.days[0].spaces[0].slots;
+  const slot = (time) => slots.find((item) => item.startAt===at(time));
+  assert.equal(slot('08:00').canBook,false,'start at or before now is never offered');
+  assert.equal(slot('11:00').canBook,false,'turnover buffer after 09–11 reservation is respected');
+  assert.equal(slot('12:00').bookingEndAt,at('14:00'),'a free link selects the full minimum duration');
+  assert.equal(slot('12:00').canBook,true,'maintenance beginning exactly at end does not inflate the buffer');
+  assert.equal(slot('13:00').canBook,false,'minimum window crosses maintenance');
+  assert.equal(slot('17:00').canBook,false,'a two-hour booking cannot run past closing');
 });

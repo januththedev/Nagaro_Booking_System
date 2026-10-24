@@ -177,13 +177,15 @@ function occupancyBySpace(db, spaceIds, rangeStart, rangeEnd) {
  * Hourly slots for one space/day, with the same boundaries and half-open
  * overlap rule as `getSpaceDayGrid()`.
  */
-function daySlots({ dateKey, units, rows }) {
+function daySlots({ dateKey, units, rows, now }) {
   const dayStart = businessLocalToEpoch(dateKey, '00:00');
   const dayEnd = dayStart + DAY_MS;
   const openMinutes = parseClock(units.openTime);
   const closeMinutes = parseClock(units.closeTime);
   const totalUnits = units.units.length;
   const dayRows = rows.filter((row) => row.start_at < dayEnd && row.end_at > dayStart);
+  const duration = Math.max(60, units.minDurationMinutes || 0);
+  const buffer = (units.bufferMinutes || 0) * 60_000;
 
   const slots = [];
   for (let minute = openMinutes; minute < closeMinutes; minute += 60) {
@@ -198,8 +200,20 @@ function daySlots({ dateKey, units, rows }) {
           && row.start_at < slotEnd && row.end_at > slotStart)
         .map((row) => row.resource_unit_id),
     );
+    const bookingEndAt = slotStart + duration * 60_000;
+    const bookingBusy = new Set(rows.filter((row) => {
+      const padding = row.source === OCCUPANCY_SOURCE.MAINTENANCE ? 0 : buffer;
+      return BUSY_SOURCES.has(row.source) && row.start_at < bookingEndAt + padding && row.end_at > slotStart - padding;
+    }).map((row) => row.resource_unit_id));
+    const canBook = slotStart > now
+      && minute + duration <= closeMinutes
+      && (!units.maxDurationMinutes || duration <= units.maxDurationMinutes)
+      && bookingBusy.size < totalUnits;
     slots.push({
       startAt: slotStart,
+      bookingEndAt,
+      bookingFreeUnits: Math.max(0, totalUnits - bookingBusy.size),
+      canBook,
       endAt: slotEnd,
       freeUnits: Math.max(0, totalUnits - busyUnitIds.size),
       totalUnits,
@@ -213,9 +227,9 @@ function daySlots({ dateKey, units, rows }) {
  * Build the public calendar payload. `spaceCode` is optional; when present it
  * must identify a PUBLISHED space or the caller gets a 404.
  */
-export function buildPublicCalendar(db, { from, to, spaceCode = null } = {}) {
+export function buildPublicCalendar(db, { from, to, spaceCode = null, now = Date.now() } = {}) {
   // A payment hold that passed its deadline must not appear busy forever.
-  expireBookingHolds(db);
+  expireBookingHolds(db, now);
   const range = parseCalendarRange(from, to);
   const code = textValue(spaceCode, 60);
   const spaces = publishedSpaces(db, code);
@@ -223,7 +237,8 @@ export function buildPublicCalendar(db, { from, to, spaceCode = null } = {}) {
   const units = unitsBySpace(db, spaceIds);
   const rangeStart = businessLocalToEpoch(range.from, '00:00');
   const rangeEnd = businessLocalToEpoch(range.to, '00:00') + DAY_MS;
-  const occupancy = occupancyBySpace(db, spaceIds, rangeStart, rangeEnd);
+  const padding = Math.max(0, ...spaces.map((space) => space.bufferMinutes || 0)) * 60_000;
+  const occupancy = occupancyBySpace(db, spaceIds, rangeStart - padding, rangeEnd + padding);
 
   const summaries = spaces.map((space) => ({
     code: space.code,
@@ -243,7 +258,11 @@ export function buildPublicCalendar(db, { from, to, spaceCode = null } = {}) {
       totalUnits: (units.get(space.id) ?? []).length,
       slots: daySlots({
         dateKey,
+        now,
         units: {
+          minDurationMinutes: space.minDurationMinutes,
+          maxDurationMinutes: space.maxDurationMinutes,
+          bufferMinutes: space.bufferMinutes,
           openTime: space.openTime,
           closeTime: space.closeTime,
           units: units.get(space.id) ?? [],

@@ -82,6 +82,7 @@ export function CatalogueClient({
   const [onlyAvailableForWindow, setOnlyAvailableForWindow] = useState(false);
   const [availabilityMap, setAvailabilityMap] = useState<Record<string, Availability>>({});
   const [checkingWindow, setCheckingWindow] = useState(false);
+  const windowVersion = useRef(0);
   const [windowError, setWindowError] = useState<string | null>(null);
   const [desktopFiltersOpen, setDesktopFiltersOpen] = useState(false);
 
@@ -110,7 +111,16 @@ export function CatalogueClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileSheetOpen]);
 
+  useEffect(() => {
+    windowVersion.current += 1;
+    setAvailabilityMap({});
+    setCheckingWindow(false);
+    setOnlyAvailableForWindow(false);
+    setWindowError(null);
+  }, [checkDate, checkStart, checkEnd]);
+
   async function verifyAvailabilityWindow() {
+    const version = ++windowVersion.current;
     if (!checkDate || !checkStart || !checkEnd) {
       setWindowError(t.catalogue.windowErrorSelect);
       return;
@@ -140,15 +150,17 @@ export function CatalogueClient({
           return [space.code, data] as const;
         }),
       );
+      if (version !== windowVersion.current) return;
+      if (entries.some(([, data]) => !data)) setWindowError(t.catalogue.windowErrorService);
       const next: Record<string, Availability> = {};
       for (const [code, data] of entries) {
         if (data) next[code] = data;
       }
       setAvailabilityMap(next);
     } catch {
-      setWindowError(t.catalogue.windowErrorService);
+      if (version === windowVersion.current) setWindowError(t.catalogue.windowErrorService);
     } finally {
-      setCheckingWindow(false);
+      if (version === windowVersion.current) setCheckingWindow(false);
     }
   }
 
@@ -666,7 +678,8 @@ export function CatalogueClient({
             const ratio = GRID_RATIOS[idx % GRID_RATIOS.length];
             const span = GRID_SPANS[idx % GRID_SPANS.length];
             const avail = availabilityMap[space.code];
-            const bookHref = `/spaces/${encodeURIComponent(space.code)}/book${draftToken ? `#draft=${encodeURIComponent(draftToken)}` : ""}`;
+            const schedule = new URLSearchParams({ date: checkDate, start: checkStart, end: checkEnd }).toString();
+            const bookHref = `/spaces/${encodeURIComponent(space.code)}/book?${schedule}${draftToken ? `#draft=${encodeURIComponent(draftToken)}` : ""}`;
 
             return (
               <article

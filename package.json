@@ -40,6 +40,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
     "pg-mem": "^3.0.14"
   },
   "overrides": {

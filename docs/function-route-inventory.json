@@ -1,0 +1,607 @@
+[
+  {
+    "method": "GET",
+    "path": "/admin/guider-knowledge",
+    "source": "src/server/routes/adminAssistantKnowledgeRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/guider-knowledge/new",
+    "source": "src/server/routes/adminAssistantKnowledgeRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/guider-knowledge",
+    "source": "src/server/routes/adminAssistantKnowledgeRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/guider-knowledge/:id/edit",
+    "source": "src/server/routes/adminAssistantKnowledgeRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/guider-knowledge/:id",
+    "source": "src/server/routes/adminAssistantKnowledgeRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/guider-knowledge/:id/delete",
+    "source": "src/server/routes/adminAssistantKnowledgeRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/reservations",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/reservations/new",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/reservations",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/reservations",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/reservations/:id",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/reservations/:id/edit",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/reservations/:id",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/reservations/:id/cancel",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/calendar",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/maintenance",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/maintenance",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/maintenance/:id/cancel",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/availability",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/calendar/events",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/calendar/reschedule",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/calendar/requests/:id/approve",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/calendar/requests/:id/reject",
+    "source": "src/server/routes/adminBookingRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/customers",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/customers/new",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/customers",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/customers/:id",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/customers/:id/edit",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/customers/:id",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/customers/search",
+    "source": "src/server/routes/adminCustomerRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/notifications",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/notifications",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/notifications/vapid-public-key",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/notifications/:id/read",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/notifications/read-all",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/notifications/subscribe",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/notifications/unsubscribe",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/notifications/test",
+    "source": "src/server/routes/adminNotificationRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/inquiries",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/inquiries/:id",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/inquiries/:id/status",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/maintenance",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/maintenance",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/maintenance/:id/cancel",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/audit",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/dashboard/summary",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/inquiries/:id",
+    "source": "src/server/routes/adminOpsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/search",
+    "source": "src/server/routes/adminSearchRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/search",
+    "source": "src/server/routes/adminSearchRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/spaces",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/spaces/new",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/spaces/:id",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/spaces/:id/edit",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/publish",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/unpublish",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/archive",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/restore",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images/:imageId/cover",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images/:imageId/delete",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images/reorder",
+    "source": "src/server/routes/adminSpaceRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/team",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team/:id",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team/:id/reset",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team/:id/role",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team/:id/delete",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team/:id/restore",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/team/:id/purge",
+    "source": "src/server/routes/adminTeamRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images",
+    "source": "src/server/routes/adminUploadRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images/reorder",
+    "source": "src/server/routes/adminUploadRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images/:imageId/cover",
+    "source": "src/server/routes/adminUploadRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/spaces/:id/images/:imageId/delete",
+    "source": "src/server/routes/adminUploadRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/login",
+    "source": "src/server/routes/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/login",
+    "source": "src/server/routes/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/logout",
+    "source": "src/server/routes/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/account",
+    "source": "src/server/routes/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/account/password",
+    "source": "src/server/routes/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logout",
+    "source": "src/server/routes/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/booking-requests",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/spaces/:code/book",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/booking-requests/:reference",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/booking-requests/:reference/cancel",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/booking-requests/:reference/payment",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/payments/payhere/notify",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/assistant/chat",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/assistant/drafts",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/assistant/drafts/resolve",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/booking-requests/fee-policy",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/booking-requests",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/booking-requests/:reference/approve",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/booking-requests/:reference/reject",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/booking-requests/:reference/resolve-payment",
+    "source": "src/server/routes/bookingWorkflowRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/internal/notifications/tick",
+    "source": "src/server/routes/internalNotificationRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/internal/notifications/tick",
+    "source": "src/server/routes/internalNotificationRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/media/:storedName",
+    "source": "src/server/routes/mediaRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/spaces",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/spaces/:code",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/book",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/book",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/book/confirmed",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/book/manage",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/book/cancel",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/booking-request",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/booking-request",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/booking-request/received",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/booking-request/withdraw",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/booking-request/withdraw",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/spaces",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/spaces/:code",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/availability",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/availability/calendar",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/availability/day",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/bookings",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/public/bookings/:reference",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/bookings/:reference/cancel",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/public/inquiries",
+    "source": "src/server/routes/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/sw.js",
+    "source": "src/server/routes/serviceWorkerRoutes.js"
+  }
+]

@@ -6,7 +6,7 @@ import { parseBookingWindow } from '../../src/server/domain/validation.js';
 import {
   approveBookingRequest, createBookingRequest, createPayHereCheckout,
   createSelfServiceBooking, expireBookingHolds, getBookingRequest, processPayHereNotification,
-  rejectBookingRequest,
+  rejectBookingRequest, previewCheckout,
 } from '../../src/server/services/bookingRequestService.js';
 import { createPublicBooking } from '../../src/server/services/publicBookingService.js';
 
@@ -107,4 +107,37 @@ test('only a valid exact PayHere callback confirms once',()=>{
   const visible=getBookingRequest(db,{reference:created.request.reference,token:created.manageToken});
   assert.equal(visible.status,'CONFIRMED');assert.equal(visible.paymentStatus,'PAID');
   db.close();
+});
+
+test('checkout quotes match the saved tariff and fee and reject a changed price', (t) => {
+  const db=createTestDb();t.after(()=>db.close());const spaceId=seedSpace(db);
+  db.prepare("UPDATE booking_fee_policy SET mode='PERCENTAGE',percentage_bps=1000 WHERE id=1").run();
+  const request=input(spaceId,'quote:parity');
+  const expectedQuote=previewCheckout(db,request);
+  assert.equal(expectedQuote.totalCents,500000);
+  assert.equal(expectedQuote.bookingFeeCents,50000);
+  assert.equal(expectedQuote.remainingBalanceCents,450000);
+  db.prepare('UPDATE space_rate SET amount_cents=300000 WHERE space_id=?').run(spaceId);
+  assert.throws(()=>createSelfServiceBooking(db,{...request,expectedQuote}), /price has changed/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM booking_request').get().c,0);
+  const updated=previewCheckout(db,request);
+  const booked=createSelfServiceBooking(db,{...request,expectedQuote:updated});
+  assert.equal(booked.request.venueTotalCents,updated.totalCents);
+  assert.equal(booked.request.payment.bookingFeeCents,updated.bookingFeeCents);
+  db.prepare('UPDATE space_rate SET amount_cents=400000 WHERE space_id=?').run(spaceId);
+  const retry=createSelfServiceBooking(db,{...request,expectedQuote:updated});
+  assert.equal(retry.request.id,booked.request.id,'an idempotent retry retains its accepted price');
+});
+
+test('public checkout conflict never discloses another customer or reservation', (t) => {
+  const db=createTestDb();t.after(()=>db.close());const spaceId=seedSpace(db);
+  const booked=createSelfServiceBooking(db,input(spaceId,'privacy:first'));
+  assert.throws(()=>createSelfServiceBooking(db,{...input(spaceId,'privacy:second'),customer:{fullName:'Other',email:'other@example.com'}}),error=>{
+    const text=JSON.stringify({message:error.message,details:error.details});
+    assert.doesNotMatch(text,/Asha|asha@example.com|Design workshop/);
+    assert.ok(!text.includes(booked.request.reservationReference));
+    assert.equal(error.status,409);
+    assert.deepEqual(error.details.conflicts,[]);
+    return true;
+  });
 });

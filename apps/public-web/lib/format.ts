@@ -1,9 +1,11 @@
 export function formatMoney(cents: number, currency = "LKR") {
+  const amount = Number(cents) || 0;
   return new Intl.NumberFormat("en-LK", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0,
-  }).format((Number(cents) || 0) / 100);
+    minimumFractionDigits: amount % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount / 100);
 }
 
 export function formatDateTime(epoch: number) {

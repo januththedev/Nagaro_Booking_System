@@ -13,6 +13,7 @@
  *   - DOOR PERMISSION is decided on every request from the booking itself
  *     (status, start, end) and can be revoked on its own.
  */
+import { runInBackground } from './backgroundTask.js';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { withWriteTransaction } from '../db/connection.js';
 import { loadConfig } from '../config.js';
@@ -249,10 +250,8 @@ export async function deliverPendingAccessLinks(db, { baseUrl = loadConfig().bas
 }
 
 function deliverSoon(db, linkId) {
-  const timer = setTimeout(() => {
-    deliverAccessLink(db, { linkId }).catch(() => { /* the scheduler retries */ });
-  }, 0);
-  if (typeof timer.unref === 'function') timer.unref();
+  // Failures are retried by the scheduler; on Vercel the send is kept alive past the response.
+  runInBackground('access-link', () => deliverAccessLink(db, { linkId }));
 }
 
 /* ------------------------------------------------------------ revocation */

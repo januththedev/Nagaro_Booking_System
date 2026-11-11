@@ -30,6 +30,7 @@
  *   when at most `late_grace_minutes` of it have been lost; otherwise the
  *   payment goes to review for a refund.
  */
+import { runInBackground } from './backgroundTask.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { withWriteTransaction } from '../db/connection.js';
 import { conflict, forbidden, notFound, validationError } from '../domain/errors.js';
@@ -309,8 +310,7 @@ function notifyAdmins(db, { extensionId, title, body, priority = NOTIFICATION_PR
 }
 
 function sendReceiptSoon(db, extensionId) {
-  const timer = setTimeout(() => { sendExtensionReceipt(db, extensionId).catch(() => {}); }, 0);
-  if (typeof timer.unref === 'function') timer.unref();
+  runInBackground('extension-receipt', () => sendExtensionReceipt(db, extensionId));
 }
 
 /** Email and SMS confirmation of a granted extension. Never throws. */

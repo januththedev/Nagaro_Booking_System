@@ -18,6 +18,7 @@
  *   send the same one twice. The deadline is cleared only by a CLOSE the
  *   controller accepted.
  */
+import { runInBackground } from './backgroundTask.js';
 import { withWriteTransaction } from '../db/connection.js';
 import { conflict, forbidden, notFound, validationError } from '../domain/errors.js';
 import { businessTimeLabel } from '../domain/time.js';
@@ -543,8 +544,5 @@ export function recordControllerStatus(db, { doorIdentifier, state, commandId = 
 
 /** Best-effort immediate run after a write queued door work; the worker and cron tick are the guarantee. */
 export function kickDoorQueue(db) {
-  const timer = setTimeout(() => {
-    runDoorQueue(db).catch((error) => console.warn('[door] immediate queue run failed:', error?.code ?? error?.message ?? 'unknown'));
-  }, 0);
-  if (typeof timer.unref === 'function') timer.unref();
+  runInBackground('door', () => runDoorQueue(db));
 }

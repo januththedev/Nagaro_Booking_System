@@ -14,6 +14,7 @@ import { recordAudit } from './auditService.js';
 import {
   afterBookingRequestCancelled, afterBookingRequestConfirmed, afterBookingRequestCreated,
 } from './notificationHooks.js';
+import { afterReservationConfirmed } from './accessLinkService.js';
 
 const ACTIVE_REQUEST = [BOOKING_REQUEST_STATUS.APPROVED_AWAITING_PAYMENT, BOOKING_REQUEST_STATUS.PAYMENT_REVIEW_REQUIRED];
 
@@ -23,6 +24,14 @@ function sha256(value) {
 
 function md5Upper(value) {
   return createHash('md5').update(String(value), 'utf8').digest('hex').toUpperCase();
+}
+
+/** A booking request that became a reservation gets its room-access link (best effort). */
+function issueAccessLinkForReference(db, reservationReference) {
+  try {
+    const row = db.prepare('SELECT id FROM reservation WHERE reference = ?').get(String(reservationReference));
+    if (row) afterReservationConfirmed(db, { reservationId: Number(row.id) });
+  } catch { /* the booking is committed; link issue is retried by staff if needed */ }
 }
 
 function publicSystemActor(db) {
@@ -232,6 +241,7 @@ export function approveBookingRequest(db,{actor,requestId,now=Date.now(),expecte
     return hydrate(db,db.prepare(`${SELECT} WHERE br.id=?`).get(row.id),{includePrivate:true});
   });
   if (result.status === BOOKING_REQUEST_STATUS.CONFIRMED && result.reservationReference) {
+    issueAccessLinkForReference(db, result.reservationReference);
     afterBookingRequestConfirmed(db, {
       reference: result.reference,
       now,
@@ -459,6 +469,8 @@ export function processPayHereNotification(db,payload={},config={},now=Date.now(
     return {accepted:true,confirmed:false};
   });
   if (result?.confirmed && result.requestReference) {
+    const confirmed = db.prepare('SELECT r.reference FROM booking_request br JOIN reservation r ON r.id = br.reservation_id WHERE br.reference = ?').get(result.requestReference);
+    if (confirmed?.reference) issueAccessLinkForReference(db, confirmed.reference);
     afterBookingRequestConfirmed(db, { reference: result.requestReference, now });
   }
   return result;

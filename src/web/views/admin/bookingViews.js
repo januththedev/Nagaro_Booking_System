@@ -588,6 +588,7 @@ function pricingPreview(preview, space, unitCount = 1) {
 export function renderReservationDetailPage({
   actor, csrfToken, flash = null, reservation, customer = null, space = null,
   currentRateCents = null, audit = [], alert = null, fieldErrors = null, cancelReason = '',
+  accessCard = null,
 }) {
   const cancelled = reservation.status === RESERVATION_STATUS.CANCELLED;
   const completed = reservation.status === RESERVATION_STATUS.COMPLETED;
@@ -738,6 +739,7 @@ export function renderReservationDetailPage({
     <div class="split-layout">
       <div class="stack">
         ${card({ title: 'Booking & Schedule Summary', description: 'Every stored field for this reservation.', body: details })}
+        ${accessCard ?? ''}
         ${card({ title: 'Financial & Rate Breakdown', body: pricing })}
         ${card({ title: 'Allocated Resource Units', description: 'The specific resource units this booking holds.', body: unitsBody })}
         ${card({
@@ -788,6 +790,7 @@ export function renderReservationDetailPage({
       { label: reservation.reference },
     ],
     pageActions: cancelled ? null : html`<a class="button button--primary button--small" href="/admin/reservations/${reservation.id}/edit">Edit booking</a>`,
+    extraStyles: accessCard ? ['/assets/admin-access.css'] : [],
     body,
   });
 }

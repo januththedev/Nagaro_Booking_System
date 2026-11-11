@@ -30,6 +30,11 @@
  * Since the router has no per-route middleware, every handler calls
  * `requireAuth` (and `requireCsrf` after `readBody` on mutations) itself.
  */
+import { getAccessLinkForReservation } from '../services/accessLinkService.js';
+import { effectiveAccessConfig } from '../services/accessPolicyService.js';
+import { listDoorActivity } from '../services/doorService.js';
+import { listExtensions } from '../services/extensionService.js';
+import { reservationAccessCard } from '../../web/views/admin/accessViews.js';
 import {
   LIMITS, asInteger, asPagination, asTrimmedString, normalizeEmail, optionalEmail,
   optionalPhone, parseBookingWindow,
@@ -1571,7 +1576,25 @@ function renderDetail(ctx, db, { reservation, alert = null, fieldErrors = null, 
     alert,
     fieldErrors,
     cancelReason,
+    accessCard: buildAccessCard(ctx, db, reservation),
   });
+}
+
+/** The "Room access" card. A problem here must never hide the reservation itself. */
+function buildAccessCard(ctx, db, reservation) {
+  try {
+    return reservationAccessCard({
+      reservation,
+      link: getAccessLinkForReservation(db, reservation.id),
+      extensions: listExtensions(db, { reservationId: reservation.id, limit: 20 }),
+      doorActivity: listDoorActivity(db, { reservationId: reservation.id, limit: 15 }),
+      doorReady: effectiveAccessConfig(db, reservation.spaceId).doorReady,
+      csrfToken: ctx.csrfToken,
+    });
+  } catch (error) {
+    console.warn('[access] reservation access card unavailable:', error?.code ?? error?.message ?? 'unknown');
+    return null;
+  }
 }
 
 /* ------------------------------------------------- prefill + filter states */

@@ -40,6 +40,8 @@ import { registerAdminNotificationRoutes } from './routes/adminNotificationRoute
 import { registerInternalNotificationRoutes } from './routes/internalNotificationRoutes.js';
 import { registerServiceWorkerRoute } from './routes/serviceWorkerRoutes.js';
 import { registerAdminSearchRoutes } from './routes/adminSearchRoutes.js';
+import { registerAccessRoutes } from './routes/accessRoutes.js';
+import { registerAdminAccessRoutes } from './routes/adminAccessRoutes.js';
 
 const STATIC_PREFIX = '/assets/';
 const FLASH_MAX_AGE_SECONDS = 30;
@@ -225,6 +227,8 @@ export function createApp({ db = getDb(), config = loadConfig() } = {}) {
   registerAdminTeamRoutes(router, deps);
   registerAdminNotificationRoutes(router, deps);
   registerAdminSearchRoutes(router, deps);
+  registerAccessRoutes(router, deps);
+  registerAdminAccessRoutes(router, deps);
   registerInternalNotificationRoutes(router, deps);
   registerServiceWorkerRoute(router, deps);
 

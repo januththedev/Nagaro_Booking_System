@@ -5,6 +5,7 @@
  * database is integrity-checked on boot, and the first administrator is
  * provisioned from the environment only when no administrator exists yet.
  */
+import { startAccessWorker } from './services/accessWorker.js';
 import { createServer } from 'node:http';
 import { getDb, databasePath, closeDb } from './db/connection.js';
 import { applyMigrations } from './db/migrate.js';
@@ -72,6 +73,9 @@ const recycleBinTimer = setInterval(() => {
   }
 }, 24 * 60 * 60 * 1000);
 recycleBinTimer.unref();
+// Smart access: the schedule lives in the database (door deadlines, command
+// retries, extension holds, link delivery); this timer only polls it.
+startAccessWorker(db);
 const completed = reconcileCompletedReservations(db);
 if (completed > 0) console.log(`[db] marked ${completed} past reservation(s) as completed`);
 const expiredHolds = expireBookingHolds(db);

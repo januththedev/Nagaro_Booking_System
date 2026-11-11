@@ -14,6 +14,9 @@ const INSERT_ID_TABLES = new Set([
   'maintenance_block', 'inquiry', 'booking_request', 'booking_hold_claim',
   'payment_obligation', 'payment_attempt', 'payment_event', 'ai_booking_draft',
   'assistant_knowledge',
+  'booking_access_link', 'booking_access_device', 'door_command',
+  'booking_extension', 'booking_extension_hold', 'extension_payment_event',
+  'staff_assistance_request',
 ]);
 
 function replacePlaceholders(sql) {

@@ -13,7 +13,9 @@ import { connect as netConnect } from 'node:net';
 import { connect as tlsConnect } from 'node:tls';
 
 const DEFAULT_ORIGIN = 'http://127.0.0.1:4174';
-const BACKEND_PREFIXES = Object.freeze(['/api', '/admin', '/assets', '/media']);
+// `/access` is the customer room-access page: a capability URL rendered by this
+// process so the token never reaches the public frontend or its logs.
+const BACKEND_PREFIXES = Object.freeze(['/api', '/admin', '/assets', '/media', '/access']);
 /**
  * Form posts the Node runtime owns even though the matching GET page is
  * rendered by the Next frontend. They are the no-JavaScript fallback for the

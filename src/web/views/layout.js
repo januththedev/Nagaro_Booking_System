@@ -52,6 +52,11 @@ const ADMIN_NAV = [
       label: 'Booking requests',
       icon: navIcon('<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>'),
     },
+    {
+      href: '/admin/access',
+      label: 'Door access',
+      icon: navIcon('<path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M3 21h18"/><path d="M14.5 12.5h.01"/>'),
+    },
   ] },
   { group: 'Catalogue', items: [
     {

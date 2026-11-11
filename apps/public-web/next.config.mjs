@@ -16,6 +16,7 @@ const nextConfig = {
       { source: "/assets/:path*", destination: `${apiTarget}/assets/:path*` },
       { source: "/media/:path*", destination: `${apiTarget}/media/:path*` },
       { source: "/admin/:path*", destination: `${apiTarget}/admin/:path*` },
+      { source: "/access/:path*", destination: `${apiTarget}/access/:path*` },
     ];
   },
 };

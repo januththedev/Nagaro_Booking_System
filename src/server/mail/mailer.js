@@ -1,8 +1,14 @@
 /**
  * Outbound email.
  *
+ * Providers, in order of precedence:
+ *   - NAGARO_MAIL_TRANSPORT=json|stream   local/test transports
+ *   - RESEND_API_KEY                      Resend HTTPS API (RESEND_FROM must be
+ *                                         an address on a domain verified in Resend)
+ *   - SMTP_HOST                           any SMTP relay via nodemailer
+ *
  * Honest delivery semantics:
- *   - SMTP_HOST absent  -> NOT_CONFIGURED. No socket is opened, no exception
+ *   - neither RESEND_API_KEY nor SMTP_HOST -> NOT_CONFIGURED. No socket is opened, no exception
  *     is thrown. This is a normal configuration state, not an error.
  *   - delivery failure  -> FAILED with a short, secret-free message. Delivery
  *     problems never propagate as exceptions, because a persisted inquiry must
@@ -43,7 +49,35 @@ function smtpSecure() {
 /** Local test transports are an explicit, deliberate configuration. */
 function transportMode() {
   const mode = envValue('NAGARO_MAIL_TRANSPORT').toLowerCase();
-  return mode === 'json' || mode === 'stream' ? mode : 'smtp';
+  if (mode === 'json' || mode === 'stream') return mode;
+  // Resend (HTTPS API) is preferred whenever its key is present; SMTP stays
+  // available as the fallback for deployments that still use it.
+  if (envValue('RESEND_API_KEY')) return 'resend';
+  return 'smtp';
+}
+
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const RESEND_TIMEOUT_MS = 10000;
+
+/** Send through the Resend REST API. Throws on any non-2xx answer. */
+async function sendViaResend({ from, to, subject, text, html, replyTo }) {
+  const body = { from, to: [to], subject, text };
+  if (html) body.html = html;
+  if (replyTo) body.reply_to = replyTo;
+  const response = await fetch(RESEND_ENDPOINT, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${envValue('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    redirect: 'error',
+    signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+  });
+  let payload = null;
+  try { payload = await response.json(); } catch { /* empty body */ }
+  if (!response.ok) {
+    const detail = payload?.message ? `: ${payload.message}` : '';
+    throw new Error(`Resend answered HTTP ${response.status}${detail}`);
+  }
+  return payload?.id ? String(payload.id) : null;
 }
 
 /**
@@ -52,11 +86,12 @@ function transportMode() {
  */
 export function mailerConfig() {
   const adminAddress = envValue('NAGARO_ADMIN_NOTIFICATION_EMAIL');
-  const from = envValue('SMTP_FROM') || adminAddress || DEFAULT_FROM;
+  const from = envValue('RESEND_FROM') || envValue('SMTP_FROM') || adminAddress || DEFAULT_FROM;
   const to = adminAddress || null;
   const host = envValue('SMTP_HOST');
   const mode = transportMode();
 
+  if (mode === 'resend') return { configured: true, from, to, mode, reason: null };
   if (host) return { configured: true, from, to, mode, reason: null };
   if (mode !== 'smtp') return { configured: true, from, to, mode, reason: null };
 
@@ -150,6 +185,10 @@ export function safeErrorMessage(error) {
     message = String(error ?? '');
   }
 
+  for (const name of ['RESEND_API_KEY']) {
+    const key = process.env[name] ? String(process.env[name]) : '';
+    if (key.length > 0) message = message.split(key).join('[redacted]');
+  }
   const secret = process.env.SMTP_PASS ? String(process.env.SMTP_PASS) : '';
   if (secret.length > 0) {
     message = message.split(secret).join('[redacted]');
@@ -204,6 +243,24 @@ export async function sendMail({
     };
   }
 
+  const message = {
+    from: config.from,
+    to: recipient,
+    subject: String(subject ?? '').replace(/[\r\n]+/g, ' ').slice(0, 300) || '(no subject)',
+    text: String(text ?? ''),
+    html: html === null || html === undefined ? undefined : String(html),
+    replyTo: replyTo === null || replyTo === undefined ? undefined : String(replyTo),
+  };
+
+  if (config.mode === 'resend') {
+    try {
+      const id = await sendViaResend(message);
+      return { status: INQUIRY_EMAIL_STATUS.SENT, messageId: id, error: null };
+    } catch (error) {
+      return failure(error);
+    }
+  }
+
   try {
     const transport = getTransport();
     if (!transport) {
@@ -213,14 +270,7 @@ export async function sendMail({
         error: 'SMTP is not configured (SMTP_HOST is unset).',
       };
     }
-    const info = await transport.sendMail({
-      from: config.from,
-      to: recipient,
-      subject: String(subject ?? '').slice(0, 300) || '(no subject)',
-      text: String(text ?? ''),
-      html: html === null || html === undefined ? undefined : String(html),
-      replyTo: replyTo === null || replyTo === undefined ? undefined : String(replyTo),
-    });
+    const info = await transport.sendMail(message);
     return {
       status: INQUIRY_EMAIL_STATUS.SENT,
       messageId: info && info.messageId ? String(info.messageId) : null,

@@ -1,0 +1,25 @@
+/* Staff console additions for smart access. Builds on styles.css tokens. */
+.access-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.15rem 0.6rem; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--sunken); color: var(--muted, inherit);
+  font-size: 0.8125rem; font-weight: 600; line-height: 1.4; white-space: nowrap;
+}
+.access-pill--ok { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok); }
+.access-pill--warn { border-color: var(--warn-border); background: var(--warn-bg); color: var(--warn); }
+.access-pill--danger { border-color: var(--danger-border); background: var(--danger-bg); color: var(--danger); }
+
+.access-request {
+  display: grid; gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line); border-radius: var(--radius-md, 10px);
+  background: var(--surface, #fff);
+}
+.access-request--open { border-color: var(--danger-border); box-shadow: inset 3px 0 0 var(--danger); }
+.access-request__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.access-request p { margin: 0; }
+.access-request input[type="text"] { min-width: 12rem; }
+[data-access-live] .inline-form select { min-height: 2.25rem; }
+[data-access-live] .data-table .inline-form { flex-wrap: nowrap; }
+[data-access-live] .data-table select { width: auto; min-width: 5.5rem; }
+[data-access-live] .data-table .cluster { flex-wrap: wrap; }

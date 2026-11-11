@@ -34,6 +34,7 @@ import { assertBookingRules, allocateUnits, findConflicts, activeUnits } from '.
 import { quote, loadRates } from './pricingService.js';
 import { recordAudit } from './auditService.js';
 import { resolveOrCreateCustomerInTransaction } from './customerService.js';
+import { afterReservationCancelled, afterReservationChanged, afterReservationConfirmed } from './accessLinkService.js';
 
 /* --------------------------------------------------------------- utilities */
 
@@ -187,7 +188,7 @@ function requiredUnitsFor(space, requested) {
  *
  * @returns {{reservation: object, idempotent: boolean}}
  */
-export function createReservation(db, input) {
+function createReservationCore(db, input) {
   const {
     actor, spaceId, customerId, customerPayload = null, startAt, endAt, unitCount = 1, attendees = null,
     purpose = null, internalNotes = null, billingUnit = null,
@@ -341,7 +342,7 @@ function handleBookingFailure(db, error, { idempotencyKey, spaceId, window, requ
  * ones taken inside the same transaction: if any part fails, the rollback
  * restores the original reservation exactly as it was.
  */
-export function updateReservation(db, {
+function updateReservationCore(db, {
   actor, reservationId, patch = {}, idempotencyKey = null,
 } = {}) {
   if (!actor || !actor.id) throw validationError('An authenticated staff actor is required.');
@@ -519,7 +520,7 @@ export function updateReservation(db, {
  * Cancel a reservation. Requires a non-blank reason, records actor/time/reason,
  * preserves the historical row, and releases inventory exactly once.
  */
-export function cancelReservation(db, { actor, reservationId, reason } = {}) {
+function cancelReservationCore(db, { actor, reservationId, reason } = {}) {
   if (!actor || !actor.id) throw validationError('An authenticated staff actor is required.');
   const id = Number(reservationId);
   if (!Number.isInteger(id) || id < 1) throw validationError('A valid reservation id is required.');
@@ -739,3 +740,34 @@ export function listMaintenanceBlocks(db, { spaceId = null, fromAt = null, toAt 
 }
 
 export const _internals = { isUniqueViolation, requiredUnitsFor, normaliseWindow, placeholders, RESERVATION_SELECT };
+
+/* ------------------------------------------------- smart-access lifecycle */
+
+// The public entry points wrap the transactional cores above so the customer
+// access link follows every booking, whichever screen or channel changed it.
+// The hooks run after the commit and are best effort: they can never turn a
+// committed booking change into an error.
+
+/**
+ * Create a CONFIRMED reservation, then issue its room-access link.
+ * @returns {{reservation: object, idempotent: boolean}}
+ */
+export function createReservation(db, input) {
+  const result = createReservationCore(db, input);
+  if (result?.reservation?.id && !result.idempotent) afterReservationConfirmed(db, { reservationId: result.reservation.id });
+  return result;
+}
+
+/** Edit a CONFIRMED reservation, then bring the access link and door deadline in step. */
+export function updateReservation(db, input) {
+  const result = updateReservationCore(db, input);
+  if (result?.reservation?.id) afterReservationChanged(db, { reservationId: result.reservation.id });
+  return result;
+}
+
+/** Cancel a reservation, then lock the door if this booking had left it open. */
+export function cancelReservation(db, input) {
+  const result = cancelReservationCore(db, input);
+  if (result?.reservation?.id) afterReservationCancelled(db, { reservationId: result.reservation.id });
+  return result;
+}

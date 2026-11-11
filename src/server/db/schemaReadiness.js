@@ -8,9 +8,12 @@ export function assertPostgresSchemaReady(db) {
     push_subscription: ['admin_user_id', 'endpoint'],
     payment_obligation: ['advance_paid_cents'],
     payment_attempt: ['advance_cents'],
+    booking_access_link: ['token_hash', 'door_access_revoked_at'],
+    door_state: ['auto_lock_at'],
+    booking_extension: ['hold_expires_at'],
   };
   const columns = db.prepare(`SELECT table_name, column_name FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name IN ('admin_user','notification','push_subscription','payment_obligation','payment_attempt')`).all();
+    WHERE table_schema = 'public' AND table_name IN ('admin_user','notification','push_subscription','payment_obligation','payment_attempt','booking_access_link','door_state','booking_extension')`).all();
   const present = new Set(columns.map((row) => `${row.table_name}.${row.column_name}`));
   const missing = Object.entries(required).flatMap(([table, names]) => names.filter((name) => !present.has(`${table}.${name}`)).map((name) => `${table}.${name}`));
   if (missing.length) {

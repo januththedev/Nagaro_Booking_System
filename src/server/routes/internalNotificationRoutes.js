@@ -10,7 +10,12 @@
  *   2. deliver any pending Web Push notifications;
  *   3. send reminder email fallback when SMTP is configured;
  *   4. prune revoked/failed push subscriptions;
- *   5. purge recycle-bin accounts whose 30-day window elapsed.
+ *   5. purge recycle-bin accounts whose 30-day window elapsed;
+ *   6. smart access: lock doors whose deadline passed, retry door commands,
+ *      release unpaid extension holds and retry access-link delivery.
+ *
+ * `/api/internal/access/tick` runs step 6 alone, so a deployment can schedule
+ * it every minute without running the heavier notification work that often.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { forbidden, unauthorized } from '../domain/errors.js';
@@ -21,6 +26,7 @@ import {
   dispatchPendingReminderEmails,
   prunePushSubscriptions,
 } from '../services/notificationService.js';
+import { runAccessMaintenance } from '../services/accessWorker.js';
 
 function secretMatches(given, expected) {
   const left = createHash('sha256').update(String(given ?? ''), 'utf8').digest();
@@ -55,9 +61,16 @@ async function tick(ctx, db) {
     // A purge failure must not stop reminder delivery. The next tick retries.
     console.warn('[notifications] recycle-bin purge failed:', error?.code ?? error?.message ?? 'unknown');
   }
+  let access = null;
+  try {
+    access = await runAccessMaintenance(db, { now });
+  } catch (error) {
+    console.warn('[access] scheduled maintenance failed:', error?.code ?? error?.message ?? 'unknown');
+  }
   ctx.json({
     ok: true,
     at: now,
+    access,
     reminders,
     push,
     email,
@@ -72,6 +85,13 @@ export function registerInternalNotificationRoutes(router, deps = {}) {
     await ctx.readBody();
     await tick(ctx, db);
   });
+  const accessTick = async (ctx) => {
+    authorized(ctx);
+    const now = Date.now();
+    ctx.json({ ok: true, at: now, access: await runAccessMaintenance(db, { now }) });
+  };
+  router.post('/api/internal/access/tick', async (ctx) => { await ctx.readBody(); await accessTick(ctx); });
+  router.get('/api/internal/access/tick', accessTick);
   // Vercel Cron sends GET by default. Supporting both keeps the endpoint easy
   // to schedule with either Vercel or an external HTTP scheduler.
   router.get('/api/internal/notifications/tick', async (ctx) => {

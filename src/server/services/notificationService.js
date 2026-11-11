@@ -26,6 +26,9 @@ export const NOTIFICATION_TYPE = Object.freeze({
   NEW_BOOKING: 'NEW_BOOKING',
   BOOKING_CANCELLED: 'BOOKING_CANCELLED',
   REMINDER: 'REMINDER',
+  STAFF_ASSISTANCE: 'STAFF_ASSISTANCE',
+  DOOR_ALERT: 'DOOR_ALERT',
+  EXTENSION: 'EXTENSION',
 });
 
 export const NOTIFICATION_PRIORITY = Object.freeze({
@@ -332,6 +335,10 @@ function entitySummary(db, notification) {
        WHERE r.id = ?
     `).get(id) ?? null;
   }
+  if (notification.entityType === 'space') {
+    const space = db.prepare('SELECT code AS space_code, name AS space_name FROM space WHERE id = ?').get(id);
+    return space ? { ...space, reference: null, start_at: undefined, end_at: undefined } : null;
+  }
   if (notification.entityType === 'booking_request') {
     return db.prepare(`
       SELECT br.reference, br.start_at, br.end_at, s.code AS space_code, s.name AS space_name
@@ -369,6 +376,15 @@ export function buildPushPayload(db, notification, { now = Date.now() } = {}) {
   } else if (type === NOTIFICATION_TYPE.BOOKING_CANCELLED) {
     title = 'Booking cancelled';
     fallbackBody = 'A booking was cancelled. Open the admin console for details.';
+  } else if (type === NOTIFICATION_TYPE.STAFF_ASSISTANCE) {
+    title = 'Customer needs assistance';
+    fallbackBody = 'A customer asked for staff assistance. Open the admin console.';
+  } else if (type === NOTIFICATION_TYPE.DOOR_ALERT) {
+    title = 'Door needs attention';
+    fallbackBody = 'A door did not behave as expected. Open the admin console.';
+  } else if (type === NOTIFICATION_TYPE.EXTENSION) {
+    title = 'Session extension';
+    fallbackBody = 'A session extension needs attention in the admin console.';
   } else {
     title = 'TRACE operations';
     fallbackBody = 'Open the admin console for details.';

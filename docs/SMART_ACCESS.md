@@ -10,6 +10,8 @@ and a "Get Staff Assistance" button.
 | What | Environment variables |
 | --- | --- |
 | Email (Resend) | `RESEND_API_KEY`, `RESEND_FROM` (address on a domain verified in Resend) |
+| SMS (Text.lk) | `TEXTLK_API_TOKEN`, `TEXTLK_SENDER_ID` (`TextLKDemo` for testing) |
+| SMS (Notify.lk) | `NOTIFYLK_USER_ID`, `NOTIFYLK_API_KEY`, `NOTIFYLK_SENDER_ID` (`NotifyDEMO` for testing) |
 | SMS (Twilio) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (or `TWILIO_API_KEY_SID` + `TWILIO_API_KEY_SECRET`), and `TWILIO_MESSAGING_SERVICE_SID` **or** `TWILIO_FROM_NUMBER` |
 | Door controllers | `DOOR_CONTROLLER_SECRET` (16+ random characters) |
 | Online extension payments | the existing `PAYHERE_MERCHANT_ID` / `PAYHERE_MERCHANT_SECRET` |

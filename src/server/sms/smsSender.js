@@ -6,7 +6,12 @@
  * a short secret-free message, and nothing here ever throws into a booking
  * transaction.
  *
- * Provider: Twilio Programmable Messaging.
+ * Providers (SMS_PROVIDER = textlk | notifylk | twilio). When SMS_PROVIDER is
+ * unset, the first provider whose credentials are present is used.
+ *
+ * Text.lk (Sri Lanka)          TEXTLK_API_TOKEN, TEXTLK_SENDER_ID (demo: TextLKDemo)
+ * Notify.lk (Sri Lanka)        NOTIFYLK_USER_ID, NOTIFYLK_API_KEY, NOTIFYLK_SENDER_ID (demo: NotifyDEMO)
+ * Twilio Programmable Messaging:
  *   TWILIO_ACCOUNT_SID           AC...
  *   TWILIO_AUTH_TOKEN            or TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET
  *   TWILIO_MESSAGING_SERVICE_SID MG... (preferred), or
@@ -35,8 +40,26 @@ function twilioCredentials() {
   return { accountSid, user: accountSid, pass: env('TWILIO_AUTH_TOKEN') };
 }
 
+function chosenProvider() {
+  const explicit = env('SMS_PROVIDER').toLowerCase();
+  if (['textlk', 'notifylk', 'twilio'].includes(explicit)) return explicit;
+  if (env('TEXTLK_API_TOKEN')) return 'textlk';
+  if (env('NOTIFYLK_API_KEY')) return 'notifylk';
+  return 'twilio';
+}
+
 export function smsConfig() {
   if (testSender) return { configured: true, provider: 'test', reason: null };
+  const provider = chosenProvider();
+  if (provider === 'textlk') {
+    if (!env('TEXTLK_API_TOKEN')) return { configured: false, provider, reason: 'Set TEXTLK_API_TOKEN.' };
+    if (!env('TEXTLK_SENDER_ID')) return { configured: false, provider, reason: 'Set TEXTLK_SENDER_ID (TextLKDemo for testing).' };
+    return { configured: true, provider, reason: null };
+  }
+  if (provider === 'notifylk') {
+    const ok = env('NOTIFYLK_USER_ID') && env('NOTIFYLK_API_KEY') && env('NOTIFYLK_SENDER_ID');
+    return { configured: Boolean(ok), provider, reason: ok ? null : 'Set NOTIFYLK_USER_ID, NOTIFYLK_API_KEY and NOTIFYLK_SENDER_ID.' };
+  }
   const { accountSid, user, pass } = twilioCredentials();
   const sender = env('TWILIO_MESSAGING_SERVICE_SID') || env('TWILIO_FROM_NUMBER');
   if (!accountSid && !pass) return { configured: false, provider: null, reason: 'SMS is not configured (TWILIO_ACCOUNT_SID is unset).' };
@@ -65,12 +88,52 @@ export function normalizeSmsNumber(value, { defaultCountryCode = env('SMS_DEFAUL
 
 function safeError(error) {
   let message = String(error?.message ?? error ?? 'SMS delivery failed.');
-  for (const name of ['TWILIO_AUTH_TOKEN', 'TWILIO_API_KEY_SECRET']) {
+  for (const name of ['TWILIO_AUTH_TOKEN', 'TWILIO_API_KEY_SECRET', 'TEXTLK_API_TOKEN', 'NOTIFYLK_API_KEY']) {
     const secret = env(name);
-    if (secret) message = message.split(secret).join('[redacted]');
+    if (secret.length >= 8) message = message.split(secret).join('[redacted]');
   }
   message = message.replace(/[\r\n\t]+/g, ' ').trim();
   return message.length > 200 ? `${message.slice(0, 197)}...` : message || 'SMS delivery failed.';
+}
+
+async function readJson(response) {
+  try { return await response.json(); } catch { return null; }
+}
+
+/** Text.lk OAuth API. Numbers are sent without the plus sign: 94771234567. */
+async function sendViaTextLk({ to, message }) {
+  const response = await fetch('https://app.text.lk/api/v3/sms/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env('TEXTLK_API_TOKEN')}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ recipient: to.replace(/^\+/, ''), sender_id: env('TEXTLK_SENDER_ID'), type: 'plain', message }),
+    redirect: 'error',
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const payload = await readJson(response);
+  if (!response.ok || payload?.status === false || payload?.status === 'error') {
+    throw new Error(`Text.lk did not send the message (HTTP ${response.status})${payload?.message ? `: ${payload.message}` : ''}`);
+  }
+  return payload?.data?.sms_id ? String(payload.data.sms_id) : (payload?.data?.uid ? String(payload.data.uid) : null);
+}
+
+/** Notify.lk API. Numbers are sent as 9471XXXXXXX. */
+async function sendViaNotifyLk({ to, message }) {
+  const params = new URLSearchParams({
+    user_id: env('NOTIFYLK_USER_ID'), api_key: env('NOTIFYLK_API_KEY'), sender_id: env('NOTIFYLK_SENDER_ID'),
+    to: to.replace(/^\+/, ''), message,
+  });
+  const response = await fetch('https://app.notify.lk/api/v1/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: params.toString(),
+    redirect: 'error',
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const payload = await readJson(response);
+  if (!response.ok || String(payload?.status ?? '').toLowerCase() !== 'success') {
+    throw new Error(`Notify.lk did not send the message (HTTP ${response.status})${payload?.message ? `: ${payload.message}` : ''}`);
+  }
+  return null;
 }
 
 async function sendViaTwilio({ to, message }) {
@@ -117,7 +180,10 @@ export async function sendSms({ to, message } = {}) {
       await testSender({ to: number, message: text });
       return { status: 'SENT', error: null, messageId: null };
     }
-    const messageId = await sendViaTwilio({ to: number, message: text });
+    const provider = config.provider;
+    const messageId = provider === 'textlk' ? await sendViaTextLk({ to: number, message: text })
+      : provider === 'notifylk' ? await sendViaNotifyLk({ to: number, message: text })
+        : await sendViaTwilio({ to: number, message: text });
     return { status: 'SENT', error: null, messageId };
   } catch (error) {
     return { status: 'FAILED', error: safeError(error) };
